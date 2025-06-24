@@ -1,9 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pytest
 import configparser
 import sys
 import os
+
+sns.set_theme(style="whitegrid", palette="husl")
+sns.set_context("paper", font_scale=1.2)
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Computer Modern Roman"],
+    "text.latex.preamble": r"\usepackage{amsmath} \usepackage{amssymb}"
+})
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.kernels import get_kernel
@@ -143,7 +154,7 @@ def test_invalid_kernel_type(config):
 
 @pytest.mark.visualization
 def test_visual():
-    """Visualize kernels"""
+    """Visualize kernels with seaborn styling"""
     config = configparser.ConfigParser()
     config.read('config/GP.ini')
     
@@ -152,7 +163,9 @@ def test_visual():
     
     kernel_types = ["RBF", "RQ"]
     
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    
+    colors = sns.color_palette("husl", 2)
     
     for i, kernel_type in enumerate(kernel_types):
         config.set("KERNEL", "type", kernel_type)
@@ -161,23 +174,35 @@ def test_visual():
         
         k_values = [kernel(x_val, x0) for x_val in x]
         
-        axes[i].plot(x, k_values, 'b-', linewidth=2, label=f'{kernel_type} Kernel')
-        axes[i].axvline(x=0, color='r', linestyle='--', alpha=0.5, label='Reference point')
-        axes[i].set_xlabel('Distance from reference point')
-        axes[i].set_ylabel('Kernel value')
-        axes[i].set_title(f'{kernel_type} Kernel Shape')
-        axes[i].legend()
+        if kernel_type == "RBF":
+            label = r'$k_{\text{RBF}}(x, x_0) = \exp\left(-\frac{(x-x_0)^2}{2\sigma^2}\right)$'
+        else:  
+            label = r'$k_{\text{RQ}}(x, x_0) = \left(1 + \frac{(x-x_0)^2}{2\alpha\sigma^2}\right)^{-\alpha}$'
+        
+        sns.lineplot(x=x, y=k_values, color=colors[i], linewidth=2.5, 
+                    label=label, ax=axes[i])
+        axes[i].axvline(x=0, color='red', linestyle='--', alpha=0.7, 
+                       linewidth=1.5, label=r'$x_0 = 0$')
+        axes[i].set_xlabel(r'$x - x_0$', fontweight='bold')
+        axes[i].set_ylabel(r'$k(x, x_0)$', fontweight='bold')
+        axes[i].set_title(f'{kernel_type} Kernel', fontweight='bold', pad=15)
+        axes[i].legend(frameon=True, fancybox=True, shadow=True, fontsize=12)
         axes[i].grid(True, alpha=0.3)
         axes[i].set_ylim(0, 1.1)
+        
+        axes[i].spines['top'].set_visible(False)
+        axes[i].spines['right'].set_visible(False)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(figures_dir, 'kernels.png'))
+    plt.subplots_adjust(top=0.88)  
+    
+    plt.savefig(os.path.join(figures_dir, 'kernels.png'), dpi=300, 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
     
 if __name__ == "__main__":
     print("\nRunning kernel tests...")
     
-    # Run specific test functions directly for demonstration
     config = configparser.ConfigParser()
     config.read('config/GP.ini')
     

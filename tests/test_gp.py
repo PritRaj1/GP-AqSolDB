@@ -1,9 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pytest
 from configparser import ConfigParser
 import sys
 import os
+
+sns.set_theme(style="whitegrid", palette="husl")
+sns.set_context("paper", font_scale=1.2)
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Computer Modern Roman"],
+    "text.latex.preamble": r"\usepackage{amsmath} \usepackage{amssymb}"
+})
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.GP_fcns import GP
@@ -163,56 +174,67 @@ def test_gp_fit_attributes():
 
 def visualize_gp_results():
     """Create visualizations for GP testing"""
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     
     X_train, y_train, X_test, y_pred, y_std = test_gp_univariate_sigma()
     
-    axes[0, 0].scatter(X_train, y_train, c='red', s=50, label='Training Data', zorder=5)
-    axes[0, 0].plot(X_test, y_pred, 'b-', label='GP Prediction', linewidth=2)
+    sns.scatterplot(x=X_train.flatten(), y=y_train, color='red', s=30, 
+                   label='Training Data', ax=axes[0, 0], zorder=5)
+    axes[0, 0].plot(X_test, y_pred, color='steelblue', linewidth=2.5, 
+                   label=r'$f(x)$ Prediction', alpha=0.8)
     axes[0, 0].fill_between(X_test.flatten(), 
                            y_pred - 2*y_std, 
                            y_pred + 2*y_std, 
-                           alpha=0.3, color='blue', label='±2σ Uncertainty')
-    axes[0, 0].set_title('GP with Univariate Sigma (RBF Kernel)')
-    axes[0, 0].set_xlabel('x')
-    axes[0, 0].set_ylabel('y')
-    axes[0, 0].legend()
+                           alpha=0.3, color='steelblue', label=r'$\pm 2\sigma$ Uncertainty')
+    axes[0, 0].set_title(r'Univariate $\sigma$ (RBF Kernel)', fontweight='bold', pad=15)
+    axes[0, 0].set_xlabel(r'$x$', fontweight='bold')
+    axes[0, 0].set_ylabel(r'$y$', fontweight='bold')
+    axes[0, 0].legend(frameon=True, fancybox=True, shadow=True)
     axes[0, 0].grid(True, alpha=0.3)
     
     X_train_2d, y_train_2d, X_test_2d, y_pred_grid, y_std_grid, X1, X2 = test_gp_multivariate_sigma()
     
-    im1 = axes[0, 1].contourf(X1, X2, y_pred_grid, levels=20, cmap='viridis')
-    axes[0, 1].scatter(X_train_2d[:, 0], X_train_2d[:, 1], c='red', s=30, marker='x', label='Training Data')
-    axes[0, 1].set_title('GP Mean Prediction (Multivariate Sigma)')
-    axes[0, 1].set_xlabel('x₁')
-    axes[0, 1].set_ylabel('x₂')
-    axes[0, 1].legend()
-    plt.colorbar(im1, ax=axes[0, 1])
+    im1 = axes[0, 1].contourf(X1, X2, y_pred_grid, levels=25, cmap='viridis', alpha=0.8)
+    sns.scatterplot(x=X_train_2d[:, 0], y=X_train_2d[:, 1], color='red', s=60, 
+                   marker='x', label='Training Data', ax=axes[0, 1])
+    axes[0, 1].set_title(r'Mean Prediction $\mathbb{E}[f(\mathbf{x})]$', fontweight='bold', pad=15)
+    axes[0, 1].set_xlabel(r'$x_1$', fontweight='bold')
+    axes[0, 1].set_ylabel(r'$x_2$', fontweight='bold')
+    axes[0, 1].legend(frameon=True, fancybox=True, shadow=True)
+    cbar1 = plt.colorbar(im1, ax=axes[0, 1], shrink=0.8)
+    cbar1.set_label(r'$\mathbb{E}[f(\mathbf{x})]$', fontweight='bold')
     
-    im2 = axes[1, 0].contourf(X1, X2, y_std_grid, levels=20, cmap='plasma')
-    axes[1, 0].scatter(X_train_2d[:, 0], X_train_2d[:, 1], c='red', s=30, marker='x', label='Training Data')
-    axes[1, 0].set_title('GP Uncertainty (Multivariate Sigma)')
-    axes[1, 0].set_xlabel('x₁')
-    axes[1, 0].set_ylabel('x₂')
-    axes[1, 0].legend()
-    plt.colorbar(im2, ax=axes[1, 0])
+    im2 = axes[1, 0].contourf(X1, X2, y_std_grid, levels=25, cmap='plasma', alpha=0.8)
+    sns.scatterplot(x=X_train_2d[:, 0], y=X_train_2d[:, 1], color='white', s=60, 
+                   marker='x', label='Training Data', ax=axes[1, 0])
+    axes[1, 0].set_title(r'Uncertainty $\sqrt{\text{Var}[f(\mathbf{x})]}$', fontweight='bold', pad=15)
+    axes[1, 0].set_xlabel(r'$x_1$', fontweight='bold')
+    axes[1, 0].set_ylabel(r'$x_2$', fontweight='bold')
+    axes[1, 0].legend(frameon=True, fancybox=True, shadow=True)
+    cbar2 = plt.colorbar(im2, ax=axes[1, 0], shrink=0.8)
+    cbar2.set_label(r'$\sigma(\mathbf{x})$', fontweight='bold')
     
     X_train_rq, y_train_rq, X_test_rq, y_pred_rq, y_std_rq = test_gp_rational_quadratic_kernel()
     
-    axes[1, 1].scatter(X_train_rq, y_train_rq, c='red', s=50, label='Training Data', zorder=5)
-    axes[1, 1].plot(X_test_rq, y_pred_rq, 'g-', label='GP Prediction (RQ)', linewidth=2)
+    sns.scatterplot(x=X_train_rq.flatten(), y=y_train_rq, color='red', s=30, 
+                   label='Training Data', ax=axes[1, 1], zorder=5)
+    axes[1, 1].plot(X_test_rq, y_pred_rq, color='forestgreen', linewidth=2.5, 
+                   label=r'$f(x)$ Prediction (RQ)', alpha=0.8)
     axes[1, 1].fill_between(X_test_rq.flatten(), 
                            y_pred_rq - 2*y_std_rq, 
                            y_pred_rq + 2*y_std_rq, 
-                           alpha=0.3, color='green', label='±2σ Uncertainty')
-    axes[1, 1].set_title('GP with Rational Quadratic Kernel')
-    axes[1, 1].set_xlabel('x')
-    axes[1, 1].set_ylabel('y')
-    axes[1, 1].legend()
+                           alpha=0.3, color='forestgreen', label=r'$\pm 2\sigma$ Uncertainty')
+    axes[1, 1].set_title(r'Rational Quadratic Kernel', fontweight='bold', pad=15)
+    axes[1, 1].set_xlabel(r'$x$', fontweight='bold')
+    axes[1, 1].set_ylabel(r'$y$', fontweight='bold')
+    axes[1, 1].legend(frameon=True, fancybox=True, shadow=True)
     axes[1, 1].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('tests/figures/gp_test_results.png', dpi=300, bbox_inches='tight')
+    plt.subplots_adjust(top=0.93)  
+    
+    plt.savefig('tests/figures/gp_test_results.png', dpi=300, bbox_inches='tight', 
+                facecolor='white', edgecolor='none')
 
 if __name__ == "__main__":
     print("Running GP tests...")
