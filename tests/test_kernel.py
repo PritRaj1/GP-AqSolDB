@@ -145,5 +145,5 @@ if __name__ == "__main__":
     print("\nRunning pytest tests...")
     pytest.main([__file__, "-v"])
 
-    print("Visualizing kernels...")
+    print(f"Visualizing kernels in {figures_dir}. These can be verified against https://www.cs.toronto.edu/~duvenaud/cookbook/")
     test_visual()
