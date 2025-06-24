@@ -55,3 +55,4 @@ class GP:
     
     def eval_fit(self, y_pred, y_true):
         slope, intercept, r_value, p_value, std_err = stats.linregress(y_true, y_pred)
+        return r_value, p_value, std_err

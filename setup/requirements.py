@@ -13,6 +13,7 @@ packages = [
     "pytest",
     "configparser",
     "scipy",
+    "scikit-learn",
 ]
 
 for package in packages:
