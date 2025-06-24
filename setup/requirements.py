@@ -10,6 +10,8 @@ packages = [
     "seaborn",
     "pandas",
     "optuna",
+    "pytest",
+    "configparser",
 ]
 
 for package in packages:
