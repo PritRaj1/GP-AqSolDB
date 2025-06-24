@@ -3,6 +3,12 @@ UQ with Gaussian Processes modeling drug solubility.
 
 ## Setup
 
+Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer and run: 
+
+```bash
+bash <conda-installer-name>-latest-Linux-x86_64.sh
+```
+
 ```bash
 bash setup/auto.sh
 ```

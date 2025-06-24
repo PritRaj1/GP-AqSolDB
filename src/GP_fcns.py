@@ -10,7 +10,7 @@ class GP:
         self.K_inv = None
         self.X_train = None
         self.y_train = None
-        self.noise_var = config['lmbda']
+        self.noise_var = config.getfloat("KERNEL", "lmbda")
 
     def construct_kernel_matrix(self, X):
         n = len(X)

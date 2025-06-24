@@ -1,0 +1,231 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pytest
+from configparser import ConfigParser
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.GP_fcns import GP
+from test_fcn import get_data
+
+def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0):
+    """Create a variable config object for testing"""
+    config = ConfigParser()
+    config['KERNEL'] = {
+        'type': kernel_type,
+        'lmbda': str(lmbda),
+        'alpha': str(alpha)
+    }
+    return config
+
+@pytest.mark.test_gp
+def test_gp_univariate_sigma():
+    """Test GP with univariate sigma (single length scale)"""
+    config = create_config(kernel_type="RBF", lmbda=0.1)
+    sigma = 1.0 
+    
+    X_train, y_train = get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
+    X_test = np.linspace(0, 10, 100).reshape(-1, 1)
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    y_pred, y_std = gp.predict(X_test, return_std=True)
+    
+    assert len(y_pred) == len(X_test)
+    assert len(y_std) == len(X_test)
+    assert np.all(y_std >= 0)  # Standard deviations should be non-negative
+    
+    # Test that uncertainty is higher, when far away from training points
+    distances = np.min(np.abs(X_test - X_train), axis=1)
+    far_points = distances > 2.0
+    near_points = distances < 0.5
+    
+    if np.any(far_points) and np.any(near_points):
+        assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
+    
+    return X_train, y_train, X_test, y_pred, y_std
+
+@pytest.mark.test_gp
+def test_gp_multivariate_sigma():
+    """Test GP with multivariate sigma (different length scales per feature)"""
+    config = create_config(kernel_type="RBF", lmbda=0.1)
+    sigma = np.array([1.0, 0.5])  
+    
+    np.random.seed(42)
+    X_train = np.random.uniform(0, 5, (30, 2))
+    y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 30)
+    
+    x1 = np.linspace(0, 5, 20)
+    x2 = np.linspace(0, 5, 20)
+    X1, X2 = np.meshgrid(x1, x2)
+    X_test = np.column_stack([X1.ravel(), X2.ravel()])
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    y_pred, y_std = gp.predict(X_test, return_std=True)
+    
+    y_pred_grid = y_pred.reshape(X1.shape)
+    y_std_grid = y_std.reshape(X1.shape)
+    
+    assert len(y_pred) == len(X_test)
+    assert len(y_std) == len(X_test)
+    assert np.all(y_std >= 0)
+    
+    return X_train, y_train, X_test, y_pred_grid, y_std_grid, X1, X2
+
+@pytest.mark.test_gp
+def test_gp_rational_quadratic_kernel():
+    """Test GP with Rational Quadratic kernel"""
+    config = create_config(kernel_type="RQ", lmbda=0.1, alpha=2.0)
+    sigma = 1.0
+    
+    X_train, y_train = get_data(num_points=25, noise=True, noise_std=0.1, x_range=(0, 10))
+    X_test = np.linspace(0, 10, 100).reshape(-1, 1)
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    y_pred, y_std = gp.predict(X_test, return_std=True)
+    
+    assert len(y_pred) == len(X_test)
+    assert len(y_std) == len(X_test)
+    assert np.all(y_std >= 0)
+    
+    return X_train, y_train, X_test, y_pred, y_std
+
+@pytest.mark.test_gp
+def test_uncertainty_behavior():
+    """Test that uncertainty behaves as expected"""
+    config = create_config(kernel_type="RBF", lmbda=0.01)
+    sigma = 1.0
+    
+    # Sparse dataset
+    X_train = np.array([1.0, 3.0, 7.0, 9.0]).reshape(-1, 1)
+    y_train = np.sin(X_train.flatten()) + np.random.normal(0, 0.01, 4)
+    
+    # Test points including and beyond training points
+    X_test = np.linspace(0, 10, 50).reshape(-1, 1)
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    y_pred, y_std = gp.predict(X_test, return_std=True)
+    
+    # Uncertainty should be lower at training points
+    training_indices = []
+    for i, x in enumerate(X_test):
+        if np.any(np.abs(x - X_train) < 1e-6):
+            training_indices.append(i)
+    
+    if training_indices:
+        training_uncertainty = y_std[training_indices]
+        other_uncertainty = y_std[~np.isin(np.arange(len(X_test)), training_indices)]
+        assert np.mean(training_uncertainty) < np.mean(other_uncertainty)
+    
+    return X_train, y_train, X_test, y_pred, y_std
+
+@pytest.mark.test_gp
+def test_gp_prediction_without_uncertainty():
+    """Test GP prediction without uncertainty quantification"""
+    config = create_config(kernel_type="RBF", lmbda=0.1)
+    sigma = 1.0
+    
+    X_train, y_train = get_data(num_points=15, noise=True, noise_std=0.1, x_range=(0, 10))
+    X_test = np.linspace(0, 10, 50).reshape(-1, 1)
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    y_pred = gp.predict(X_test, return_std=False)
+    
+    assert len(y_pred) == len(X_test)
+    assert isinstance(y_pred, np.ndarray)
+
+@pytest.mark.test_gp
+def test_gp_fit_attributes():
+    """Test that GP fit method sets all required attributes"""
+    config = create_config(kernel_type="RBF", lmbda=0.1)
+    sigma = 1.0
+    
+    X_train, y_train = get_data(num_points=10, noise=True, noise_std=0.1, x_range=(0, 10))
+    
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    assert gp.X_train is not None
+    assert gp.y_train is not None
+    assert gp.K_inv is not None
+    assert gp.C is not None
+    assert gp.X_train.shape[0] == len(y_train)
+    assert gp.y_train.shape[0] == len(y_train)
+
+def visualize_gp_results():
+    """Create visualizations for GP testing"""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    
+    X_train, y_train, X_test, y_pred, y_std = test_gp_univariate_sigma()
+    
+    axes[0, 0].scatter(X_train, y_train, c='red', s=50, label='Training Data', zorder=5)
+    axes[0, 0].plot(X_test, y_pred, 'b-', label='GP Prediction', linewidth=2)
+    axes[0, 0].fill_between(X_test.flatten(), 
+                           y_pred - 2*y_std, 
+                           y_pred + 2*y_std, 
+                           alpha=0.3, color='blue', label='±2σ Uncertainty')
+    axes[0, 0].set_title('GP with Univariate Sigma (RBF Kernel)')
+    axes[0, 0].set_xlabel('x')
+    axes[0, 0].set_ylabel('y')
+    axes[0, 0].legend()
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    X_train_2d, y_train_2d, X_test_2d, y_pred_grid, y_std_grid, X1, X2 = test_gp_multivariate_sigma()
+    
+    im1 = axes[0, 1].contourf(X1, X2, y_pred_grid, levels=20, cmap='viridis')
+    axes[0, 1].scatter(X_train_2d[:, 0], X_train_2d[:, 1], c='red', s=30, marker='x', label='Training Data')
+    axes[0, 1].set_title('GP Mean Prediction (Multivariate Sigma)')
+    axes[0, 1].set_xlabel('x₁')
+    axes[0, 1].set_ylabel('x₂')
+    axes[0, 1].legend()
+    plt.colorbar(im1, ax=axes[0, 1])
+    
+    im2 = axes[1, 0].contourf(X1, X2, y_std_grid, levels=20, cmap='plasma')
+    axes[1, 0].scatter(X_train_2d[:, 0], X_train_2d[:, 1], c='red', s=30, marker='x', label='Training Data')
+    axes[1, 0].set_title('GP Uncertainty (Multivariate Sigma)')
+    axes[1, 0].set_xlabel('x₁')
+    axes[1, 0].set_ylabel('x₂')
+    axes[1, 0].legend()
+    plt.colorbar(im2, ax=axes[1, 0])
+    
+    X_train_rq, y_train_rq, X_test_rq, y_pred_rq, y_std_rq = test_gp_rational_quadratic_kernel()
+    
+    axes[1, 1].scatter(X_train_rq, y_train_rq, c='red', s=50, label='Training Data', zorder=5)
+    axes[1, 1].plot(X_test_rq, y_pred_rq, 'g-', label='GP Prediction (RQ)', linewidth=2)
+    axes[1, 1].fill_between(X_test_rq.flatten(), 
+                           y_pred_rq - 2*y_std_rq, 
+                           y_pred_rq + 2*y_std_rq, 
+                           alpha=0.3, color='green', label='±2σ Uncertainty')
+    axes[1, 1].set_title('GP with Rational Quadratic Kernel')
+    axes[1, 1].set_xlabel('x')
+    axes[1, 1].set_ylabel('y')
+    axes[1, 1].legend()
+    axes[1, 1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig('tests/figures/gp_test_results.png', dpi=300, bbox_inches='tight')
+
+if __name__ == "__main__":
+    print("Running GP tests...")
+    
+    test_gp_univariate_sigma()
+    test_gp_multivariate_sigma()
+    test_gp_rational_quadratic_kernel()
+    test_uncertainty_behavior()
+    test_gp_prediction_without_uncertainty()
+    test_gp_fit_attributes()
+    
+    print("All tests passed!")
+    
+    print("Creating visualizations...")
+    visualize_gp_results()
+    print("Visualizations saved to tests/figures/gp_test_results.png")

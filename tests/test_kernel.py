@@ -20,6 +20,7 @@ def config():
     config.read('config/GP.ini')
     return config
 
+@pytest.mark.test_kernel
 def test_rbf_kernel_shape(config):
     """Test RBF kernel output shape"""
     config.set("KERNEL", "type", "RBF")
@@ -38,6 +39,7 @@ def test_rbf_kernel_shape(config):
     assert results.shape == (3,)
     assert np.all(results >= 0) and np.all(results <= 1)
 
+@pytest.mark.test_kernel
 def test_rq_kernel_shape(config):
     """Test RQ kernel output shape"""
     config.set("KERNEL", "type", "RQ")
@@ -56,6 +58,7 @@ def test_rq_kernel_shape(config):
     assert results.shape == (3,)
     assert np.all(results >= 0) and np.all(results <= 1)
 
+@pytest.mark.test_kernel
 def test_kernel_symmetry(config):
     """Test that kernels are symmetric"""
     kernel_types = ["RBF", "RQ"]
@@ -71,6 +74,7 @@ def test_kernel_symmetry(config):
         
         assert np.isclose(k_xy, k_yx, rtol=1e-10)
 
+@pytest.mark.test_kernel
 def test_kernel_identity(config):
     """Test that kernel at same point equals 1"""
     kernel_types = ["RBF", "RQ"]
@@ -85,6 +89,7 @@ def test_kernel_identity(config):
         
         assert np.isclose(k_xx, 1.0, rtol=1e-10)
 
+@pytest.mark.test_kernel
 def test_kernel_matrix_shape(config):
     """Test kernel matrix computation and shape"""
     config.set("KERNEL", "type", "RBF")
@@ -108,6 +113,35 @@ def test_kernel_matrix_shape(config):
     # Test diagonal elements are 1
     assert np.allclose(np.diag(K), 1.0)
 
+@pytest.mark.test_kernel
+def test_multivariate_kernel():
+    """Test kernels with multivariate sigma"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
+    
+    config.set("KERNEL", "type", "RBF")
+    sigma_multivariate = np.array([1.0, 0.5])
+    kernel = get_kernel(config, sigma_multivariate)
+    
+    x = np.array([1.0, 2.0])
+    y = np.array([0.5, 1.5])
+    
+    result = kernel(x, y)
+    assert isinstance(result, (int, float, np.number))
+    assert result >= 0 and result <= 1
+    
+    k_xx = kernel(x, x)
+    assert np.isclose(k_xx, 1.0, rtol=1e-10)
+
+@pytest.mark.test_kernel
+def test_invalid_kernel_type(config):
+    """Test that invalid kernel type raises error"""
+    config.set("KERNEL", "type", "INVALID_KERNEL")
+    
+    with pytest.raises(ValueError, match="Unknown kernel type"):
+        get_kernel(config, 1.0)
+
+@pytest.mark.visualization
 def test_visual():
     """Visualize kernels"""
     config = configparser.ConfigParser()
@@ -141,9 +175,22 @@ def test_visual():
     plt.close()
     
 if __name__ == "__main__":
+    print("\nRunning kernel tests...")
     
-    print("\nRunning pytest tests...")
-    pytest.main([__file__, "-v"])
-
-    print(f"Visualizing kernels in {figures_dir}. These can be verified against https://www.cs.toronto.edu/~duvenaud/cookbook/")
+    # Run specific test functions directly for demonstration
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
+    
+    test_rbf_kernel_shape(config)
+    test_rq_kernel_shape(config)
+    test_kernel_symmetry(config)
+    test_kernel_identity(config)
+    test_kernel_matrix_shape(config)
+    test_multivariate_kernel()
+    test_invalid_kernel_type(config)
+    
+    print("All kernel tests passed!")
+    
+    print(f"Creating kernel visualizations in {figures_dir}...")
     test_visual()
+    print("Kernel visualizations saved. These can be verified against https://www.cs.toronto.edu/~duvenaud/cookbook/")
