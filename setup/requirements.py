@@ -12,6 +12,7 @@ packages = [
     "optuna",
     "pytest",
     "configparser",
+    "scipy",
 ]
 
 for package in packages:
