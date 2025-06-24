@@ -22,7 +22,7 @@ class GP:
     
     def predict(self, X_test):
         K_star = self.construct_kernel_matrix(X_test)
-        return np.dot(K_star, self.C)
+        return K_star @ self.C
     
     def eval_fit(self, y_pred, y_true):
         slope, intercept, r_value, p_value, std_err = stats.linregress(y_true, y_pred)
