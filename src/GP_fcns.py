@@ -40,7 +40,7 @@ class GP:
         # Predicted mean
         mean_pred = K_star @ self.C
         
-        # Uncertainty quantification on test points
+        # Epistemic uncertainty quantification on test points
         if return_std:
             K_star_star = np.zeros((n_test, n_test))
             for i in range(n_test):
