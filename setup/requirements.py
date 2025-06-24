@@ -7,6 +7,7 @@ def install(package):
 packages = [
     "numpy",
     "matplotlib",
+    "seaborn",
     "pandas",
 ]
 
