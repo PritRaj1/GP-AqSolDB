@@ -8,6 +8,11 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.kernels import get_kernel
 
+figures_dir = os.path.join(os.path.dirname(__file__), 'figures')
+if not os.path.exists(figures_dir):
+    os.makedirs(figures_dir)
+    print(f"Created test figures directory: {figures_dir}")
+
 @pytest.fixture
 def config():
     """Fixture to provide config file"""
@@ -132,8 +137,9 @@ def test_visual():
         axes[i].set_ylim(0, 1.1)
     
     plt.tight_layout()
-    plt.show()
-
+    plt.savefig(os.path.join(figures_dir, 'kernels.png'))
+    plt.close()
+    
 if __name__ == "__main__":
     
     print("\nRunning pytest tests...")
