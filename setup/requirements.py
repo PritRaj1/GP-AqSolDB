@@ -9,6 +9,7 @@ packages = [
     "matplotlib",
     "seaborn",
     "pandas",
+    "optuna",
 ]
 
 for package in packages:
