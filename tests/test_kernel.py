@@ -31,74 +31,74 @@ def config():
     config.read('config/GP.ini')
     return config
 
+@pytest.fixture
+def test_points():
+    """Fixture for test points"""
+    return np.array([1.0, 2.0, 3.0]), np.array([0.5, 1.5, 2.5])
+
 @pytest.mark.test_kernel
-def test_rbf_kernel_shape(config):
-    """Test RBF kernel output shape"""
-    config.set("KERNEL", "type", "RBF")
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
+def test_kernel_shape(config, kernel_type, test_points):
+    """Test kernel output shape for different kernel types"""
+    config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, 1.0)
     
-    # Test single
+    x, y = test_points
+    
+    # Test single point
     result = kernel(1.0, 2.0)
     assert isinstance(result, (int, float, np.number))
     assert result >= 0 and result <= 1
     
-    # Test array
-    x = np.array([1.0, 2.0, 3.0])
-    y = np.array([0.5, 1.5, 2.5])
+    # Test array of points
     results = np.array([kernel(xi, yi) for xi, yi in zip(x, y)])
     
     assert results.shape == (3,)
     assert np.all(results >= 0) and np.all(results <= 1)
 
 @pytest.mark.test_kernel
-def test_rq_kernel_shape(config):
-    """Test RQ kernel output shape"""
-    config.set("KERNEL", "type", "RQ")
-    kernel = get_kernel(config, 1.0)
-    
-    # Test single
-    result = kernel(1.0, 2.0)
-    assert isinstance(result, (int, float, np.number))
-    assert result >= 0 and result <= 1
-    
-    # Test array
-    x = np.array([1.0, 2.0, 3.0])
-    y = np.array([0.5, 1.5, 2.5])
-    results = np.array([kernel(xi, yi) for xi, yi in zip(x, y)])
-    
-    assert results.shape == (3,)
-    assert np.all(results >= 0) and np.all(results <= 1)
-
-@pytest.mark.test_kernel
-def test_kernel_symmetry(config):
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
+def test_kernel_symmetry(config, kernel_type):
     """Test that kernels are symmetric"""
-    kernel_types = ["RBF", "RQ"]
+    config.set("KERNEL", "type", kernel_type)
+    kernel = get_kernel(config, 1.0)
     
-    for kernel_type in kernel_types:
-        config.set("KERNEL", "type", kernel_type)
-        kernel = get_kernel(config, 1.0)
-        
-        # Test symmetry: k(x,y) = k(y,x)
-        x, y = 1.0, 2.0
-        k_xy = kernel(x, y)
-        k_yx = kernel(y, x)
-        
-        assert np.isclose(k_xy, k_yx, rtol=1e-10)
+    # Test symmetry: k(x,y) = k(y,x)
+    x, y = 1.0, 2.0
+    k_xy = kernel(x, y)
+    k_yx = kernel(y, x)
+    
+    assert np.isclose(k_xy, k_yx, rtol=1e-10)
 
 @pytest.mark.test_kernel
-def test_kernel_identity(config):
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
+def test_kernel_identity(config, kernel_type):
     """Test that kernel at same point equals 1"""
-    kernel_types = ["RBF", "RQ"]
+    config.set("KERNEL", "type", kernel_type)
+    kernel = get_kernel(config, 1.0)
     
-    for kernel_type in kernel_types:
-        config.set("KERNEL", "type", kernel_type)
-        kernel = get_kernel(config, 1.0)
-        
-        # Test identity: k(x,x) = 1
-        x = 1.0
-        k_xx = kernel(x, x)
-        
-        assert np.isclose(k_xx, 1.0, rtol=1e-10)
+    # Test identity: k(x,x) = 1
+    x = 1.0
+    k_xx = kernel(x, x)
+    
+    assert np.isclose(k_xx, 1.0, rtol=1e-10)
+
+@pytest.mark.test_kernel
+@pytest.mark.parametrize("sigma", [0.5, 1.0, 2.0])
+def test_kernel_sigma_scaling(config, sigma):
+    """Test that kernel values scale properly with sigma"""
+    config.set("KERNEL", "type", "RBF")
+    kernel = get_kernel(config, sigma)
+    
+    # Test that larger sigma gives broader kernel
+    x, y = 1.0, 2.0
+    k_value = kernel(x, y)
+    
+    # For RBF, larger sigma should give higher values for same distance
+    if sigma == 0.5:
+        assert k_value < 0.5  # Should be small for small sigma
+    elif sigma == 2.0:
+        assert k_value > 0.5  # Should be larger for large sigma
 
 @pytest.mark.test_kernel
 def test_kernel_matrix_shape(config):
@@ -125,32 +125,57 @@ def test_kernel_matrix_shape(config):
     assert np.allclose(np.diag(K), 1.0)
 
 @pytest.mark.test_kernel
-def test_multivariate_kernel():
+@pytest.mark.parametrize("sigma_type", ["scalar", "array"])
+def test_multivariate_kernel(sigma_type):
     """Test kernels with multivariate sigma"""
     config = configparser.ConfigParser()
     config.read('config/GP.ini')
     
     config.set("KERNEL", "type", "RBF")
-    sigma_multivariate = np.array([1.0, 0.5])
-    kernel = get_kernel(config, sigma_multivariate)
     
-    x = np.array([1.0, 2.0])
-    y = np.array([0.5, 1.5])
+    if sigma_type == "scalar":
+        sigma = 1.0
+        x = 1.0  # Use scalar for univariate sigma
+        y = 0.5
+    else:  # array
+        sigma = np.array([1.0, 0.5])
+        x = np.array([1.0, 2.0])
+        y = np.array([0.5, 1.5])
+    
+    kernel = get_kernel(config, sigma)
     
     result = kernel(x, y)
     assert isinstance(result, (int, float, np.number))
     assert result >= 0 and result <= 1
     
+    # Test identity for multivariate
     k_xx = kernel(x, x)
     assert np.isclose(k_xx, 1.0, rtol=1e-10)
 
 @pytest.mark.test_kernel
+@pytest.mark.error_handling
 def test_invalid_kernel_type(config):
     """Test that invalid kernel type raises error"""
     config.set("KERNEL", "type", "INVALID_KERNEL")
     
     with pytest.raises(ValueError, match="Unknown kernel type"):
         get_kernel(config, 1.0)
+
+@pytest.mark.test_kernel
+@pytest.mark.error_handling
+def test_invalid_sigma_values():
+    """Test kernel behavior with invalid sigma values"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
+    config.set("KERNEL", "type", "RBF")
+    
+    # Test with zero sigma
+    with pytest.raises(ValueError):
+        get_kernel(config, 0.0)
+    
+    # Test with negative sigma
+    with pytest.raises(ValueError):
+        get_kernel(config, -1.0)
 
 @pytest.mark.visualization
 def test_visual():
@@ -206,12 +231,20 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read('config/GP.ini')
     
-    test_rbf_kernel_shape(config)
-    test_rq_kernel_shape(config)
-    test_kernel_symmetry(config)
-    test_kernel_identity(config)
+    test_points = np.array([1.0, 2.0, 3.0]), np.array([0.5, 1.5, 2.5])
+    
+    test_kernel_shape(config, "RBF", test_points)
+    test_kernel_shape(config, "RQ", test_points)
+    
+    test_kernel_symmetry(config, "RBF")
+    test_kernel_symmetry(config, "RQ")
+    test_kernel_identity(config, "RBF")
+    test_kernel_identity(config, "RQ")
+    
+    test_kernel_sigma_scaling(config, 1.0)
     test_kernel_matrix_shape(config)
-    test_multivariate_kernel()
+    test_multivariate_kernel("scalar")
+    test_multivariate_kernel("array")
     test_invalid_kernel_type(config)
     
     print("All kernel tests passed!")
