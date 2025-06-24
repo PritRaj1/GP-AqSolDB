@@ -23,7 +23,7 @@ def config():
 def test_rbf_kernel_shape(config):
     """Test RBF kernel output shape"""
     config.set("KERNEL", "type", "RBF")
-    kernel = get_kernel(config)
+    kernel = get_kernel(config, 1.0)
     
     # Test single
     result = kernel(1.0, 2.0)
@@ -41,7 +41,7 @@ def test_rbf_kernel_shape(config):
 def test_rq_kernel_shape(config):
     """Test RQ kernel output shape"""
     config.set("KERNEL", "type", "RQ")
-    kernel = get_kernel(config)
+    kernel = get_kernel(config, 1.0)
     
     # Test single
     result = kernel(1.0, 2.0)
@@ -62,7 +62,7 @@ def test_kernel_symmetry(config):
     
     for kernel_type in kernel_types:
         config.set("KERNEL", "type", kernel_type)
-        kernel = get_kernel(config)
+        kernel = get_kernel(config, 1.0)
         
         # Test symmetry: k(x,y) = k(y,x)
         x, y = 1.0, 2.0
@@ -77,7 +77,7 @@ def test_kernel_identity(config):
     
     for kernel_type in kernel_types:
         config.set("KERNEL", "type", kernel_type)
-        kernel = get_kernel(config)
+        kernel = get_kernel(config, 1.0)
         
         # Test identity: k(x,x) = 1
         x = 1.0
@@ -88,7 +88,7 @@ def test_kernel_identity(config):
 def test_kernel_matrix_shape(config):
     """Test kernel matrix computation and shape"""
     config.set("KERNEL", "type", "RBF")
-    kernel = get_kernel(config)
+    kernel = get_kernel(config, 1.0)
     
     x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
     n = len(x)
@@ -123,7 +123,7 @@ def test_visual():
     for i, kernel_type in enumerate(kernel_types):
         config.set("KERNEL", "type", kernel_type)
         
-        kernel = get_kernel(config)
+        kernel = get_kernel(config, 1.0)
         
         k_values = [kernel(x_val, x0) for x_val in x]
         
