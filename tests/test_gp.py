@@ -205,7 +205,7 @@ def visualize_gp_results():
     cbar1.set_label(r'$\mathbb{E}[f(\mathbf{x})]$', fontweight='bold')
     
     im2 = axes[1, 0].contourf(X1, X2, y_std_grid, levels=25, cmap='plasma', alpha=0.8)
-    sns.scatterplot(x=X_train_2d[:, 0], y=X_train_2d[:, 1], color='white', s=60, 
+    sns.scatterplot(x=X_train_2d[:, 0], y=X_train_2d[:, 1], color='lime', s=60, 
                    marker='x', label='Training Data', ax=axes[1, 0])
     axes[1, 0].set_title(r'Uncertainty $\sqrt{\text{Var}[f(\mathbf{x})]}$', fontweight='bold', pad=15)
     axes[1, 0].set_xlabel(r'$x_1$', fontweight='bold')
