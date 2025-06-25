@@ -375,7 +375,7 @@ def visualize_auto_tune_results():
         
         im1 = axes[0].contourf(X1, X2, y_pred_grid, levels=25, cmap='viridis', alpha=0.8)
         axes[0].scatter(X_train[:, 0], X_train[:, 1], c='red', s=30, marker='x', label='Training Data')
-        axes[0].set_title(f'Optimized GP Prediction\nKernel: {config["KERNEL"]["type"]}, λ: {config["KERNEL"]["lmbda"]}')
+        axes[0].set_title('Optimized GP Prediction\nKernel: ' + config["KERNEL"]["type"] + r', $\lambda$: ' + config["KERNEL"]["lmbda"])
         axes[0].set_xlabel(r'$x_1$')
         axes[0].set_ylabel(r'$x_2$')
         axes[0].legend()
@@ -384,7 +384,7 @@ def visualize_auto_tune_results():
         # Uncertainty
         im2 = axes[1].contourf(X1, X2, y_std_grid, levels=25, cmap='plasma', alpha=0.8)
         axes[1].scatter(X_train[:, 0], X_train[:, 1], c='lime', s=30, marker='x', label='Training Data')
-        axes[1].set_title(f'Prediction Uncertainty\nσ: {sigmas}')
+        axes[1].set_title('Prediction Uncertainty\n' + r'$\sigma$: ' + str(sigmas))
         axes[1].set_xlabel(r'$x_1$')
         axes[1].set_ylabel(r'$x_2$')
         axes[1].legend()
@@ -436,7 +436,7 @@ if __name__ == "__main__":
         if os.path.exists(temp_sigma_path):
             os.unlink(temp_sigma_path)
     
-    print("All basic tests passed!")
+    print("All tests passed!")
     
     print("Creating visualizations...")
     visualize_auto_tune_results()
