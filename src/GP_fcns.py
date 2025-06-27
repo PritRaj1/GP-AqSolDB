@@ -12,15 +12,23 @@ class GP:
         self.y_train = None
         self.noise_var = config.getfloat("KERNEL", "lmbda")
 
+    def _recast_2D(self, X):
+        """Ensure X is 2D array for vectorized kernels"""
+        X = np.asarray(X)
+        if X.ndim == 1:
+            X = X.reshape(-1, 1)
+        return X
+
     def fit(self, X, y):
-        self.X_train = X
+        self.X_train = self._recast_2D(X)
         self.y_train = y
-        K = self.kernel(X, X)
-        K += self.noise_var * np.eye(len(X))
+        K = self.kernel(self.X_train, self.X_train)
+        K += self.noise_var * np.eye(len(self.X_train))
         self.K_inv = np.linalg.inv(K)
         self.C = self.K_inv @ y
     
     def predict(self, X_test, return_std=False):
+        X_test = self._recast_2D(X_test)
         K_star = self.kernel(X_test, self.X_train)        
         mean_pred = K_star @ self.C
         
