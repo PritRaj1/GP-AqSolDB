@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 import tempfile
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.GP_fcns import GP
+from src.dense_gp import GP
 from src.kernels import get_cache_stats, clear_kernel_cache
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache_size=100):

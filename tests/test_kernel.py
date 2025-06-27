@@ -17,7 +17,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.kernels import RBF, RQ, get_kernel
+from src.kernels import get_kernel
 
 figures_dir = os.path.join(os.path.dirname(__file__), 'figures')
 if not os.path.exists(figures_dir):

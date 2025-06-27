@@ -10,8 +10,8 @@ class GP:
         cache_size = config.getint("KERNEL", "cache_size", fallback=100)
         
         self.kernel = get_kernel(config, sigma, use_cache=self.use_cache, cache_size=cache_size)
-        self.L = None
-        self.alpha = None
+        self.L = None # Cholesky factor
+        self.alpha = None # Solution vector
         self.X_train = None
         self.y_train = None
         self.noise_var = config.getfloat("KERNEL", "lmbda")
@@ -26,7 +26,7 @@ class GP:
     def fit(self, X, y):
         """
         Fit the GP model to the training data
-
+        
         Cholesky decomposition is used instead of np.linalg.inv
         since kernel matrix is symmetric positive definite.
 
@@ -60,10 +60,27 @@ class GP:
         self.alpha = linalg.solve_triangular(self.L, self.y_train, lower=True)
     
     def predict(self, X_test, return_std=False):
+        """
+        Predict using the fitted GP model
+        
+        Parameters
+        ----------
+        X_test : array-like, shape (n_test_samples, n_features)
+            Test points
+        return_std : bool, optional
+            If True, return standard deviation along with mean
+            
+        Returns
+        -------
+        mean_pred : array-like, shape (n_test_samples,)
+            Predicted mean
+        std_pred : array-like, shape (n_test_samples,), optional
+            Predicted standard deviation (if return_std=True)
+        """
         X_test = self._recast_2D(X_test)
         K_star = self.kernel(X_test, self.X_train)
         
-        # Predicted mean: K_star @ K^(-1) @ y = K_star @ K^(-1) @ y
+        # Predicted mean: K_star @ K^(-1) @ y = K_star @ solve(L.T, alpha)
         mean_pred = K_star @ linalg.solve_triangular(self.L.T, self.alpha, lower=False)
         
         # Predictive variance: k(x*,x*) - k(x*,X) @ K^(-1) @ k(X,x*)

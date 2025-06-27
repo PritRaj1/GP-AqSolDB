@@ -9,8 +9,7 @@ from sklearn.metrics import mean_squared_error
 import warnings
 warnings.filterwarnings('ignore')
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.GP_fcns import GP
+from src.dense_gp import GP
 
 class GPAutoTuner:
     def __init__(

@@ -19,7 +19,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.GP_fcns import GP
+from src.dense_gp import GP
 from src.auto_tune import GPAutoTuner, load_sigmas_from_file
 
 @pytest.fixture
