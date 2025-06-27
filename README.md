@@ -19,8 +19,6 @@ The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this reposit
 
 ## TODO
 
-- Vectorize kernel comps
-- Cholesky
 - Caching for repeated kernels
 - Spare approximations
 - Parallelize
