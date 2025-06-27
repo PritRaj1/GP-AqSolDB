@@ -17,6 +17,12 @@ bash setup/auto.sh
 
 The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.
 
+## Optimisations
+
+- **Optuna** - used to automate hyperparameter search.
+
+- **Kernel caching** - to speed up repeated predictions on the same data, the kernel matrix is cached and evicted with LRU. If the dataset is small, turn this off. It also does not help with autotuning since optuna proposes different hyperparameters each time. 
+
 ## TODO
 
 - Parallelize

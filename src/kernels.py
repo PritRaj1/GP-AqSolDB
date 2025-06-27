@@ -3,7 +3,7 @@ from functools import lru_cache
 import hashlib
 
 class KernelCache:
-    """Simple cache for repeated kernel computation, (particulary optimizes autotune)
+    """Simple cache for repeated kernel computation
     """
     def __init__(self, max_size=100):
         self.cache = {}
