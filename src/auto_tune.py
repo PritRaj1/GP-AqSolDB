@@ -227,7 +227,7 @@ class GPAutoTuner:
         else:
             raise FileNotFoundError(f"Sigma file not found: {self.sigma_save_path}")
         
-        return config, sigmas
+        return config, np.array(sigmas)
 
 def load_sigmas_from_file(file_path):
     """Load optimized sigmas from file"""

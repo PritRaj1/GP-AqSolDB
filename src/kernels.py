@@ -3,8 +3,7 @@ from functools import lru_cache
 import hashlib
 
 class KernelCache:
-    """Simple cache for repeated kernel computation
-    """
+    """Simple cache for repeated kernel computation"""
     def __init__(self, max_size=100):
         self.cache = {}
         self.max_size = max_size
@@ -16,7 +15,7 @@ class KernelCache:
         # Convert to bytes for hashing
         X1_bytes = X1.tobytes()
         X2_bytes = X2.tobytes()
-        sigma_bytes = sigma.tobytes()
+        sigma_bytes = np.asarray(sigma).tobytes()
         
         hash_input = X1_bytes + X2_bytes + sigma_bytes + str(alpha).encode() + kernel_type.encode()
         return hashlib.md5(hash_input).hexdigest()
@@ -106,6 +105,9 @@ def RBF(X1, X2, sigma, use_cache=True):
     K : np.ndarray, shape (n1, n2)
         Kernel matrix
     """
+    # Ensure sigma is a numpy array
+    sigma = np.asarray(sigma)
+    
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=None, kernel_type="RBF")
         if cached_result is not None:
@@ -166,6 +168,9 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
     K : np.ndarray, shape (n1, n2)
         Kernel matrix
     """
+    # Ensure sigma is a numpy array
+    sigma = np.asarray(sigma)
+    
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=alpha, kernel_type="RQ")
         if cached_result is not None:
