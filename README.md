@@ -1,5 +1,5 @@
 # GaussianProcess-Solubility
-UQ with Gaussian Processes modeling drug solubility.
+Gaussian Processes modeling drug solubility with various optimizations.
 
 ## Setup
 
@@ -17,29 +17,19 @@ bash setup/auto.sh
 
 The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.
 
-## Features
+## Optimizations
 
 ### Kernel Caching
-The implementation includes intelligent caching for kernel computations to improve performance during:
+Caching for kernel computations to improve performance during:
 - **Repeated predictions**: Multiple predictions on the same test points
-- **Large datasets**: When kernel computations become expensive
+- **Large datasets**: When (vectorized) kernel computations become expensive
 - **Multiple kernel evaluations**: When the same kernel parameters are used repeatedly
-
-**Usage:**
-```ini
-[KERNEL]
-type = "RBF"
-lmbda = 1.0
-alpha = 1.0
-use_cache = true
-cache_size = 100
-```
 
 **Benefits:**
 - Significant speedup for repeated computations
 - Automatic cache management with LRU eviction
 - Configurable cache size
-- Cache statistics for performance monitoring
+- Cache stat for performance monitoring/benchmarking
 
 ## TODO
 
