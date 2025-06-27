@@ -9,7 +9,7 @@ from sklearn.metrics import mean_squared_error
 import warnings
 warnings.filterwarnings('ignore')
 
-from src.dense_gp import GP
+from src.gp import GP
 
 class GPAutoTuner:
     def __init__(
@@ -38,6 +38,7 @@ class GPAutoTuner:
         self.config_path = config_path
         self.sigma_save_path = sigma_save_path
         self.n_features = X_train.shape[1]
+        self.n_samples = X_train.shape[0]
         
         # Load existing config
         self.config = ConfigParser()
@@ -55,6 +56,22 @@ class GPAutoTuner:
             'use_cache': 'true',
             'cache_size': '100'
         }
+        self.config['SPARSE'] = {
+            'use_sparse': 'false',
+            'num_inducing': '20',
+            'inducing_method': 'random'
+        }
+    
+    def calculate_bic(self, mse, n_params, n_samples):
+        """
+        Calculate Bayesian Information Criterion (BIC)
+        
+        BIC = n * log(MSE) + k * log(n)
+        where n = number of samples, k = number of parameters
+        
+        Lower BIC is better (penalizes complexity)
+        """
+        return n_samples * np.log(mse) + n_params * np.log(n_samples)
     
     def objective(self, trial):
         """
@@ -67,26 +84,47 @@ class GPAutoTuner:
             
         Returns:
         --------
-        float : Cross-validation score (negative MSE for minimization)
+        float : Cross-validation score (negative BIC for minimization)
         """
+        # Suggest model type (dense vs sparse)
+        use_sparse = trial.suggest_categorical('use_sparse', [True, False])
+        
         # Suggest hyperparameters
         kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ'])
         lmbda = trial.suggest_float('lmbda', 1e-4, 1.0, log=True)
         alpha = trial.suggest_float('alpha', 0.1, 10.0) if kernel_type == 'RQ' else 1.0
         sigmas = [trial.suggest_float(f'sigma_{i}', 0.1, 3.0) for i in range(self.n_features)]
         
+        # Sparse GP specific parameters
+        if use_sparse:
+            # Suggest number of inducing points (between 10% and 50% of data size)
+            min_inducing = max(10, int(0.1 * self.n_samples))
+            max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
+            num_inducing = trial.suggest_int('num_inducing', min_inducing, max_inducing)
+            inducing_method = trial.suggest_categorical('inducing_method', ['random', 'uniform'])
+        else:
+            num_inducing = 20
+            inducing_method = 'random'
+        
         # Create config for this trial
         config = ConfigParser()
         config['KERNEL'] = {
             'type': kernel_type,
             'lmbda': str(lmbda),
-            'alpha': str(alpha)
+            'alpha': str(alpha),
+            'use_cache': 'true',
+            'cache_size': '100'
+        }
+        config['SPARSE'] = {
+            'use_sparse': str(use_sparse).lower(),
+            'num_inducing': str(num_inducing),
+            'inducing_method': inducing_method
         }
         
         # Perform cross-validation
         try:
-            cv_scores = self._cross_validate_gp(config, sigmas, n_splits=5)
-            return -np.mean(cv_scores)  # Negative because Optuna minimizes
+            cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
+            return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
         except Exception as e:
             print(f"Trial failed: {e}")
             return float('inf')  # Return large value for failed trials
@@ -106,11 +144,12 @@ class GPAutoTuner:
             
         Returns:
         --------
-        list : Cross-validation scores
+        dict : Cross-validation results with MSE and BIC
         """
         
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-        scores = []
+        mse_scores = []
+        bic_scores = []
         
         for train_idx, val_idx in kf.split(self.X_train):
             X_train_fold = self.X_train[train_idx]
@@ -122,12 +161,21 @@ class GPAutoTuner:
             gp = GP(config, np.array(sigmas))
             gp.fit(X_train_fold, y_train_fold)
             
+            # Get model complexity for BIC calculation
+            n_params = gp.get_model_complexity()
+            
             # Predict and calculate score
             y_pred = gp.predict(X_val_fold)
             mse = mean_squared_error(y_val_fold, y_pred)
-            scores.append(mse)
+            bic = self.calculate_bic(mse, n_params, len(y_val_fold))
+            
+            mse_scores.append(mse)
+            bic_scores.append(bic)
         
-        return scores
+        return {
+            'mse': mse_scores,
+            'bic': bic_scores
+        }
     
     def optimize(self, n_trials=100, timeout=None):
         """
@@ -146,6 +194,9 @@ class GPAutoTuner:
         """
         print(f"Starting GP hyperparameter optimization with {n_trials} trials...")
         print(f"Features: {self.n_features}")
+        print(f"Samples: {self.n_samples}")
+        print("Models: Dense GP and Sparse GP (FITC)")
+        print("Metric: BIC (Bayesian Information Criterion)")
         
         # Create study
         study = optuna.create_study(
@@ -161,7 +212,8 @@ class GPAutoTuner:
         best_value = study.best_value
         
         print(f"\nOptimization completed!")
-        print(f"Best CV MSE: {-best_value:.6f}")
+        print(f"Best CV BIC: {-best_value:.2f}")
+        print(f"Best model type: {'Sparse' if best_params['use_sparse'] else 'Dense'}")
         print(f"Best parameters: {best_params}")
         
         # Report cache stats
@@ -184,16 +236,27 @@ class GPAutoTuner:
     def _save_best_parameters(self, best_params):
         """Save the best hyperparameters to files"""
 
+        use_sparse = best_params['use_sparse']
         kernel_type = best_params['kernel_type']
         lmbda = best_params['lmbda']
         alpha = best_params.get('alpha', 1.0)
         
         if 'KERNEL' not in self.config:
             self.config['KERNEL'] = {}
+        if 'SPARSE' not in self.config:
+            self.config['SPARSE'] = {}
         
         self.config['KERNEL']['type'] = kernel_type
         self.config['KERNEL']['lmbda'] = str(lmbda)
         self.config['KERNEL']['alpha'] = str(alpha)
+        
+        # Save sparse GP parameters if applicable
+        self.config['SPARSE']['use_sparse'] = str(use_sparse).lower()
+        if use_sparse:
+            num_inducing = best_params.get('num_inducing', 20)
+            inducing_method = best_params.get('inducing_method', 'random')
+            self.config['SPARSE']['num_inducing'] = str(num_inducing)
+            self.config['SPARSE']['inducing_method'] = inducing_method
                 
         with open(self.config_path, 'w') as f:
             self.config.write(f)
@@ -206,12 +269,16 @@ class GPAutoTuner:
         print(f"\nSaved hyperparameters:")
         print(f"Config file: {self.config_path}")
         print(f"Sigma file: {self.sigma_save_path}")
+        print(f"Model type: {'Sparse' if use_sparse else 'Dense'}")
         print(f"Kernel type: {kernel_type}")
         print(f"Lambda: {lmbda}")
         print(f"Alpha: {alpha}")
         print(f"Sigmas: {sigmas}")
+        if use_sparse:
+            print(f"Number of inducing points: {best_params.get('num_inducing', 20)}")
+            print(f"Inducing method: {best_params.get('inducing_method', 'random')}")
         
-        preserved_sections = [section for section in self.config.sections() if section != 'KERNEL']
+        preserved_sections = [section for section in self.config.sections() if section not in ['KERNEL', 'SPARSE']]
         if preserved_sections:
             print(f"Preserved sections: {preserved_sections}")
     
