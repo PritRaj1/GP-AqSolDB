@@ -120,8 +120,6 @@ def test_uncertainty_behavior():
         training_uncertainty = y_std[training_indices]
         other_uncertainty = y_std[~np.isin(np.arange(len(X_test)), training_indices)]
         assert np.mean(training_uncertainty) < np.mean(other_uncertainty)
-    
-    return X_train, y_train, X_test, y_pred, y_std
 
 @pytest.mark.test_gp
 @pytest.mark.uncertainty
@@ -160,12 +158,10 @@ def test_gp_fit_attributes(sample_data_1d):
     
     assert gp.X_train is not None
     assert gp.y_train is not None
-    assert gp.K_inv is not None
-    assert gp.C is not None
     assert gp.X_train.shape[0] == len(y_train)
     assert gp.y_train.shape[0] == len(y_train)
-    assert gp.K_inv.shape == (len(X_train), len(X_train))
-    assert gp.C.shape == (len(X_train),)
+    assert gp.L.shape == (len(X_train), len(X_train))
+    assert gp.alpha.shape == (len(X_train),)
 
 @pytest.mark.test_gp
 @pytest.mark.error_handling
@@ -184,7 +180,6 @@ def test_gp_invalid_inputs():
     with pytest.raises(ValueError):
         gp.fit(np.array([[1], [2]]), np.array([1]))
 
-# Legacy test functions for visualization (keeping for backward compatibility)
 @pytest.mark.test_gp
 @pytest.mark.visualization
 def test_gp_univariate_sigma():
@@ -211,8 +206,6 @@ def test_gp_univariate_sigma():
     
     if np.any(far_points) and np.any(near_points):
         assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
-    
-    return X_train, y_train, X_test, y_pred, y_std
 
 @pytest.mark.test_gp
 @pytest.mark.visualization
@@ -241,8 +234,6 @@ def test_gp_multivariate_sigma():
     assert len(y_pred) == len(X_test)
     assert len(y_std) == len(X_test)
     assert np.all(y_std >= 0)
-    
-    return X_train, y_train, X_test, y_pred_grid, y_std_grid, X1, X2
 
 @pytest.mark.test_gp
 @pytest.mark.visualization
@@ -262,8 +253,6 @@ def test_gp_rational_quadratic_kernel():
     assert len(y_pred) == len(X_test)
     assert len(y_std) == len(X_test)
     assert np.all(y_std >= 0)
-    
-    return X_train, y_train, X_test, y_pred, y_std
 
 def visualize_gp_results():
     """Create visualizations for GP testing"""
@@ -332,10 +321,27 @@ def visualize_gp_results():
 if __name__ == "__main__":
     print("Running GP tests...")
     
+    # Create sample data manually for direct execution
+    X_train_1d, y_train_1d = get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
+    sample_data_1d = (X_train_1d, y_train_1d)
+    
+    np.random.seed(42)
+    X_train_2d = np.random.uniform(0, 5, (30, 2))
+    y_train_2d = np.sin(X_train_2d[:, 0]) * np.exp(X_train_2d[:, 1]/5) + np.random.normal(0, 0.1, 30)
+    sample_data_2d = (X_train_2d, y_train_2d)
+    
+    # Call pytest functions directly
+    test_gp_basic_functionality("RBF", 1.0, sample_data_1d)
+    test_gp_basic_functionality("RQ", 1.0, sample_data_1d)
+    test_gp_sigma_types("univariate", sample_data_1d, sample_data_2d)
+    test_gp_sigma_types("multivariate", sample_data_1d, sample_data_2d)
+    test_uncertainty_behavior()
+    test_uncertainty_distance_relationship(sample_data_1d)
+    test_gp_fit_attributes(sample_data_1d)
+    test_gp_invalid_inputs()
     test_gp_univariate_sigma()
     test_gp_multivariate_sigma()
     test_gp_rational_quadratic_kernel()
-    test_uncertainty_behavior()
     
     print("All tests passed!")
     
