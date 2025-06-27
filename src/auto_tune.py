@@ -52,7 +52,9 @@ class GPAutoTuner:
         self.config['KERNEL'] = {
             'type': 'RBF',
             'lmbda': '0.1',
-            'alpha': '1.0'
+            'alpha': '1.0',
+            'use_cache': 'true',
+            'cache_size': '100'
         }
     
     def objective(self, trial):
@@ -163,13 +165,26 @@ class GPAutoTuner:
         print(f"Best CV MSE: {-best_value:.6f}")
         print(f"Best parameters: {best_params}")
         
+        # Report cache stats
+        try:
+            from src.kernels import get_cache_stats
+            cache_stats = get_cache_stats()
+            total_requests = cache_stats['hits'] + cache_stats['misses']
+            if total_requests > 0:
+                print(f"\nKernel cache statistics:")
+                print(f"  Cache hits: {cache_stats['hits']}")
+                print(f"  Cache misses: {cache_stats['misses']}")
+                print(f"  Hit rate: {cache_stats['hit_rate']:.2%}")
+                print(f"  Cache size: {cache_stats['cache_size']}")
+        except:
+            pass
+        
         self._save_best_parameters(best_params)        
         return best_params
     
     def _save_best_parameters(self, best_params):
         """Save the best hyperparameters to files"""
 
-        # Extract non-vector parameters and update config
         kernel_type = best_params['kernel_type']
         lmbda = best_params['lmbda']
         alpha = best_params.get('alpha', 1.0)
@@ -184,7 +199,6 @@ class GPAutoTuner:
         with open(self.config_path, 'w') as f:
             self.config.write(f)
         
-        # Extract and save vector sigmas
         sigmas = [best_params[f'sigma_{i}'] for i in range(self.n_features)]
         
         with open(self.sigma_save_path, 'wb') as f:
@@ -198,7 +212,6 @@ class GPAutoTuner:
         print(f"Alpha: {alpha}")
         print(f"Sigmas: {sigmas}")
         
-        # Show what sections were preserved
         preserved_sections = [section for section in self.config.sections() if section != 'KERNEL']
         if preserved_sections:
             print(f"Preserved sections: {preserved_sections}")

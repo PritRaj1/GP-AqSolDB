@@ -1,14 +1,17 @@
 import numpy as np
-from src.kernels import get_kernel
+from src.kernels import get_kernel, get_cache_stats, clear_kernel_cache
 from scipy import stats
 from scipy import linalg
 
 class GP:
     def __init__(self, config, sigma):
         self.config = config
-        self.kernel = get_kernel(config, sigma)
-        self.L = None  # Cholesky factor
-        self.alpha = None  # Solution vector
+        self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)
+        cache_size = config.getint("KERNEL", "cache_size", fallback=100)
+        
+        self.kernel = get_kernel(config, sigma, use_cache=self.use_cache, cache_size=cache_size)
+        self.L = None
+        self.alpha = None
         self.X_train = None
         self.y_train = None
         self.noise_var = config.getfloat("KERNEL", "lmbda")
@@ -76,3 +79,13 @@ class GP:
     def eval_fit(self, y_pred, y_true):
         slope, intercept, r_value, p_value, std_err = stats.linregress(y_true, y_pred)
         return r_value, p_value, std_err
+    
+    def get_cache_stats(self):
+        if self.use_cache:
+            return get_cache_stats()
+        else:
+            return None
+    
+    def clear_cache(self):
+        if self.use_cache:
+            clear_kernel_cache()
