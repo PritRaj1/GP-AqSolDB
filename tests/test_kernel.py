@@ -24,26 +24,17 @@ if not os.path.exists(figures_dir):
     os.makedirs(figures_dir)
     print(f"Created test figures directory: {figures_dir}")
 
-@pytest.fixture
-def config():
-    """Fixture to provide config file"""
-    config = configparser.ConfigParser()
-    config.read('config/GP.ini')
-    return config
-
-@pytest.fixture
-def test_points():
-    """Fixture for test points"""
-    return np.array([[1.0, 2.0, 3.0]]), np.array([[0.5, 1.5, 2.5]])
-
 @pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
-def test_vectorized_kernel_shape(config, kernel_type, test_points):
+def test_vectorized_kernel_shape(kernel_type):
     """Test vectorized kernel output shape for different kernel types"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
-    X1, X2 = test_points
+    X1 = np.array([[1.0, 2.0, 3.0]])
+    X2 = np.array([[0.5, 1.5, 2.5]])
     
     # Test with single points (population of one)
     result = kernel(X1, X2)
@@ -61,8 +52,10 @@ def test_vectorized_kernel_shape(config, kernel_type, test_points):
 
 @pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
-def test_vectorized_kernel_symmetry(config, kernel_type):
+def test_vectorized_kernel_symmetry(kernel_type):
     """Test that vectorized kernels are symmetric"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -77,8 +70,10 @@ def test_vectorized_kernel_symmetry(config, kernel_type):
 
 @pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
-def test_vectorized_kernel_identity(config, kernel_type):
+def test_vectorized_kernel_identity(kernel_type):
     """Test that vectorized kernel at same point equals 1"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -90,8 +85,10 @@ def test_vectorized_kernel_identity(config, kernel_type):
 
 @pytest.mark.test_kernel
 @pytest.mark.parametrize("sigma", [0.5, 1.0, 2.0])
-def test_vectorized_kernel_sigma_scaling(config, sigma):
+def test_vectorized_kernel_sigma_scaling(sigma):
     """Test that vectorized kernel values scale properly with sigma"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", "RBF")
     kernel = get_kernel(config, np.array([sigma, sigma, sigma]))
     
@@ -108,8 +105,10 @@ def test_vectorized_kernel_sigma_scaling(config, sigma):
         assert k_value > 0.5  # Should be larger for large sigma
 
 @pytest.mark.test_kernel
-def test_vectorized_kernel_matrix_shape(config):
+def test_vectorized_kernel_matrix_shape():
     """Test vectorized kernel matrix computation and shape"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", "RBF")
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -160,8 +159,10 @@ def test_vectorized_multivariate_kernel(sigma_type):
 
 @pytest.mark.test_kernel
 @pytest.mark.error_handling
-def test_invalid_kernel_type(config):
+def test_invalid_kernel_type():
     """Test that invalid kernel type raises error"""
+    config = configparser.ConfigParser()
+    config.read('config/GP.ini')
     config.set("KERNEL", "type", "INVALID_KERNEL")
     
     with pytest.raises(ValueError, match="Unknown kernel type"):
@@ -214,31 +215,29 @@ def test_visual():
     plt.savefig(os.path.join(figures_dir, 'kernels.png'), dpi=300, 
                 bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
-    
+
 if __name__ == "__main__":
     print("\nRunning vectorized kernel tests...")
     
-    config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    test_vectorized_kernel_shape("RBF")
+    test_vectorized_kernel_shape("RQ")
     
-    test_points = np.array([[1.0, 2.0, 3.0]]), np.array([[0.5, 1.5, 2.5]])
+    test_vectorized_kernel_symmetry("RBF")
+    test_vectorized_kernel_symmetry("RQ")
+    test_vectorized_kernel_identity("RBF")
+    test_vectorized_kernel_identity("RQ")
     
-    test_vectorized_kernel_shape(config, "RBF", test_points)
-    test_vectorized_kernel_shape(config, "RQ", test_points)
-    
-    test_vectorized_kernel_symmetry(config, "RBF")
-    test_vectorized_kernel_symmetry(config, "RQ")
-    test_vectorized_kernel_identity(config, "RBF")
-    test_vectorized_kernel_identity(config, "RQ")
-    
-    test_vectorized_kernel_sigma_scaling(config, 1.0)
-    test_vectorized_kernel_matrix_shape(config)
+    test_vectorized_kernel_sigma_scaling(0.5)
+    test_vectorized_kernel_sigma_scaling(1.0)
+    test_vectorized_kernel_sigma_scaling(2.0)
+    test_vectorized_kernel_matrix_shape()
     test_vectorized_multivariate_kernel("scalar")
     test_vectorized_multivariate_kernel("array")
-    test_invalid_kernel_type(config)
+    test_invalid_kernel_type()
     
     print("All vectorized kernel tests passed!")
     
     print(f"Creating kernel visualizations in {figures_dir}...")
     test_visual()
     print("Kernel visualizations saved. These can be verified against https://www.cs.toronto.edu/~duvenaud/cookbook/")
+    
