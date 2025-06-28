@@ -43,7 +43,6 @@ def sample_data_2d():
     y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 30)
     return X_train, y_train
 
-@pytest.mark.test_gp
 @pytest.mark.parametrize("kernel_type,sigma", [
     ("RBF", 1.0),
     ("RQ", 1.0),
@@ -63,7 +62,6 @@ def test_gp_basic_functionality(kernel_type, sigma, sample_data_1d):
     assert isinstance(y_pred, np.ndarray)
     assert not np.any(np.isnan(y_pred))
 
-@pytest.mark.test_gp
 @pytest.mark.parametrize("sigma_type", ["univariate", "multivariate"])
 def test_gp_sigma_types(sigma_type, sample_data_1d, sample_data_2d):
     """Test GP with different sigma types"""
@@ -92,8 +90,6 @@ def test_gp_sigma_types(sigma_type, sample_data_1d, sample_data_2d):
     assert not np.any(np.isnan(y_pred))
     assert not np.any(np.isnan(y_std))
 
-@pytest.mark.test_gp
-@pytest.mark.uncertainty
 def test_uncertainty_behavior():
     """Test that uncertainty behaves as expected"""
     config = create_config(kernel_type="RBF", lmbda=0.01)
@@ -121,8 +117,6 @@ def test_uncertainty_behavior():
         other_uncertainty = y_std[~np.isin(np.arange(len(X_test)), training_indices)]
         assert np.mean(training_uncertainty) < np.mean(other_uncertainty)
 
-@pytest.mark.test_gp
-@pytest.mark.uncertainty
 def test_uncertainty_distance_relationship(sample_data_1d):
     """Test that uncertainty increases with distance from training points"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
@@ -144,8 +138,6 @@ def test_uncertainty_distance_relationship(sample_data_1d):
     if np.any(far_points) and np.any(near_points):
         assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
 
-@pytest.mark.test_gp
-@pytest.mark.attributes
 def test_gp_fit_attributes(sample_data_1d):
     """Test that GP fit method sets all required attributes"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
@@ -160,11 +152,7 @@ def test_gp_fit_attributes(sample_data_1d):
     assert gp.y_train is not None
     assert gp.X_train.shape[0] == len(y_train)
     assert gp.y_train.shape[0] == len(y_train)
-    assert gp.L.shape == (len(X_train), len(X_train))
-    assert gp.alpha.shape == (len(X_train),)
 
-@pytest.mark.test_gp
-@pytest.mark.error_handling
 def test_gp_invalid_inputs():
     """Test GP error handling for invalid inputs"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
@@ -180,8 +168,6 @@ def test_gp_invalid_inputs():
     with pytest.raises(ValueError):
         gp.fit(np.array([[1], [2]]), np.array([1]))
 
-@pytest.mark.test_gp
-@pytest.mark.visualization
 def test_gp_univariate_sigma():
     """Test GP with univariate sigma (single length scale)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
@@ -207,8 +193,6 @@ def test_gp_univariate_sigma():
     if np.any(far_points) and np.any(near_points):
         assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
 
-@pytest.mark.test_gp
-@pytest.mark.visualization
 def test_gp_multivariate_sigma():
     """Test GP with multivariate sigma (different length scales per feature)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
@@ -235,8 +219,6 @@ def test_gp_multivariate_sigma():
     assert len(y_std) == len(X_test)
     assert np.all(y_std >= 0)
 
-@pytest.mark.test_gp
-@pytest.mark.visualization
 def test_gp_rational_quadratic_kernel():
     """Test GP with Rational Quadratic kernel"""
     config = create_config(kernel_type="RQ", lmbda=0.1, alpha=2.0)

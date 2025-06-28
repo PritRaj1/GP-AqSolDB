@@ -24,7 +24,6 @@ if not os.path.exists(figures_dir):
     os.makedirs(figures_dir)
     print(f"Created test figures directory: {figures_dir}")
 
-@pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_shape(kernel_type):
     """Test vectorized kernel output shape for different kernel types"""
@@ -50,7 +49,6 @@ def test_vectorized_kernel_shape(kernel_type):
     assert results.shape == (2, 2)
     assert np.all(results >= 0) and np.all(results <= 1)
 
-@pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_symmetry(kernel_type):
     """Test that vectorized kernels are symmetric"""
@@ -68,7 +66,6 @@ def test_vectorized_kernel_symmetry(kernel_type):
     
     assert np.allclose(K_xy, K_yx.T, rtol=1e-10)
 
-@pytest.mark.test_kernel
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_identity(kernel_type):
     """Test that vectorized kernel at same point equals 1"""
@@ -83,7 +80,6 @@ def test_vectorized_kernel_identity(kernel_type):
     
     assert np.allclose(np.diag(K_xx), 1.0, rtol=1e-10)
 
-@pytest.mark.test_kernel
 @pytest.mark.parametrize("sigma", [0.5, 1.0, 2.0])
 def test_vectorized_kernel_sigma_scaling(sigma):
     """Test that vectorized kernel values scale properly with sigma"""
@@ -104,7 +100,6 @@ def test_vectorized_kernel_sigma_scaling(sigma):
     elif sigma == 2.0:
         assert k_value > 0.5  # Should be larger for large sigma
 
-@pytest.mark.test_kernel
 def test_vectorized_kernel_matrix_shape():
     """Test vectorized kernel matrix computation and shape"""
     config = configparser.ConfigParser()
@@ -128,7 +123,6 @@ def test_vectorized_kernel_matrix_shape():
     # Test diagonal elements are 1
     assert np.allclose(np.diag(K), 1.0)
 
-@pytest.mark.test_kernel
 @pytest.mark.parametrize("sigma_type", ["scalar", "array"])
 def test_vectorized_multivariate_kernel(sigma_type):
     """Test vectorized kernels with multivariate sigma"""
@@ -157,8 +151,6 @@ def test_vectorized_multivariate_kernel(sigma_type):
     K_xx = kernel(X1, X1)
     assert np.allclose(K_xx[0, 0], 1.0, rtol=1e-10)
 
-@pytest.mark.test_kernel
-@pytest.mark.error_handling
 def test_invalid_kernel_type():
     """Test that invalid kernel type raises error"""
     config = configparser.ConfigParser()
@@ -168,7 +160,6 @@ def test_invalid_kernel_type():
     with pytest.raises(ValueError, match="Unknown kernel type"):
         get_kernel(config, np.array([1.0, 1.0, 1.0]))
 
-@pytest.mark.visualization
 def test_visual():
     """Visualize vectorized kernels with seaborn styling"""
     config = configparser.ConfigParser()
