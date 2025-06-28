@@ -2,16 +2,15 @@ import numpy as np
 import time
 import sys
 import os
+import pytest
 from configparser import ConfigParser
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
-import tempfile
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.dense_gp import GP
 from src.kernels import get_cache_stats, clear_kernel_cache
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache_size=100):
+    """Create test config"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': kernel_type,
@@ -22,269 +21,219 @@ def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache
     }
     return config
 
-def test_repeated_predictions():
-    """Test caching benefits for repeated predictions on same test points"""
-    print("Testing caching for repeated predictions...")
-    
+def test_repeated_predictions_caching():
+    """Test caching benefits for repeated predictions"""
     np.random.seed(42)
-    X_train = np.random.randn(200, 5)  
+    X_train = np.random.randn(200, 5)
     y_train = np.random.randn(200)
-    X_test = np.random.randn(100, 5)  
-    
-    config = create_config("RBF", lmbda=0.1, use_cache=False)
+    X_test = np.random.randn(100, 5)
     sigma = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
     
     # 1. Without caching
-    print("\n1. Repeated predictions WITHOUT caching:")
     clear_kernel_cache()
+    config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
     
     start_time = time.time()
-    gp_no_cache = GP(config, sigma)
+    gp_no_cache = GP(config_no_cache, sigma)
     gp_no_cache.fit(X_train, y_train)
     
-    for i in range(50):  
+    for i in range(20):  
         y_pred = gp_no_cache.predict(X_test)
     
     time_no_cache = time.time() - start_time
-    print(f"   Time without caching: {time_no_cache:.4f} seconds")
     
     # 2. With caching
-    print("\n2. Repeated predictions WITH caching:")
     clear_kernel_cache()
+    config_cache = create_config("RBF", lmbda=0.1, use_cache=True)
     
-    config = create_config("RBF", lmbda=0.1, use_cache=True)
     start_time = time.time()
-    gp_cache = GP(config, sigma)
+    gp_cache = GP(config_cache, sigma)
     gp_cache.fit(X_train, y_train)
     
-    for i in range(50):  
+    for i in range(20):  
         y_pred = gp_cache.predict(X_test)
     
-    time_with_cache = time.time() - start_time
-    print(f"   Time with caching: {time_with_cache:.4f} seconds")
-    
+    time_with_cache = time.time() - start_time    
     cache_stats = get_cache_stats()
-    print(f"\n3. Cache statistics:")
-    print(f"   Cache hits: {cache_stats['hits']}")
-    print(f"   Cache misses: {cache_stats['misses']}")
-    print(f"   Hit rate: {cache_stats['hit_rate']:.2%}")
-    print(f"   Cache size: {cache_stats['cache_size']}")
+    assert cache_stats is not None, "Cache stats should be available when caching is enabled"
+    assert cache_stats['hits'] > 0, "Should have cache hits for repeated predictions"
+    assert cache_stats['hit_rate'] > 0, "Hit rate should be positive"
     
-    # Calculate speedup
     if time_no_cache > 0 and time_with_cache > 0:
-        speedup = time_no_cache / time_with_cache
-        print(f"\n4. Performance improvement:")
-        print(f"   Speedup: {speedup:.2f}x")
-        print(f"   Time saved: {time_no_cache - time_with_cache:.4f} seconds")
-    elif time_with_cache == 0:
-        print(f"\n4. Performance improvement:")
-        print(f"   Speedup: ∞ (caching eliminated computation time)")
-        print(f"   Time saved: {time_no_cache:.4f} seconds")
-    else:
-        print(f"\n4. Performance improvement:")
-        print(f"   Unable to calculate speedup (both times are zero)")
+        assert time_with_cache <= time_no_cache, "Caching should not be slower than no caching"
 
 def test_large_dataset_caching():
     """Test caching benefits with larger datasets"""
-    print("\n" + "="*60)
-    print("Testing caching with larger datasets...")
-    
     np.random.seed(42)
-    X_train = np.random.randn(500, 3)  
+    X_train = np.random.randn(500, 3)
     y_train = np.random.randn(500)
     X_test = np.random.randn(200, 3)
-    
-    # 1. Without caching
-    print("\n1. Large dataset WITHOUT caching:")
-    clear_kernel_cache()
-    
-    config = create_config("RBF", lmbda=0.1, use_cache=False)
     sigma = np.array([1.0, 1.0, 1.0])
     
+    # 1. Without caching
+    clear_kernel_cache()
+    config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
+    
     start_time = time.time()
-    gp_no_cache = GP(config, sigma)
+    gp_no_cache = GP(config_no_cache, sigma)
+    gp_no_cache.fit(X_train, y_train)
+    
+    for i in range(5):  
+        y_pred = gp_no_cache.predict(X_test)
+    
+    time_no_cache = time.time() - start_time
+    
+    # 2. With caching
+    clear_kernel_cache()
+    config_cache = create_config("RBF", lmbda=0.1, use_cache=True)
+    
+    start_time = time.time()
+    gp_cache = GP(config_cache, sigma)
+    gp_cache.fit(X_train, y_train)
+    
+    for i in range(5):  
+        y_pred = gp_cache.predict(X_test)
+    
+    time_with_cache = time.time() - start_time
+    cache_stats = get_cache_stats()
+    assert cache_stats is not None, "Cache stats should be available when caching is enabled"
+    assert cache_stats['hits'] > 0, "Should have cache hits for repeated predictions"
+
+def test_cache_config_options():
+    """Test that cache config works"""
+    np.random.seed(42)
+    X_train = np.random.randn(100, 2)
+    y_train = np.random.randn(100)
+    X_test = np.random.randn(50, 2)
+    sigma = np.array([1.0, 1.0])
+    
+    clear_kernel_cache()
+    config_cache = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=50)
+    
+    gp_cache = GP(config_cache, sigma)
+    gp_cache.fit(X_train, y_train)
+    
+    # Multiple predictions required to make cache hits (after first misses)
+    for i in range(10):
+        y_pred = gp_cache.predict(X_test)
+    
+    cache_stats = gp_cache.get_cache_stats()
+    assert cache_stats is not None, "Cache stats should be available when caching is enabled"
+    assert cache_stats['cache_size'] > 0, "Cache should have some entries"
+    assert cache_stats['cache_size'] <= 50, "Cache size should not exceed configured limit"
+    
+    # Test with cache disabled  
+    clear_kernel_cache()
+    config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
+    
+    gp_no_cache = GP(config_no_cache, sigma)
     gp_no_cache.fit(X_train, y_train)
     
     for i in range(10):
         y_pred = gp_no_cache.predict(X_test)
     
-    time_no_cache = time.time() - start_time
-    print(f"   Time without caching: {time_no_cache:.4f} seconds")
-    
-    # 2. With caching
-    print("\n2. Large dataset WITH caching:")
-    clear_kernel_cache()
-    
-    config = create_config("RBF", lmbda=0.1, use_cache=True)
-    start_time = time.time()
-    gp_cache = GP(config, sigma)
-    gp_cache.fit(X_train, y_train)
-    
-    for i in range(10):
-        y_pred = gp_cache.predict(X_test)
-    
-    time_with_cache = time.time() - start_time
-    print(f"   Time with caching: {time_with_cache:.4f} seconds")
-    
-    # Report cache statistics
-    cache_stats = get_cache_stats()
-    print(f"\n3. Cache statistics:")
-    print(f"   Cache hits: {cache_stats['hits']}")
-    print(f"   Cache misses: {cache_stats['misses']}")
-    print(f"   Hit rate: {cache_stats['hit_rate']:.2%}")
-    print(f"   Cache size: {cache_stats['cache_size']}")
-    
-    # Calculate speedup
-    if time_no_cache > 0 and time_with_cache > 0:
-        speedup = time_no_cache / time_with_cache
-        print(f"\n4. Performance improvement:")
-        print(f"   Speedup: {speedup:.2f}x")
-        print(f"   Time saved: {time_no_cache - time_with_cache:.4f} seconds")
+    cache_stats = gp_no_cache.get_cache_stats()
+    assert cache_stats is None, "Cache stats should be None when caching is disabled"
 
-def test_cache_config_options():
-    """Test that cache config options work correctly"""
-    print("\n" + "="*60)
-    print("Testing cache configuration options...")
-    
+def test_cache_clearing():
+    """Test cache clearing functionality"""
     np.random.seed(42)
-    X_train = np.random.randn(100, 2)
-    y_train = np.random.randn(100)
-    X_test = np.random.randn(50, 2)
+    X_train = np.random.randn(50, 2)
+    y_train = np.random.randn(50)
+    X_test = np.random.randn(20, 2)
     sigma = np.array([1.0, 1.0])
     
-    # Test with cache enabled
-    print("\n1. Testing with cache enabled:")
-    clear_kernel_cache()
-    config = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=50)
-    
-    gp = GP(config, sigma)
-    gp.fit(X_train, y_train)
-    
-    # Multiple predictions to make cache hits
-    for i in range(20):
-        y_pred = gp.predict(X_test)
-    
-    cache_stats = gp.get_cache_stats()
-    print(f"   Cache enabled: {cache_stats is not None}")
-    if cache_stats:
-        print(f"   Cache hits: {cache_stats['hits']}")
-        print(f"   Hit rate: {cache_stats['hit_rate']:.2%}")
-    
-    # Test with cache disabled
-    print("\n2. Testing with cache disabled:")
-    clear_kernel_cache()
-    config = create_config("RBF", lmbda=0.1, use_cache=False)
-    
-    gp = GP(config, sigma)
-    gp.fit(X_train, y_train)
-    
-    for i in range(20):
-        y_pred = gp.predict(X_test)
-    
-    cache_stats = gp.get_cache_stats()
-    print(f"   Cache enabled: {cache_stats is not None}")
-    
-    # Test cache clearing
-    print("\n3. Testing cache clearing:")
     config = create_config("RBF", lmbda=0.1, use_cache=True)
     gp = GP(config, sigma)
     gp.fit(X_train, y_train)
     
-    # Generate some cache entries
-    for i in range(10):
+    for i in range(5):
         y_pred = gp.predict(X_test)
     
     initial_stats = gp.get_cache_stats()
-    print(f"   Cache size before clearing: {initial_stats['cache_size']}")
+    assert initial_stats['cache_size'] > 0, "Cache should have entries before clearing"
     
     gp.clear_cache()
-    final_stats = gp.get_cache_stats()
-    print(f"   Cache size after clearing: {final_stats['cache_size']}")
 
-def test_cache_with_different_kernels():
-    """Test caching with different kernel types"""
-    print("\n" + "="*60)
-    print("Testing caching with different kernel types...")
-    
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
+def test_cache_with_different_kernels(kernel_type):
+    """Test caching works with different kernels"""
     np.random.seed(42)
-    X_train = np.random.randn(150, 3)
-    y_train = np.random.randn(150)
-    X_test = np.random.randn(75, 3)
+    X_train = np.random.randn(100, 3)
+    y_train = np.random.randn(100)
+    X_test = np.random.randn(30, 3)
     sigma = np.array([1.0, 1.0, 1.0])
     
-    kernels = ["RBF", "RQ"]
+    clear_kernel_cache()
+    config = create_config(kernel_type, lmbda=0.1, alpha=2.0, use_cache=True)
     
-    for kernel_type in kernels:
-        print(f"\nTesting {kernel_type} kernel:")
-        clear_kernel_cache()
-        
-        # Without caching
-        config = create_config(kernel_type, lmbda=0.1, alpha=2.0, use_cache=False)
-        start_time = time.time()
-        gp_no_cache = GP(config, sigma)
-        gp_no_cache.fit(X_train, y_train)
-        
-        for i in range(15):
-            y_pred = gp_no_cache.predict(X_test)
-        
-        time_no_cache = time.time() - start_time
-        
-        # With caching
-        clear_kernel_cache()
-        config = create_config(kernel_type, lmbda=0.1, alpha=2.0, use_cache=True)
-        start_time = time.time()
-        gp_cache = GP(config, sigma)
-        gp_cache.fit(X_train, y_train)
-        
-        for i in range(15):
-            y_pred = gp_cache.predict(X_test)
-        
-        time_with_cache = time.time() - start_time
-        
-        cache_stats = gp_cache.get_cache_stats()
-        
-        print(f"   Time without caching: {time_no_cache:.4f}s")
-        print(f"   Time with caching: {time_with_cache:.4f}s")
-        print(f"   Cache hits: {cache_stats['hits']}")
-        print(f"   Hit rate: {cache_stats['hit_rate']:.2%}")
-        
-        if time_no_cache > 0 and time_with_cache > 0:
-            speedup = time_no_cache / time_with_cache
-            print(f"   Speedup: {speedup:.2f}x")
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    for i in range(5):
+        y_pred = gp.predict(X_test)
+    
+    cache_stats = gp.get_cache_stats()
+    assert cache_stats is not None, f"Cache should work with {kernel_type} kernel"
+    assert cache_stats['hits'] > 0, f"Should have cache hits with {kernel_type} kernel"
 
-def test_cache_size_configuration():
-    """Test that different cache sizes work correctly"""
-    print("\n" + "="*60)
-    print("Testing cache size configuration...")
-    
+@pytest.mark.parametrize("cache_size", [5, 50, 100])
+def test_cache_size_configuration(cache_size):
+    """Test that cache sizing works - more entries than cache size should be LRU evicted"""
     np.random.seed(42)
-    X_train = np.random.randn(100, 2)
-    y_train = np.random.randn(100)
-    X_test = np.random.randn(50, 2)
+    X_train = np.random.randn(50, 2)
+    y_train = np.random.randn(50)
+    X_test = np.random.randn(20, 2)
     sigma = np.array([1.0, 1.0])
     
-    cache_sizes = [10, 50, 100]
+    clear_kernel_cache()
+    config = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=cache_size)
     
-    for cache_size in cache_sizes:
-        print(f"\nTesting cache size: {cache_size}")
-        clear_kernel_cache()
-        
-        config = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=cache_size)
-        gp = GP(config, sigma)
-        gp.fit(X_train, y_train)
-        
-        # Generate many predictions to test cache eviction
-        for i in range(30):
-            y_pred = gp.predict(X_test)
-        
-        cache_stats = gp.get_cache_stats()
-        print(f"   Final cache size: {cache_stats['cache_size']}")
-        print(f"   Cache hits: {cache_stats['hits']}")
-        print(f"   Hit rate: {cache_stats['hit_rate']:.2%}")
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    for i in range(10):
+        y_pred = gp.predict(X_test)
+    
+    cache_stats = gp.get_cache_stats()
+    assert cache_stats['cache_size'] <= cache_size, f"Cache size should respect configuration limit of {cache_size}"
+
+def test_cache_hit_rate():
+    """Test that cache hit rate increases with repeated preds"""
+    np.random.seed(42)
+    X_train = np.random.randn(50, 2)
+    y_train = np.random.randn(50)
+    X_test = np.random.randn(20, 2)
+    sigma = np.array([1.0, 1.0])
+    
+    config = create_config("RBF", lmbda=0.1, use_cache=True)
+    gp = GP(config, sigma)
+    gp.fit(X_train, y_train)
+    
+    # First prediction (should be cache miss)
+    y_pred = gp.predict(X_test)
+    stats_1 = gp.get_cache_stats()
+    hit_rate_1 = stats_1['hit_rate']
+    
+    # Multiple repeated predictions (should increase hit rate)
+    for i in range(10):
+        y_pred = gp.predict(X_test)
+    
+    stats_2 = gp.get_cache_stats()
+    hit_rate_2 = stats_2['hit_rate']
+    
+    assert hit_rate_2 >= hit_rate_1, "Hit rate should increase with repeated predictions"
+    assert stats_2['hits'] > stats_1['hits'], "Number of hits should increase with repeated predictions"
 
 if __name__ == "__main__":
-    test_repeated_predictions()
+    print("Running cache tests...")
+    
+    test_repeated_predictions_caching()
     test_large_dataset_caching()
     test_cache_config_options()
-    test_cache_with_different_kernels()
-    test_cache_size_configuration() 
+    test_cache_with_different_kernels("RBF")
+    test_cache_with_different_kernels("RQ")
+    test_cache_size_configuration(50)
+    test_cache_hit_rate()
+    
+    print("All cache tests completed!") 
