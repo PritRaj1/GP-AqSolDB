@@ -10,6 +10,8 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from src.gp import GP
+from src.kernels import load_parallel_conf, get_parallel_info
+
 
 class GPAutoTuner:
     def __init__(
@@ -46,6 +48,31 @@ class GPAutoTuner:
             self.config.read(config_path)
         else:
             self._create_default_config()
+        
+        self._load_parallel_settings()
+    
+    def _load_parallel_settings(self):
+        """Load and display parallel processing settings"""
+        try:
+            load_parallel_conf(self.config)
+            parallel_info = get_parallel_info()
+            
+            print(f"Parallelization configuration:")
+            print(f"  CPU cores available: {parallel_info['cpu_cores']}")
+            print(f"  GPU available: {parallel_info['gpu_available']}")
+            if parallel_info['gpu_available']:
+                if parallel_info['cupy_available']:
+                    print(f"  GPU backend: CuPy")
+            
+            settings = parallel_info['settings']
+            print(f"  Use parallel: {settings['use_parallel']}")
+            print(f"  Jobs: {settings['n_jobs'] if settings['n_jobs'] else 'auto'}")
+            print(f"  Use GPU: {settings['use_gpu']}")
+            print(f"  Chunk size: {settings['chunk_size']}")
+            print(f"  Min size for parallel: {settings['min_size_for_parallel']}")
+            
+        except Exception as e:
+            print(f"Warning: Could not load parallel settings: {e}")
     
     def _create_default_config(self):
         """Create default configuration"""
@@ -60,6 +87,13 @@ class GPAutoTuner:
             'use_sparse': 'false',
             'num_inducing': '20',
             'inducing_method': 'random'
+        }
+        self.config['PARALLEL'] = {
+            'use_parallel': 'true',
+            'n_jobs': 'None',
+            'chunk_size': '1000',
+            'use_gpu': 'false',
+            'min_size_for_parallel': '500'
         }
     
     def calculate_bic(self, mse, n_params, n_samples):
@@ -120,6 +154,10 @@ class GPAutoTuner:
             'num_inducing': str(num_inducing),
             'inducing_method': inducing_method
         }
+        
+        # Copy parallel settings from main config
+        if 'PARALLEL' in self.config:
+            config['PARALLEL'] = dict(self.config['PARALLEL'])
         
         # Perform cross-validation
         try:

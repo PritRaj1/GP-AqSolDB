@@ -25,9 +25,19 @@ def load_parallel_conf(config):
     if 'PARALLEL' in config:
         parallel_config = config['PARALLEL']
         
+        # Handle n_jobs specially - it can be 'None' string or an integer
+        n_jobs_raw = parallel_config.get('n_jobs', fallback=None)
+        if n_jobs_raw is None or n_jobs_raw.lower() == 'none':
+            n_jobs = None
+        else:
+            try:
+                n_jobs = parallel_config.getint('n_jobs')
+            except ValueError:
+                n_jobs = None
+        
         PARALLEL_SETTINGS.update({
             'use_parallel': parallel_config.getboolean('use_parallel', fallback=False),
-            'n_jobs': parallel_config.getint('n_jobs', fallback=None),
+            'n_jobs': n_jobs,
             'chunk_size': parallel_config.getint('chunk_size', fallback=1000),
             'use_gpu': parallel_config.getboolean('use_gpu', fallback=False),
             'min_size_for_parallel': parallel_config.getint('min_size_for_parallel', fallback=500)
