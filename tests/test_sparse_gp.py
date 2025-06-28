@@ -283,7 +283,7 @@ def test_sparse_gp_fit_predict_cycle():
     assert np.all(y_std > 0), "All uncertainties should be positive"
 
 if __name__ == "__main__":
-    print("Running sparse GP tests...")
+    print("\nRunning sparse GP tests...")
     
     test_sparse_vs_full_gp()
     test_different_inducing_points(10)

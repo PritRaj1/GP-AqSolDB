@@ -13,6 +13,14 @@ bash <conda-installer-name>-latest-Linux-x86_64.sh
 bash setup/auto.sh
 ```
 
+## Scripts
+
+### Testing
+
+```bash 
+bash tests/auto.sh
+```
+
 ## Data
 
 The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.

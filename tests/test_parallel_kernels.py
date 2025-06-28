@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Test script for parallel kernel computations
-"""
-
 import numpy as np
 import time
 import pytest
@@ -384,32 +379,21 @@ def test_memory_efficiency():
     assert not np.any(np.isnan(result))
 
 if __name__ == "__main__":
-    print("Running parallel kernel tests...")
-    print("=" * 50)
+    print("\nRunning parallel kernel tests...")
     
     sample_kernel_data = create_test_data(500, 3)
     
     test_sequential_vs_parallel("RBF", sample_kernel_data)
     test_sequential_vs_parallel("RQ", sample_kernel_data)
-    print("Sequential vs parallel consistency tests passed")
     
     for size in [100, 500, 1000]:
         test_parallel_performance_scaling(size)
-    print("Performance scaling tests passed")
     
     test_cache()
-    print("Cache integration tests passed")
-    
     test_memory_efficiency()
-    print("Memory efficiency tests passed")
-    
-    print("\n" + "=" * 50)
-    print("Testing GPU functionality...")
     test_gpu()
     test_gpu_vs_cpu()
     test_gpu_performance()
     test_gpu_fallback()
-    print("GPU tests completed")
     
-    print("\n" + "=" * 50)
     print("All parallel kernel tests completed!") 

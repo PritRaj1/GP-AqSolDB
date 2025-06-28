@@ -310,7 +310,7 @@ def visualize_gp_results():
                 facecolor='white', edgecolor='none')
 
 if __name__ == "__main__":
-    print("Running GP tests...")
+    print("\nRunning GP tests...")
     
     X_train_1d, y_train_1d = get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
     sample_data_1d = (X_train_1d, y_train_1d)

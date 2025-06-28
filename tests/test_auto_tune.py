@@ -410,7 +410,7 @@ def visualize_auto_tune_results():
             os.unlink(temp_sigma_path)
 
 if __name__ == "__main__":
-    print("Running auto-tuning tests...")
+    print("\nRunning auto-tuning tests...")
     np.random.seed(42)
     X_train = np.random.uniform(0, 5, (50, 2))
     y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 50)

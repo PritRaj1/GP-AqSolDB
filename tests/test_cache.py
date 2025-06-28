@@ -226,7 +226,7 @@ def test_cache_hit_rate():
     assert stats_2['hits'] > stats_1['hits'], "Number of hits should increase with repeated predictions"
 
 if __name__ == "__main__":
-    print("Running cache tests...")
+    print("\nRunning cache tests...")
     
     test_repeated_predictions_caching()
     test_large_dataset_caching()

@@ -230,7 +230,7 @@ def test_cache_integration():
     gp.clear_cache()
 
 if __name__ == "__main__":
-    print("Running GP tests...")
+    print("\nRunning GP tests...")
     
     test_unified_gp_switching()
     test_different_inducing_methods('random')
