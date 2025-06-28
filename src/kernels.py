@@ -25,7 +25,7 @@ def load_parallel_conf(config):
     if 'PARALLEL' in config:
         parallel_config = config['PARALLEL']
         
-        # Handle n_jobs specially - it can be 'None' string or an integer
+        # Conf for n_jobs can be 'None' string or an integer
         n_jobs_raw = parallel_config.get('n_jobs', fallback=None)
         if n_jobs_raw is None or n_jobs_raw.lower() == 'none':
             n_jobs = None
