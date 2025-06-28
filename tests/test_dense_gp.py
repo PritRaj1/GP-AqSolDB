@@ -168,7 +168,7 @@ def test_gp_invalid_inputs():
     with pytest.raises(ValueError):
         gp.fit(np.array([[1], [2]]), np.array([1]))
 
-def test_gp_univariate_sigma():
+def test_gp_univariate_sigma(return_data=False):
     """Test GP with univariate sigma (single length scale)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0 
@@ -193,7 +193,10 @@ def test_gp_univariate_sigma():
     if np.any(far_points) and np.any(near_points):
         assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
 
-def test_gp_multivariate_sigma():
+    if return_data:
+        return X_train, y_train, X_test, y_pred, y_std
+
+def test_gp_multivariate_sigma(return_data=False):
     """Test GP with multivariate sigma (different length scales per feature)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = np.array([1.0, 0.5])  
@@ -219,7 +222,10 @@ def test_gp_multivariate_sigma():
     assert len(y_std) == len(X_test)
     assert np.all(y_std >= 0)
 
-def test_gp_rational_quadratic_kernel():
+    if return_data:
+        return X_train, y_train, X_test, y_pred_grid, y_std_grid, X1, X2
+
+def test_gp_rational_quadratic_kernel(return_data=False):
     """Test GP with Rational Quadratic kernel"""
     config = create_config(kernel_type="RQ", lmbda=0.1, alpha=2.0)
     sigma = 1.0
@@ -236,11 +242,14 @@ def test_gp_rational_quadratic_kernel():
     assert len(y_std) == len(X_test)
     assert np.all(y_std >= 0)
 
+    if return_data:
+        return X_train, y_train, X_test, y_pred, y_std
+
 def visualize_gp_results():
     """Create visualizations for GP testing"""
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     
-    X_train, y_train, X_test, y_pred, y_std = test_gp_univariate_sigma()
+    X_train, y_train, X_test, y_pred, y_std = test_gp_univariate_sigma(return_data=True)
     
     sns.scatterplot(x=X_train.flatten(), y=y_train, color='red', s=30, 
                    label='Training Data', ax=axes[0, 0], zorder=5)
@@ -256,7 +265,7 @@ def visualize_gp_results():
     axes[0, 0].legend(frameon=True, fancybox=True, shadow=True)
     axes[0, 0].grid(True, alpha=0.3)
     
-    X_train_2d, y_train_2d, X_test_2d, y_pred_grid, y_std_grid, X1, X2 = test_gp_multivariate_sigma()
+    X_train_2d, y_train_2d, X_test_2d, y_pred_grid, y_std_grid, X1, X2 = test_gp_multivariate_sigma(return_data=True)
     
     im1 = axes[0, 1].contourf(X1, X2, y_pred_grid, levels=25, cmap='viridis', alpha=0.8)
     sns.scatterplot(x=X_train_2d[:, 0], y=X_train_2d[:, 1], color='red', s=60, 
@@ -278,7 +287,7 @@ def visualize_gp_results():
     cbar2 = plt.colorbar(im2, ax=axes[1, 0], shrink=0.8)
     cbar2.set_label(r'$\sigma(\mathbf{x})$', fontweight='bold')
     
-    X_train_rq, y_train_rq, X_test_rq, y_pred_rq, y_std_rq = test_gp_rational_quadratic_kernel()
+    X_train_rq, y_train_rq, X_test_rq, y_pred_rq, y_std_rq = test_gp_rational_quadratic_kernel(return_data=True)
     
     sns.scatterplot(x=X_train_rq.flatten(), y=y_train_rq, color='red', s=30, 
                    label='Training Data', ax=axes[1, 1], zorder=5)
@@ -303,7 +312,6 @@ def visualize_gp_results():
 if __name__ == "__main__":
     print("Running GP tests...")
     
-    # Create sample data manually for direct execution
     X_train_1d, y_train_1d = get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
     sample_data_1d = (X_train_1d, y_train_1d)
     
@@ -312,7 +320,6 @@ if __name__ == "__main__":
     y_train_2d = np.sin(X_train_2d[:, 0]) * np.exp(X_train_2d[:, 1]/5) + np.random.normal(0, 0.1, 30)
     sample_data_2d = (X_train_2d, y_train_2d)
     
-    # Call pytest functions directly
     test_gp_basic_functionality("RBF", 1.0, sample_data_1d)
     test_gp_basic_functionality("RQ", 1.0, sample_data_1d)
     test_gp_sigma_types("univariate", sample_data_1d, sample_data_2d)
