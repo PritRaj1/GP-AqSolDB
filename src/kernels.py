@@ -1,6 +1,43 @@
 import numpy as np
-from functools import lru_cache
 import hashlib
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+import warnings
+
+try:
+    import cupy as cp
+    CUPY_AVAILABLE = True
+except ImportError:
+    CUPY_AVAILABLE = False
+
+# Default
+PARALLEL_SETTINGS = {
+    'use_parallel': False,
+    'n_jobs': None,  # None for auto-detect
+    'chunk_size': 1000,  # Size of chunks for parallel processing
+    'use_gpu': False, 
+    'min_size_for_parallel': 500  # Minimum matrix size to use parallel processing
+}
+
+def load_parallel_conf(config):
+    global PARALLEL_SETTINGS
+    
+    if 'PARALLEL' in config:
+        parallel_config = config['PARALLEL']
+        
+        PARALLEL_SETTINGS.update({
+            'use_parallel': parallel_config.getboolean('use_parallel', fallback=False),
+            'n_jobs': parallel_config.getint('n_jobs', fallback=None),
+            'chunk_size': parallel_config.getint('chunk_size', fallback=1000),
+            'use_gpu': parallel_config.getboolean('use_gpu', fallback=False),
+            'min_size_for_parallel': parallel_config.getint('min_size_for_parallel', fallback=500)
+        })
+        
+        if PARALLEL_SETTINGS['use_gpu'] and not (CUPY_AVAILABLE):
+            warnings.warn("GPU acceleration requested but no GPU libraries available. Falling back to CPU.")
+            PARALLEL_SETTINGS['use_gpu'] = False
+    
+    return PARALLEL_SETTINGS
 
 class KernelCache:
     """Simple cache for repeated kernel computation"""
@@ -85,9 +122,135 @@ class KernelCache:
 # Global instance
 _kernel_cache = KernelCache()
 
+def _get_n_jobs():
+    """Number of jobs for parallel processing"""
+    if PARALLEL_SETTINGS['n_jobs'] is not None:
+        return PARALLEL_SETTINGS['n_jobs']
+    return min(mp.cpu_count(), 8)  # Capped at 8 to avoid overhead
+
+def _should_use_parallel(n1, n2):
+    """Based on matrix size"""
+    if not PARALLEL_SETTINGS['use_parallel']:
+        return False
+    min_size = PARALLEL_SETTINGS['min_size_for_parallel']
+    return n1 * n2 >= min_size * min_size
+
+def _chunk_indices(n, chunk_size):
+    """List of chunk indices"""
+    for i in range(0, n, chunk_size):
+        yield i, min(i + chunk_size, n)
+
+def _compute_kernel_chunk(args):
+    """Single chunk kernel matrix"""
+    X1_chunk, X2, sigma, kernel_type, alpha = args
+    
+    if kernel_type == "RBF":
+        return _compute_rbf_chunk(X1_chunk, X2, sigma)
+    elif kernel_type == "RQ":
+        return _compute_rq_chunk(X1_chunk, X2, sigma, alpha)
+    else:
+        raise ValueError(f"Unknown kernel type: {kernel_type}")
+
+def _compute_rbf_chunk(X1_chunk, X2, sigma):
+    """RBF kernel for a chunk of X1"""
+    X1_norm = X1_chunk / sigma
+    X2_norm = X2 / sigma
+    
+    # ||x-y||² = ||x||² + ||y||² - 2⟨x,y⟩
+    X1_sq = np.sum(X1_norm**2, axis=1, keepdims=True)
+    X2_sq = np.sum(X2_norm**2, axis=1)
+    inner_prod = X1_norm @ X2_norm.T
+    
+    sq_dist = X1_sq + X2_sq - 2 * inner_prod
+    return np.exp(-0.5 * sq_dist)
+
+def _compute_rq_chunk(X1_chunk, X2, sigma, alpha):
+    """RQ kernel for a chunk of X1"""
+    X1_norm = X1_chunk / sigma
+    X2_norm = X2 / sigma
+    
+    # ||x-y||² = ||x||² + ||y||² - 2⟨x,y⟩
+    X1_sq = np.sum(X1_norm**2, axis=1, keepdims=True)
+    X2_sq = np.sum(X2_norm**2, axis=1)
+    inner_prod = X1_norm @ X2_norm.T
+    
+    sq_dist = X1_sq + X2_sq - 2 * inner_prod
+    return (1 + 0.5 * sq_dist / alpha)**(-alpha)
+
+def _parallel_kernel_computation(X1, X2, sigma, kernel_type, alpha=None, use_cache=True):
+    """Parallelized kernel computation"""
+    n1, n2 = X1.shape[0], X2.shape[0]
+    chunk_size = PARALLEL_SETTINGS['chunk_size']
+    
+    # Check cache first
+    if use_cache:
+        if kernel_type == "RBF":
+            cached_result = _kernel_cache.get(X1, X2, sigma, alpha=None, kernel_type="RBF")
+        else:
+            cached_result = _kernel_cache.get(X1, X2, sigma, alpha=alpha, kernel_type="RQ")
+        
+        if cached_result is not None:
+            return cached_result
+    
+    # Prepare and process chunk
+    chunks = []
+    for i_start, i_end in _chunk_indices(n1, chunk_size):
+        X1_chunk = X1[i_start:i_end]
+        chunks.append((X1_chunk, X2, sigma, kernel_type, alpha))
+    
+    n_jobs = _get_n_jobs()
+    result_chunks = []
+    
+
+    # If single chunk, no need for parallel processing
+    if len(chunks) == 1:
+        result_chunks = [_compute_kernel_chunk(chunks[0])]
+    else:
+        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+            result_chunks = list(executor.map(_compute_kernel_chunk, chunks))
+    
+    result = np.vstack(result_chunks)
+    
+    if use_cache:
+        if kernel_type == "RBF":
+            _kernel_cache.set(X1, X2, sigma, alpha=None, kernel_type="RBF", result=result)
+        else:
+            _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result)
+    
+    return result
+
+def _cupy_kernel(X1, X2, sigma, kernel_type, alpha=None):
+    """CuPy kernel computation"""
+    if not CUPY_AVAILABLE:
+        raise RuntimeError("GPU acceleration not available. Install cupy.")
+    
+    X1_gpu = cp.asarray(X1)
+    X2_gpu = cp.asarray(X2)
+    sigma_gpu = cp.asarray(sigma)
+    
+    X1_norm = X1_gpu / sigma_gpu
+    X2_norm = X2_gpu / sigma_gpu
+    
+    # ||x-y||² = ||x||² + ||y||² - 2⟨x,y⟩
+    X1_sq = cp.sum(X1_norm**2, axis=1, keepdims=True)
+    X2_sq = cp.sum(X2_norm**2, axis=1)
+    inner_prod = X1_norm @ X2_norm.T
+    
+    sq_dist = X1_sq + X2_sq - 2 * inner_prod
+    
+    if kernel_type == "RBF":
+        result = cp.exp(-0.5 * sq_dist)
+    elif kernel_type == "RQ":
+        result = (1 + 0.5 * sq_dist / alpha)**(-alpha)
+    else:
+        raise ValueError(f"Unknown kernel type: {kernel_type}")
+    
+    # Back to CPU
+    return cp.asnumpy(result)
+
 def RBF(X1, X2, sigma, use_cache=True):
     """
-    Radial Basis Function kernel
+    Radial Basis Function kernel with optional parallel processing
     
     Parameters:
     -----------
@@ -105,9 +268,19 @@ def RBF(X1, X2, sigma, use_cache=True):
     K : np.ndarray, shape (n1, n2)
         Kernel matrix
     """
-    # Ensure sigma is a numpy array
     sigma = np.asarray(sigma)
+    n1, n2 = X1.shape[0], X2.shape[0]
     
+    if PARALLEL_SETTINGS['use_gpu']:
+        try:
+            return _cupy_kernel(X1, X2, sigma, "RBF")
+        except Exception as e:
+            warnings.warn(f"GPU computation failed, falling back to CPU: {e}")
+    
+    if _should_use_parallel(n1, n2):
+        return _parallel_kernel_computation(X1, X2, sigma, "RBF", use_cache=use_cache)
+    
+    # Sequential implementation
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=None, kernel_type="RBF")
         if cached_result is not None:
@@ -148,7 +321,7 @@ def RBF(X1, X2, sigma, use_cache=True):
 
 def RQ(X1, X2, sigma, alpha, use_cache=True):
     """
-    Rational Quadratic kernel 
+    Rational Quadratic kernel with optional parallel processing
     
     Parameters:
     -----------
@@ -170,7 +343,18 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
     """
     # Ensure sigma is a numpy array
     sigma = np.asarray(sigma)
+    n1, n2 = X1.shape[0], X2.shape[0]
     
+    if PARALLEL_SETTINGS['use_gpu']:
+        try:
+            return _cupy_kernel(X1, X2, sigma, "RQ", alpha)
+        except Exception as e:
+            warnings.warn(f"GPU computation failed, falling back to CPU: {e}")
+    
+    if _should_use_parallel(n1, n2):
+        return _parallel_kernel_computation(X1, X2, sigma, "RQ", alpha, use_cache=use_cache)
+    
+    # Sequential implementation
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=alpha, kernel_type="RQ")
         if cached_result is not None:
@@ -209,9 +393,68 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
     
     return result
 
+def configure_parallel_settings(use_parallel=False, n_jobs=None, chunk_size=1000, 
+                               use_gpu=False, min_size_for_parallel=500):
+    """
+    Configure config for kernel computations
+    
+    Parameters:
+    -----------
+    use_parallel : bool
+        Whether to use parallel processing
+    n_jobs : int, optional
+        Number of parallel jobs (None for auto-detect)
+    chunk_size : int
+        Size of chunks for parallel processing
+    use_gpu : bool
+        Whether to use GPU acceleration
+    min_size_for_parallel : int
+        Minimum matrix size to use parallel processing
+    """
+    global PARALLEL_SETTINGS
+    PARALLEL_SETTINGS.update({
+        'use_parallel': use_parallel,
+        'n_jobs': n_jobs,
+        'chunk_size': chunk_size,
+        'use_gpu': use_gpu,
+        'min_size_for_parallel': min_size_for_parallel
+    })
+    
+    print(f"Parallel kernel settings:")
+    print(f"  Use parallel: {use_parallel}")
+    print(f"  Jobs: {n_jobs if n_jobs else 'auto'}")
+    print(f"  Chunk size: {chunk_size}")
+    print(f"  Use GPU: {use_gpu}")
+    print(f"  Min size for parallel: {min_size_for_parallel}")
+    
+    if use_gpu:
+        if CUPY_AVAILABLE:
+            print(f"  GPU backend: CuPy")
+        else:
+            print(f"  GPU backend: None available")
+            PARALLEL_SETTINGS['use_gpu'] = False
+
+def get_parallel_info():
+    """Get parallel processing capabilities"""
+    info = {
+        'parallel_available': PARALLEL_SETTINGS['use_parallel'],
+        'cpu_cores': mp.cpu_count(),
+        'gpu_available': CUPY_AVAILABLE,
+        'cupy_available': CUPY_AVAILABLE,
+        'settings': PARALLEL_SETTINGS.copy()
+    }
+    
+    if CUPY_AVAILABLE:
+        try:
+            info['gpu_memory'] = cp.cuda.runtime.memGetInfo()[0]  # Free memory
+        except:
+            info['gpu_memory'] = None
+    
+    return info
+
 def get_kernel(config, sigma, use_cache=True, cache_size=100):
     """
-    Get kernel function based on config with optional caching
+    Get kernel function based on config with optional caching and parallel processing
     
     Parameters:
     -----------
@@ -230,6 +473,9 @@ def get_kernel(config, sigma, use_cache=True, cache_size=100):
         Vectorized kernel function that takes (X1, X2) and returns kernel matrix
     """
     global _kernel_cache
+    load_parallel_conf(config)
+    
+    # Configure cache
     if use_cache and _kernel_cache.max_size != cache_size:
         _kernel_cache = KernelCache(max_size=cache_size)
     

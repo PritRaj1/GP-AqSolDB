@@ -20,7 +20,8 @@ The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this reposit
 
 ## TODO
 
-- Parallelize
+- Parallelize auto tune cross-validation
+- Parallelize hp opt
 
 ## References
 
