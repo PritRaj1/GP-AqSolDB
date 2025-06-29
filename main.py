@@ -41,8 +41,16 @@ def uncertainty_plot(gp, X_train, X_test, y_test):
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    axes[0].scatter(y_test, y_pred, alpha=0.7, s=30, label='Predictions')
-    axes[0].errorbar(y_test, y_pred, yerr=2*y_std, fmt='none', alpha=0.3, capsize=2)
+    # 1.5x median uncertainty get differently coloured
+    threshold = np.median(y_std) * 1.5
+    high_uncertainty = y_std > threshold
+    low_uncertainty = ~high_uncertainty
+
+    axes[0].scatter(y_test[low_uncertainty], y_pred[low_uncertainty], alpha=0.7, s=30, label='Predictions', color='C0')
+    axes[0].errorbar(y_test[low_uncertainty], y_pred[low_uncertainty], yerr=2*y_std[low_uncertainty], fmt='none', alpha=0.3, capsize=2, color='C0')
+    if np.any(high_uncertainty):
+        axes[0].scatter(y_test[high_uncertainty], y_pred[high_uncertainty], alpha=0.9, s=40, label='High Uncertainty', color='red', edgecolor='black', zorder=5)
+        axes[0].errorbar(y_test[high_uncertainty], y_pred[high_uncertainty], yerr=2*y_std[high_uncertainty], fmt='none', alpha=0.7, capsize=2, color='red')
     axes[0].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
     axes[0].set_xlabel('Actual Solubility')
     axes[0].set_ylabel('Predicted Solubility')
