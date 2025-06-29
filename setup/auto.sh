@@ -9,6 +9,7 @@ if [ $? -ne 0 ]; then
 fi
 
 conda activate GP_sol
+conda install -c conda-forge tmux -y # OPTIONAL
 
 # Install Python requirements
 echo "Installing Python requirements..."

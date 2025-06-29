@@ -9,16 +9,36 @@ Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/i
 bash <conda-installer-name>-latest-Linux-x86_64.sh
 ```
 
+Run:
 ```bash
 bash setup/auto.sh
 ```
 
+NOTE: This will create a conda environment for the Python dependencies called 'GP_sol'. The terminal multiplexer 'tmux' will also be installed in GP_sol - which is my personall preferred method of running long programs.
+
 ## Scripts
 
-### Testing
+```bash
+conda activate GP_sol
+```
+
+To test:
 
 ```bash 
 pytest tests
+```
+
+To run:
+
+```bash
+# In terminal
+python main.py 
+```
+
+```bash
+# In pseudo terminal (preferred)
+tmux new-session -d -s GP_sol_main "python main.py"
+tmux pipe-pane -t GP_sol_main "cat > main.log"
 ```
 
 ## Data
