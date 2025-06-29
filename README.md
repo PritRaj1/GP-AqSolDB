@@ -18,7 +18,7 @@ bash setup/auto.sh
 ### Testing
 
 ```bash 
-bash tests/auto.sh
+pytest tests
 ```
 
 ## Data

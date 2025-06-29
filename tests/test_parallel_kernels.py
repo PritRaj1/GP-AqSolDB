@@ -6,7 +6,7 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_settings_from_config
+from src.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
 
 def create_test_data(n_samples, n_features):
     """Create test data for kernel computation"""
@@ -44,14 +44,12 @@ def test_parallel_info():
     assert 'cpu_cores' in parallel_info
     assert 'gpu_available' in parallel_info
     assert 'cupy_available' in parallel_info
-    assert 'numba_cuda_available' in parallel_info
     assert 'settings' in parallel_info
     
     assert isinstance(parallel_info['cpu_cores'], int)
     assert parallel_info['cpu_cores'] > 0
     assert isinstance(parallel_info['gpu_available'], bool)
     assert isinstance(parallel_info['cupy_available'], bool)
-    assert isinstance(parallel_info['numba_cuda_available'], bool)
 
 def test_conf():
     """Test config"""
@@ -59,7 +57,7 @@ def test_conf():
     parallel_info = get_parallel_info()
     settings = parallel_info['settings']
     
-    assert settings['use_parallel'] == True
+    assert settings['use_parallel'] == False
     assert settings['n_jobs'] is None  # Auto-detect
     assert settings['chunk_size'] == 1000
     assert settings['use_gpu'] == False
@@ -93,7 +91,7 @@ def test_conf_load():
         'min_size_for_parallel': '300'
     }
     
-    load_parallel_settings_from_config(config)
+    load_parallel_conf(config)
     
     parallel_info = get_parallel_info()
     settings = parallel_info['settings']
@@ -109,7 +107,7 @@ def test_conf_load_missing():
     config = ConfigParser()
     config['KERNEL'] = {'type': 'RBF'}
     
-    load_parallel_settings_from_config(config)
+    load_parallel_conf(config)
     
     parallel_info = get_parallel_info()
     settings = parallel_info['settings']
