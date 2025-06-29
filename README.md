@@ -37,8 +37,7 @@ python main.py
 
 ```bash
 # In pseudo terminal (preferred)
-tmux new-session -d -s GP_sol_main "python main.py"
-tmux pipe-pane -t GP_sol_main "cat > main.log"
+bash run.sh
 ```
 
 ## Data
