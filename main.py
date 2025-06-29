@@ -1,13 +1,13 @@
 import os
-import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-import warnings
-warnings.filterwarnings('ignore')
+from configparser import ConfigParser
+import imageio
+import glob
 
 from src.auto_tune import GPAutoTuner
 from src.gp import GP
@@ -165,6 +165,149 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
+def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, n_steps=400, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
+    np.random.seed(42)
+    os.makedirs(FIGURE_DIR, exist_ok=True)
+    frames = []
+    gif_config = ConfigParser()
+    
+    for section in config.sections():
+        gif_config[section] = dict(config[section])
+    if 'PARALLEL' not in gif_config:
+        gif_config['PARALLEL'] = {}
+    
+    gif_config['PARALLEL']['use_parallel'] = 'false'
+    gif_config['PARALLEL']['n_jobs'] = '1'
+    gif_config['PARALLEL']['use_gpu'] = 'false'
+
+    length_scales = 1.0 / sigmas
+    sorted_indices = np.argsort(length_scales)[::-1]
+    bottom2_idx = sorted_indices[-2:]
+    x_idx, y_idx = bottom2_idx[0], bottom2_idx[1]
+    x_name, y_name = feature_names[x_idx], feature_names[y_idx]
+
+    xlim = (np.percentile(full_X[:, x_idx], 1), np.percentile(full_X[:, x_idx], 99))
+    ylim = (np.percentile(full_X[:, y_idx], 1), np.percentile(full_X[:, y_idx], 99))
+    grid_size = 30
+    x1 = np.linspace(xlim[0], xlim[1], grid_size)
+    x2 = np.linspace(ylim[0], ylim[1], grid_size)
+    X1g, X2g = np.meshgrid(x1, x2)
+    X_grid = np.zeros((X1g.size, X.shape[1]))
+    X_grid[:, x_idx] = X1g.ravel()
+    X_grid[:, y_idx] = X2g.ravel()
+    for i in range(X.shape[1]):
+        if i not in (x_idx, y_idx):
+            X_grid[:, i] = np.mean(X[:, i])
+
+    pool_idx = np.arange(len(X))
+    init_idx = np.random.choice(pool_idx, size=n_init, replace=False)
+    train_idx = list(init_idx)
+    pool_idx = np.setdiff1d(pool_idx, train_idx)
+    temp_train_idx = list(train_idx)
+    temp_pool_idx = np.setdiff1d(np.arange(len(X)), temp_train_idx)
+    temp_mean_uncertainties = []
+    grid_unc_min, grid_unc_max = np.inf, -np.inf
+    
+    for _ in range(n_steps):
+        X_train, y_train = X[temp_train_idx], y[temp_train_idx]
+        
+        gp = GP(gif_config, sigmas)
+        gp.fit(X_train, y_train)
+        
+        _, y_std_grid = gp.predict(X_grid, return_std=True)
+        grid_unc_min = min(grid_unc_min, np.min(y_std_grid))
+        grid_unc_max = max(grid_unc_max, np.max(y_std_grid))
+        X_pool = X[temp_pool_idx]
+        _, y_std_pool = gp.predict(X_pool, return_std=True)
+        temp_mean_uncertainties.append(np.mean(y_std_pool))
+        
+        if len(temp_pool_idx) > 0:
+            next_idx_in_pool = np.argmax(y_std_pool)
+            next_idx = temp_pool_idx[next_idx_in_pool]
+            temp_train_idx.append(next_idx)
+            temp_pool_idx = np.setdiff1d(temp_pool_idx, [next_idx])
+    
+    unc_ylim = (min(temp_mean_uncertainties)*0.95, max(temp_mean_uncertainties)*1.05)
+    del temp_train_idx, temp_pool_idx, temp_mean_uncertainties
+
+    mean_uncertainties = []
+    all_uncertainties = []
+    all_gp_uncertainties = []
+    pool_idx = np.arange(len(X))
+    init_idx = np.random.choice(pool_idx, size=n_init, replace=False)
+    train_idx = list(init_idx)
+    pool_idx = np.setdiff1d(pool_idx, train_idx)
+
+    for step in range(n_steps):
+        X_train, y_train = X[train_idx], y[train_idx]
+        X_pool = X[pool_idx]
+        
+        gp = GP(gif_config, sigmas)
+        gp.fit(X_train, y_train)
+        
+        _, y_std_pool = gp.predict(X_pool, return_std=True)
+        mean_uncertainties.append(np.mean(y_std_pool))
+        all_uncertainties.append(y_std_pool.copy())
+        all_gp_uncertainties.extend(y_std_pool.tolist())
+        
+        if len(pool_idx) > 0:
+            next_idx_in_pool = np.argmax(y_std_pool)
+            next_idx = pool_idx[next_idx_in_pool]
+            train_idx.append(next_idx)
+            pool_idx = np.setdiff1d(pool_idx, [next_idx])
+        
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        
+        ax = axes[0]
+        ax.scatter(full_X[:, x_idx], full_X[:, y_idx], c='white', s=40, marker='x', label='All Data', alpha=0.8, zorder=1)
+        ax.scatter(X[pool_idx, x_idx], X[pool_idx, y_idx], c='gray', s=40, marker='x', label='Pool', alpha=0.3, zorder=2)
+        ax.scatter(X[train_idx, x_idx], X[train_idx, y_idx], c='lime', s=40, marker='x', label='Train', alpha=0.9, zorder=3)
+        
+        if len(train_idx) > n_init:
+            last_added_idx = train_idx[-1]
+            ax.scatter(X[last_added_idx, x_idx], X[last_added_idx, y_idx], c='red', s=120, marker='x', label='Newly Added', edgecolor='black', linewidth=3, zorder=4)
+        
+        ax.set_xlabel(x_name)
+        ax.set_ylabel(y_name)
+        ax.set_title(f'Learning Step {step+1}/{n_steps}')
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        
+        _, y_std_grid = gp.predict(X_grid, return_std=True)
+        y_std_grid = y_std_grid.reshape(X1g.shape)
+        levels = np.linspace(grid_unc_min, grid_unc_max, 40)
+        im = ax.contourf(X1g, X2g, y_std_grid, levels=levels, cmap='plasma', alpha=0.7, vmin=grid_unc_min, vmax=grid_unc_max)
+        
+        fig.colorbar(im, ax=ax, label='Uncertainty')
+        
+        ax2 = axes[1]
+        ax2.plot(np.arange(1, step+2), mean_uncertainties, '-o', color='purple')
+        ax2.set_xlabel('Active Learning Step')
+        ax2.set_ylabel('Mean Predictive Uncertainty')
+        ax2.set_title('Uncertainty Reduction')
+        ax2.set_xlim(1, n_steps)
+        ax2.set_ylim(unc_ylim)
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        frame_path = f'{FIGURE_DIR}/_al_frame_{step:03d}.png'
+        plt.savefig(frame_path, dpi=120, bbox_inches='tight')
+        plt.close(fig)
+        
+        frames.append(imageio.v2.imread(frame_path))
+        os.remove(frame_path)
+    
+    imageio.mimsave(gif_path, frames, duration=0.7)
+    print(f"Active learning GIF saved to {gif_path}")
+    
+    for f in glob.glob(f'{FIGURE_DIR}/_al_frame_*.png'):
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+
 def main():
     print("="*80)
     print("Tuning/training on AqSolDB")
@@ -200,12 +343,21 @@ def main():
     print(f"Mean uncertainty: {np.mean(y_std):.4f}")
 
     uncertainty_plot(gp, X_train, X_test, y_test)
+    
     length_scales = 1.0 / sigmas
     sorted_indices = np.argsort(length_scales)[::-1]
+    
     plot_length_scales(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_length_scales.png')
     plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
     plot_relative_importance(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_relative_importance.png')
     plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
+
+    subset_size = min(500, len(X))
+    subset_idx = np.random.choice(len(X), subset_size, replace=False)
+    X_subset = X[subset_idx, :2]
+    y_subset = y[subset_idx]
+    
+    learning_evolution(X_subset, y_subset, feature_names[:2], config, sigmas[:2], full_X=X, n_init=3, n_steps=50, gif_path=f'{FIGURE_DIR}/learning_evolution.gif')
 
     print("\n" + "="*80)
     print("Done!")
@@ -217,6 +369,7 @@ def main():
     print(f"- {FIGURE_DIR}/kernel_sigmas.png")
     print(f"- {FIGURE_DIR}/kernel_relative_importance.png")
     print(f"- {FIGURE_DIR}/kernel_uncertainty_heatmap.png")
+    print(f"- {FIGURE_DIR}/learning_evolution.gif")
     print(f"- {CONFIG_PATH}")
     print(f"- {SIGMA_PATH}")
 

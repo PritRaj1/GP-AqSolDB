@@ -13,6 +13,7 @@ requirements = [
     'matplotlib',
     'seaborn',
     'pandas',
+    'imageio',
     'cupy-cuda12x', # Replace with your CUDA version
 ]
 
