@@ -39,93 +39,117 @@ def load_data():
 def uncertainty_plot(gp, X_train, X_test, y_test):
     y_pred, y_std = gp.predict(X_test, return_std=True)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     # 1.5x median uncertainty get differently coloured
     threshold = np.median(y_std) * 1.5
     high_uncertainty = y_std > threshold
     low_uncertainty = ~high_uncertainty
 
-    axes[0].scatter(y_test[low_uncertainty], y_pred[low_uncertainty], alpha=0.7, s=30, label='Predictions', color='C0')
-    axes[0].errorbar(y_test[low_uncertainty], y_pred[low_uncertainty], yerr=2*y_std[low_uncertainty], fmt='none', alpha=0.3, capsize=2, color='C0')
+    ax.scatter(y_test[low_uncertainty], y_pred[low_uncertainty], alpha=0.7, s=30, label='Predictions', color='C0')
+    ax.errorbar(y_test[low_uncertainty], y_pred[low_uncertainty], yerr=2*y_std[low_uncertainty], fmt='none', alpha=0.3, capsize=2, color='C0')
     if np.any(high_uncertainty):
-        axes[0].scatter(y_test[high_uncertainty], y_pred[high_uncertainty], alpha=0.9, s=40, label='High Uncertainty', color='red', edgecolor='black', zorder=5)
-        axes[0].errorbar(y_test[high_uncertainty], y_pred[high_uncertainty], yerr=2*y_std[high_uncertainty], fmt='none', alpha=0.7, capsize=2, color='red')
-    axes[0].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-    axes[0].set_xlabel('Actual Solubility')
-    axes[0].set_ylabel('Predicted Solubility')
-    axes[0].set_title('GP Predictions with 95% Confidence Intervals')
-    axes[0].legend()
-    axes[0].grid(True, alpha=0.3)
-    
-    axes[1].hist(y_std, bins=30, alpha=0.8, edgecolor='black')
-    axes[1].axvline(np.mean(y_std), color='red', linestyle='--', label=f'Mean: {np.mean(y_std):.3f}')
-    axes[1].set_xlabel('Prediction Uncertainty (σ)')
-    axes[1].set_ylabel('Frequency')
-    axes[1].set_title('Distribution of Prediction Uncertainties')
-    axes[1].legend()
-    axes[1].grid(True, alpha=0.3)
+        ax.scatter(y_test[high_uncertainty], y_pred[high_uncertainty], alpha=0.9, s=40, label='High Uncertainty', color='red', edgecolor='black', zorder=5)
+        ax.errorbar(y_test[high_uncertainty], y_pred[high_uncertainty], yerr=2*y_std[high_uncertainty], fmt='none', alpha=0.7, capsize=2, color='red')
+    ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+    ax.set_xlabel('Actual Solubility')
+    ax.set_ylabel('Predicted Solubility')
+    ax.set_title('GP Predictions with 95% Confidence Intervals')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
     os.makedirs(FIGURE_DIR, exist_ok=True)
     plt.savefig(f'{FIGURE_DIR}/solubility_uncertainty.png', dpi=300, bbox_inches='tight')
     plt.close()
 
-def kernel_plot(sigmas, feature_names):
-    
-    length_scales = 1.0 / sigmas
-    
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    
-    sorted_indices = np.argsort(length_scales)[::-1]
+def plot_length_scales(length_scales, feature_names, sorted_indices, save_path):
     sorted_features = [feature_names[i] for i in sorted_indices]
     sorted_length_scales = length_scales[sorted_indices]
-    bars = axes[0, 0].barh(range(len(sorted_features)), sorted_length_scales)
-    
-    axes[0, 0].set_yticks(range(len(sorted_features)))
-    axes[0, 0].set_yticklabels(sorted_features)
-    axes[0, 0].set_xlabel('Length Scale (Feature Importance)')
-    axes[0, 0].set_title('Kernel Length Scales - Feature Importance')
-    axes[0, 0].grid(True, alpha=0.3)
-    
+    fig, ax = plt.subplots(figsize=(10, 8))
+    bars = ax.barh(range(len(sorted_features)), sorted_length_scales)
+    ax.set_yticks(range(len(sorted_features)))
+    ax.set_yticklabels(sorted_features)
+    ax.set_xlabel('Length Scale (Feature Importance)')
+    ax.set_title('Kernel Length Scales - Feature Importance')
+    ax.grid(True, alpha=0.3)
     colors = plt.cm.viridis(np.linspace(0, 1, len(bars)))
     for bar, color in zip(bars, colors):
         bar.set_color(color)
-    
-    axes[0, 1].barh(range(len(sorted_features)), 1/sorted_length_scales)
-    axes[0, 1].set_yticks(range(len(sorted_features)))
-    axes[0, 1].set_yticklabels(sorted_features)
-    axes[0, 1].set_xlabel('Sigma (Length Scale)')
-    axes[0, 1].set_title('Kernel Sigma Values')
-    axes[0, 1].grid(True, alpha=0.3)
-    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_sigmas(length_scales, feature_names, sorted_indices, save_path):
+    sorted_features = [feature_names[i] for i in sorted_indices]
+    sorted_length_scales = length_scales[sorted_indices]
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.barh(range(len(sorted_features)), 1/sorted_length_scales, color='lightcoral')
+    ax.set_yticks(range(len(sorted_features)))
+    ax.set_yticklabels(sorted_features)
+    ax.set_xlabel('Sigma (Length Scale)')
+    ax.set_title('Kernel Sigma Values')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_relative_importance(length_scales, feature_names, sorted_indices, save_path):
+    sorted_features = [feature_names[i] for i in sorted_indices]
     importance_ratio = length_scales / np.max(length_scales)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.barh(range(len(sorted_features)), importance_ratio[sorted_indices], color='lightcoral')
+    ax.set_yticks(range(len(sorted_features)))
+    ax.set_yticklabels(sorted_features)
+    ax.set_xlabel('Relative Importance')
+    ax.set_title('Relative Feature Importance')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path):
+    length_scales = 1.0 / sigmas
+    sorted_indices = np.argsort(length_scales)[::-1]
+    top2_idx = sorted_indices[:2]
     
-    axes[1, 0].barh(range(len(sorted_features)), importance_ratio)
-    axes[1, 0].set_yticks(range(len(sorted_features)))
-    axes[1, 0].set_yticklabels(sorted_features)
-    axes[1, 0].set_xlabel('Relative Importance')
-    axes[1, 0].set_title('Relative Feature Importance')
-    axes[1, 0].grid(True, alpha=0.3)
+    x1_name, x2_name = feature_names[top2_idx[0]], feature_names[top2_idx[1]]
+    x1 = np.linspace(np.percentile(X[:, top2_idx[0]], 1), np.percentile(X[:, top2_idx[0]], 99), 60)
+    x2 = np.linspace(np.percentile(X[:, top2_idx[1]], 1), np.percentile(X[:, top2_idx[1]], 99), 60)
+    X1g, X2g = np.meshgrid(x1, x2)
+    X_grid = np.zeros((X1g.size, X.shape[1]))
+    X_grid[:, top2_idx[0]] = X1g.ravel()
+    X_grid[:, top2_idx[1]] = X2g.ravel()
     
-    cumulative_importance = np.cumsum(sorted_length_scales) / np.sum(length_scales)
+    for i in range(X.shape[1]):
+        if i not in top2_idx:
+            X_grid[:, i] = np.mean(X[:, i])
+    _, y_std_grid = gp.predict(X_grid, return_std=True)
+    y_std_grid = y_std_grid.reshape(X1g.shape)
     
-    axes[1, 1].plot(range(len(sorted_features)), cumulative_importance, 'o-', linewidth=2)
-    axes[1, 1].set_xlabel('Number of Features')
-    axes[1, 1].set_ylabel('Cumulative Importance')
-    axes[1, 1].set_title('Cumulative Feature Importance')
-    axes[1, 1].grid(True, alpha=0.3)
-    axes[1, 1].axhline(0.8, color='red', linestyle='--', alpha=0.7, label='80% Importance')
-    axes[1, 1].legend()
+    fig, (ax_heat, ax_hist) = plt.subplots(1, 2, figsize=(16, 7))
+    cf = ax_heat.contourf(X1g, X2g, y_std_grid, levels=30, cmap='plasma')
+    fig.colorbar(cf, ax=ax_heat, label='Predicted Uncertainty')
+    
+    ax_heat.set_xlabel(x1_name)
+    ax_heat.set_ylabel(x2_name)
+    ax_heat.set_title('2D Uncertainty Heatmap (Top 2 Features)')
+    ax_heat.set_xlim(x1.min(), x1.max())
+    ax_heat.set_ylim(x2.min(), x2.max())
+    
+    if X_train is not None:
+        ax_heat.scatter(X_train[:, top2_idx[0]], X_train[:, top2_idx[1]], 
+                       c='lime', marker='x', s=18, alpha=0.7, 
+                       label='Training Data', zorder=5, linewidth=1.2)
+        ax_heat.legend()
+    
+    ax_hist.hist(y_std_grid.ravel(), bins=30, color='purple', alpha=0.7, edgecolor='black')
+    ax_hist.set_xlabel('Predicted Uncertainty')
+    ax_hist.set_ylabel('Frequency')
+    ax_hist.set_title('Distribution of Predicted Uncertainties (Grid)')
     
     plt.tight_layout()
-    os.makedirs(FIGURE_DIR, exist_ok=True)
-    plt.savefig(f'{FIGURE_DIR}/kernel_interpretability.png', dpi=300, bbox_inches='tight')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    
-    print("\nTop 5 Important Features:")
-    
-    for i, (feature, importance) in enumerate(zip(sorted_features[:5], sorted_length_scales[:5])):
-        print(f"{i+1}. {feature}: {importance:.3f}")
 
 def main():
     print("="*80)
@@ -162,15 +186,23 @@ def main():
     print(f"Mean uncertainty: {np.mean(y_std):.4f}")
 
     uncertainty_plot(gp, X_train, X_test, y_test)
-    kernel_plot(sigmas, feature_names)
-    
+    length_scales = 1.0 / sigmas
+    sorted_indices = np.argsort(length_scales)[::-1]
+    plot_length_scales(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_length_scales.png')
+    plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
+    plot_relative_importance(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_relative_importance.png')
+    plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
+
     print("\n" + "="*80)
     print("Done!")
     print("="*80)
 
     print("Files:")
     print(f"- {FIGURE_DIR}/solubility_uncertainty.png")
-    print(f"- {FIGURE_DIR}/solubility_kernel_interpretability.png")
+    print(f"- {FIGURE_DIR}/kernel_length_scales.png")
+    print(f"- {FIGURE_DIR}/kernel_sigmas.png")
+    print(f"- {FIGURE_DIR}/kernel_relative_importance.png")
+    print(f"- {FIGURE_DIR}/kernel_uncertainty_heatmap.png")
     print(f"- {CONFIG_PATH}")
     print(f"- {SIGMA_PATH}")
 
