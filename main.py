@@ -42,8 +42,8 @@ def uncertainty_plot(gp, X_train, X_test, y_test):
 
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    # 1.5x median uncertainty get differently coloured
-    threshold = np.median(y_std) * 1.5
+    # 2 std away from mean uncertainty get differently coloured
+    threshold = np.mean(y_std) + 2 * np.std(y_std)
     high_uncertainty = y_std > threshold
     low_uncertainty = ~high_uncertainty
 
@@ -82,23 +82,6 @@ def plot_length_scales(length_scales, feature_names, sorted_indices, save_path):
     colors = plt.cm.viridis(np.linspace(0, 1, len(bars)))
     for bar, color in zip(bars, colors):
         bar.set_color(color)
-    
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def plot_sigmas(length_scales, feature_names, sorted_indices, save_path):
-    sorted_features = [feature_names[i] for i in sorted_indices]
-    sorted_length_scales = length_scales[sorted_indices]
-    
-    fig, ax = plt.subplots(figsize=(10, 8))
-    
-    ax.barh(range(len(sorted_features)), 1/sorted_length_scales, color='lightcoral')
-    ax.set_yticks(range(len(sorted_features)))
-    ax.set_yticklabels(sorted_features)
-    ax.set_xlabel('Sigma (Length Scale)')
-    ax.set_title('Kernel Sigma Values')
-    ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -173,7 +156,7 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=30, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
+def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=100, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
     np.random.seed(42)
     os.makedirs(FIGURE_DIR, exist_ok=True)
     frames = []
@@ -376,7 +359,7 @@ def surface_plot(gp, X, y, sigmas, feature_names, save_path):
     ax.set_ylim(np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95))
     ax.legend()
     
-    ax.view_init(elev=20, azim=45)
+    ax.view_init(elev=20, azim=115)
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -422,7 +405,6 @@ def main():
     sorted_indices = np.argsort(length_scales)[::-1]
     
     plot_length_scales(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_length_scales.png')
-    plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
     plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
     
     surface_plot(gp, X, y, sigmas, feature_names, f'{FIGURE_DIR}/solubility_surface.png')
