@@ -492,7 +492,7 @@ def get_kernel(config, sigma, use_cache=True, cache_size=100):
     kernel_type = config.get("KERNEL", "type")
     alpha = config.getfloat("KERNEL", "alpha")
 
-    kernel_functions = {    
+    kernel_functions = {
         "RBF": lambda X1, X2: RBF(X1, X2, sigma, use_cache=use_cache),
         "RQ": lambda X1, X2: RQ(X1, X2, sigma, alpha, use_cache=use_cache)
     }

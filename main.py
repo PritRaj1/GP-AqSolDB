@@ -8,6 +8,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from configparser import ConfigParser
 import imageio
 import glob
+from scipy.spatial.distance import cdist
 
 from src.auto_tune import GPAutoTuner
 from src.gp import GP
@@ -109,16 +110,32 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     top2_idx = sorted_indices[:2]
     x_idx, y_idx = top2_idx[0], top2_idx[1]
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
-    x1 = np.linspace(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), 60)
-    x2 = np.linspace(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), 60)
+    
+    x1_min, x1_max = np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99)
+    x2_min, x2_max = np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99)
+    x1 = np.linspace(x1_min, x1_max, 60)
+    x2 = np.linspace(x2_min, x2_max, 60)
     X1g, X2g = np.meshgrid(x1, x2)
     X_grid = np.zeros((X1g.size, X.shape[1]))
     X_grid[:, x_idx] = X1g.ravel()
     X_grid[:, y_idx] = X2g.ravel()
     
+    subset_size = min(1000, len(X))
+    if len(X) > subset_size:
+        np.random.seed(42)
+        sample_indices = np.random.choice(len(X), subset_size, replace=False)
+        X_sample = X[sample_indices]
+    else:
+        X_sample = X
+    
+    # For each grid point, use the closest real data point for other dimensions
     for i in range(X.shape[1]):
         if i not in top2_idx:
-            X_grid[:, i] = np.mean(X[:, i])
+            grid_2d = X_grid[:, [x_idx, y_idx]]
+            sample_2d = X_sample[:, [x_idx, y_idx]]
+            distances = cdist(grid_2d, sample_2d)
+            closest_indices = np.argmin(distances, axis=1)
+            X_grid[:, i] = X_sample[closest_indices, i]
     
     _, y_std_grid = gp.predict(X_grid, return_std=True)
     y_std_grid = y_std_grid.reshape(X1g.shape)
@@ -134,7 +151,15 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     ax_heat.set_ylim(x2.min(), x2.max())
     
     if X_train is not None:
-        ax_heat.scatter(X_train[:, x_idx], X_train[:, y_idx], 
+        train_subset_size = min(500, len(X_train))
+        if len(X_train) > train_subset_size:
+            np.random.seed(42)
+            train_sample_indices = np.random.choice(len(X_train), train_subset_size, replace=False)
+            X_train_sample = X_train[train_sample_indices]
+        else:
+            X_train_sample = X_train
+            
+        ax_heat.scatter(X_train_sample[:, x_idx], X_train_sample[:, y_idx], 
                        c='lime', marker='x', s=18, alpha=0.7, 
                        label='Training Data', zorder=5, linewidth=1.2)
         ax_heat.legend()
@@ -142,7 +167,7 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     ax_hist.hist(y_std_grid.ravel(), bins=30, color='purple', alpha=0.7, edgecolor='black')
     ax_hist.set_xlabel('Predicted Uncertainty')
     ax_hist.set_ylabel('Frequency')
-    ax_hist.set_title('Distribution of Predicted Uncertainties (Grid)')
+    ax_hist.set_title('Distribution of Predicted Uncertainties')
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -253,8 +278,8 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         ax.set_title(f'Learning Step {step+1}/{n_steps}')
         ax.legend(loc='lower right')
         ax.grid(True, alpha=0.3)
-        ax.set_xlim(0, 10)
-        ax.set_ylim(0,0.1)
+        ax.set_xlim(np.percentile(full_X[:, x_idx], 5), np.percentile(full_X[:, x_idx], 95))
+        ax.set_ylim(np.percentile(full_X[:, y_idx], 5), np.percentile(full_X[:, y_idx], 95))
         
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         y_std_grid = y_std_grid.reshape(X1g.shape)
@@ -289,8 +314,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         except Exception:
             pass
 
-def heatmap_predictions(gp, X, sigmas, feature_names, save_path):
-
+def surface_plot(gp, X, y, sigmas, feature_names, save_path):
     length_scales = 1.0 / sigmas
     sorted_indices = np.argsort(length_scales)[::-1]
     x_idx, y_idx = sorted_indices[0], sorted_indices[1]
@@ -304,27 +328,56 @@ def heatmap_predictions(gp, X, sigmas, feature_names, save_path):
     X_grid[:, x_idx] = X1g.ravel()
     X_grid[:, y_idx] = X2g.ravel()
     
+    subset_size = min(1000, len(X))
+    if len(X) > subset_size:
+        np.random.seed(42)
+        sample_indices = np.random.choice(len(X), subset_size, replace=False)
+        X_sample = X[sample_indices]
+    else:
+        X_sample = X
+    
     for i in range(X.shape[1]):
         if i not in (x_idx, y_idx):
-            X_grid[:, i] = np.mean(X[:, i])
+            grid_2d = X_grid[:, [x_idx, y_idx]]
+            sample_2d = X_sample[:, [x_idx, y_idx]]
+            distances = cdist(grid_2d, sample_2d)
+            closest_indices = np.argmin(distances, axis=1)
+            X_grid[:, i] = X_sample[closest_indices, i]
 
     y_pred_grid = gp.predict(X_grid)
     y_pred_grid = y_pred_grid.reshape(X1g.shape)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
-    cf = ax.contourf(X1g, X2g, y_pred_grid, levels=30, cmap='viridis')
-    cbar = fig.colorbar(cf, ax=ax, label='Predicted Solubility')
+    # Sample actual data points for overlay
+    n_data_points = min(200, len(X))
+    if len(X) > n_data_points:
+        np.random.seed(42)
+        sample_indices = np.random.choice(len(X), n_data_points, replace=False)
+        X_sample = X[sample_indices]
+        y_sample = y[sample_indices]
+    else:
+        X_sample = X
+        y_sample = y
 
-    ax.scatter(X[:, x_idx], X[:, y_idx], c='r', s=12, alpha=0.8, marker='x', label='Actual Data')
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')    
+    surf = ax.plot_surface(X1g, X2g, y_pred_grid, cmap='viridis', 
+                          alpha=0.8, linewidth=0, antialiased=True)
+    
+    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='GP Solubility')
+    
+    ax.scatter(X_sample[:, x_idx], X_sample[:, y_idx], y_sample, c='red', s=20, alpha=0.8, 
+               marker='x', label=f'Actual Data ({len(X_sample)} points)', edgecolor='black', linewidth=0.5)
 
     ax.set_xlabel(feature_names[x_idx])
     ax.set_ylabel(feature_names[y_idx])
-    ax.set_title(f'Predicted Solubilities')
-    ax.legend(loc='upper left')
-    ax.grid(True, alpha=0.3)
-    ax.set_xlim(x1_min, x1_max)
-    ax.set_ylim(x2_min, x2_max)
-
+    ax.set_zlabel('Solubility')
+    ax.set_title(f'3D Solubility Surface Plot')
+    ax.set_xlim(np.percentile(X[:, x_idx], 5), np.percentile(X[:, x_idx], 95))
+    ax.set_ylim(np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95))
+    ax.legend()
+    
+    ax.view_init(elev=20, azim=45)
+    
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -349,7 +402,7 @@ def main():
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
         tuner = GPAutoTuner(X_train, y_train, config_path=CONFIG_PATH, sigma_save_path=SIGMA_PATH)
-        tuner.optimize(n_trials=200)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
@@ -372,7 +425,7 @@ def main():
     plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
     plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
     
-    heatmap_predictions(gp, X, sigmas, feature_names, f'{FIGURE_DIR}/solubility_surface.png')
+    surface_plot(gp, X, y, sigmas, feature_names, f'{FIGURE_DIR}/solubility_surface.png')
 
     subset_size = min(500, len(X))
     subset_idx = np.random.choice(len(X), subset_size, replace=False)

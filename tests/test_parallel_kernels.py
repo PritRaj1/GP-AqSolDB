@@ -123,8 +123,8 @@ def test_conf_load_missing():
 def test_sequential_vs_parallel(kernel_type, sample_kernel_data):
     """Test sequential and parallel produces same results"""
     X1, X2, sigma = sample_kernel_data
-    
-    # Sequential 
+        
+    # Sequential
     configure_parallel_settings(use_parallel=False, use_gpu=False)
     
     if kernel_type == "RBF":
