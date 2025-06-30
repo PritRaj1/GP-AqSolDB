@@ -103,38 +103,21 @@ def plot_sigmas(length_scales, feature_names, sorted_indices, save_path):
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def plot_relative_importance(length_scales, feature_names, sorted_indices, save_path):
-    sorted_features = [feature_names[i] for i in sorted_indices]
-    importance_ratio = length_scales / np.max(length_scales)
-    
-    fig, ax = plt.subplots(figsize=(10, 8))
-    
-    ax.barh(range(len(sorted_features)), importance_ratio[sorted_indices], color='lightcoral')
-    ax.set_yticks(range(len(sorted_features)))
-    ax.set_yticklabels(sorted_features)
-    ax.set_xlabel('Relative Importance')
-    ax.set_title('Relative Feature Importance')
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
-
 def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path):
     length_scales = 1.0 / sigmas
     sorted_indices = np.argsort(length_scales)[::-1]
-    bottom2_idx = sorted_indices[-2:]
-    
-    x1_name, x2_name = feature_names[bottom2_idx[0]], feature_names[bottom2_idx[1]]
-    x1 = np.linspace(np.percentile(X[:, bottom2_idx[0]], 1), np.percentile(X[:, bottom2_idx[0]], 99), 60)
-    x2 = np.linspace(np.percentile(X[:, bottom2_idx[1]], 1), np.percentile(X[:, bottom2_idx[1]], 99), 60)
+    top2_idx = sorted_indices[:2]
+    x_idx, y_idx = top2_idx[0], top2_idx[1]
+    x_name, y_name = feature_names[x_idx], feature_names[y_idx]
+    x1 = np.linspace(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), 60)
+    x2 = np.linspace(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), 60)
     X1g, X2g = np.meshgrid(x1, x2)
     X_grid = np.zeros((X1g.size, X.shape[1]))
-    X_grid[:, bottom2_idx[0]] = X1g.ravel()
-    X_grid[:, bottom2_idx[1]] = X2g.ravel()
+    X_grid[:, x_idx] = X1g.ravel()
+    X_grid[:, y_idx] = X2g.ravel()
     
     for i in range(X.shape[1]):
-        if i not in bottom2_idx:
+        if i not in top2_idx:
             X_grid[:, i] = np.mean(X[:, i])
     
     _, y_std_grid = gp.predict(X_grid, return_std=True)
@@ -144,14 +127,14 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     cf = ax_heat.contourf(X1g, X2g, y_std_grid, levels=30, cmap='plasma')
     fig.colorbar(cf, ax=ax_heat, label='Predicted Uncertainty')
     
-    ax_heat.set_xlabel(x1_name)
-    ax_heat.set_ylabel(x2_name)
-    ax_heat.set_title('2D Uncertainty Heatmap (Bottom 2 Features)')
+    ax_heat.set_xlabel(x_name)
+    ax_heat.set_ylabel(y_name)
+    ax_heat.set_title('2D Uncertainty Heatmap (Top 2 Features)')
     ax_heat.set_xlim(x1.min(), x1.max())
     ax_heat.set_ylim(x2.min(), x2.max())
     
     if X_train is not None:
-        ax_heat.scatter(X_train[:, bottom2_idx[0]], X_train[:, bottom2_idx[1]], 
+        ax_heat.scatter(X_train[:, x_idx], X_train[:, y_idx], 
                        c='lime', marker='x', s=18, alpha=0.7, 
                        label='Training Data', zorder=5, linewidth=1.2)
         ax_heat.legend()
@@ -165,7 +148,7 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, n_steps=400, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
+def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=30, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
     np.random.seed(42)
     os.makedirs(FIGURE_DIR, exist_ok=True)
     frames = []
@@ -182,15 +165,13 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
 
     length_scales = 1.0 / sigmas
     sorted_indices = np.argsort(length_scales)[::-1]
-    bottom2_idx = sorted_indices[-2:]
-    x_idx, y_idx = bottom2_idx[0], bottom2_idx[1]
+    top2_idx = sorted_indices[:2]
+    x_idx, y_idx = top2_idx[0], top2_idx[1]
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
 
-    xlim = (np.percentile(full_X[:, x_idx], 1), np.percentile(full_X[:, x_idx], 99))
-    ylim = (np.percentile(full_X[:, y_idx], 1), np.percentile(full_X[:, y_idx], 99))
-    grid_size = 30
-    x1 = np.linspace(xlim[0], xlim[1], grid_size)
-    x2 = np.linspace(ylim[0], ylim[1], grid_size)
+    grid_size = 60
+    x1 = np.linspace(0, 10, grid_size)
+    x2 = np.linspace(0, 0.1, grid_size)
     X1g, X2g = np.meshgrid(x1, x2)
     X_grid = np.zeros((X1g.size, X.shape[1]))
     X_grid[:, x_idx] = X1g.ravel()
@@ -209,11 +190,11 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
     grid_unc_min, grid_unc_max = np.inf, -np.inf
     
     for _ in range(n_steps):
+        if len(temp_pool_idx) == 0:
+            break
         X_train, y_train = X[temp_train_idx], y[temp_train_idx]
-        
         gp = GP(gif_config, sigmas)
         gp.fit(X_train, y_train)
-        
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         grid_unc_min = min(grid_unc_min, np.min(y_std_grid))
         grid_unc_max = max(grid_unc_max, np.max(y_std_grid))
@@ -226,13 +207,16 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
             next_idx = temp_pool_idx[next_idx_in_pool]
             temp_train_idx.append(next_idx)
             temp_pool_idx = np.setdiff1d(temp_pool_idx, [next_idx])
-    
-    unc_ylim = (min(temp_mean_uncertainties)*0.95, max(temp_mean_uncertainties)*1.05)
+
+    if len(temp_mean_uncertainties) == 0 or not np.isfinite(temp_mean_uncertainties).all():
+        unc_ylim = (0, 1)
+        grid_unc_min, grid_unc_max = 0, 1
+    else:
+        unc_ylim = (min(temp_mean_uncertainties)*0.95, max(temp_mean_uncertainties)*1.05)
+        
     del temp_train_idx, temp_pool_idx, temp_mean_uncertainties
 
     mean_uncertainties = []
-    all_uncertainties = []
-    all_gp_uncertainties = []
     pool_idx = np.arange(len(X))
     init_idx = np.random.choice(pool_idx, size=n_init, replace=False)
     train_idx = list(init_idx)
@@ -247,8 +231,6 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
         
         _, y_std_pool = gp.predict(X_pool, return_std=True)
         mean_uncertainties.append(np.mean(y_std_pool))
-        all_uncertainties.append(y_std_pool.copy())
-        all_gp_uncertainties.extend(y_std_pool.tolist())
         
         if len(pool_idx) > 0:
             next_idx_in_pool = np.argmax(y_std_pool)
@@ -259,8 +241,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
         
         ax = axes[0]
-        ax.scatter(full_X[:, x_idx], full_X[:, y_idx], c='white', s=40, marker='x', label='All Data', alpha=0.8, zorder=1)
-        ax.scatter(X[pool_idx, x_idx], X[pool_idx, y_idx], c='gray', s=40, marker='x', label='Pool', alpha=0.3, zorder=2)
+        ax.scatter(full_X[:, x_idx], full_X[:, y_idx], c='black', s=40, marker='x', label='All Data', alpha=0.8, zorder=1)
         ax.scatter(X[train_idx, x_idx], X[train_idx, y_idx], c='lime', s=40, marker='x', label='Train', alpha=0.9, zorder=3)
         
         if len(train_idx) > n_init:
@@ -270,10 +251,10 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
         ax.set_xlabel(x_name)
         ax.set_ylabel(y_name)
         ax.set_title(f'Learning Step {step+1}/{n_steps}')
-        ax.legend(loc='upper right')
+        ax.legend(loc='lower right')
         ax.grid(True, alpha=0.3)
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0,0.1)
         
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         y_std_grid = y_std_grid.reshape(X1g.shape)
@@ -284,7 +265,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
         
         ax2 = axes[1]
         ax2.plot(np.arange(1, step+2), mean_uncertainties, '-o', color='purple')
-        ax2.set_xlabel('Active Learning Step')
+        ax2.set_xlabel('Learning Step')
         ax2.set_ylabel('Mean Predictive Uncertainty')
         ax2.set_title('Uncertainty Reduction')
         ax2.set_xlim(1, n_steps)
@@ -299,7 +280,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=500, 
         frames.append(imageio.v2.imread(frame_path))
         os.remove(frame_path)
     
-    imageio.mimsave(gif_path, frames, duration=0.7)
+    imageio.mimsave(gif_path, frames, duration=2)
     print(f"Active learning GIF saved to {gif_path}")
     
     for f in glob.glob(f'{FIGURE_DIR}/_al_frame_*.png'):
@@ -349,7 +330,6 @@ def main():
     
     plot_length_scales(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_length_scales.png')
     plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
-    plot_relative_importance(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_relative_importance.png')
     plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
 
     subset_size = min(500, len(X))
@@ -357,7 +337,7 @@ def main():
     X_subset = X[subset_idx, :2]
     y_subset = y[subset_idx]
     
-    learning_evolution(X_subset, y_subset, feature_names[:2], config, sigmas[:2], full_X=X, n_init=3, n_steps=50, gif_path=f'{FIGURE_DIR}/learning_evolution.gif')
+    learning_evolution(X_subset, y_subset, feature_names[:2], config, sigmas[:2], full_X=X, gif_path=f'{FIGURE_DIR}/learning_evolution.gif')
 
     print("\n" + "="*80)
     print("Done!")
@@ -367,7 +347,6 @@ def main():
     print(f"- {FIGURE_DIR}/solubility_uncertainty.png")
     print(f"- {FIGURE_DIR}/kernel_length_scales.png")
     print(f"- {FIGURE_DIR}/kernel_sigmas.png")
-    print(f"- {FIGURE_DIR}/kernel_relative_importance.png")
     print(f"- {FIGURE_DIR}/kernel_uncertainty_heatmap.png")
     print(f"- {FIGURE_DIR}/learning_evolution.gif")
     print(f"- {CONFIG_PATH}")
