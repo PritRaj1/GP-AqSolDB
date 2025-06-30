@@ -289,6 +289,46 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         except Exception:
             pass
 
+def heatmap_predictions(gp, X, sigmas, feature_names, save_path):
+
+    length_scales = 1.0 / sigmas
+    sorted_indices = np.argsort(length_scales)[::-1]
+    x_idx, y_idx = sorted_indices[0], sorted_indices[1]
+
+    x1_min, x1_max = np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99)
+    x2_min, x2_max = np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99)
+    x1 = np.linspace(x1_min, x1_max, 80)
+    x2 = np.linspace(x2_min, x2_max, 80)
+    X1g, X2g = np.meshgrid(x1, x2)
+    X_grid = np.zeros((X1g.size, X.shape[1]))
+    X_grid[:, x_idx] = X1g.ravel()
+    X_grid[:, y_idx] = X2g.ravel()
+    
+    for i in range(X.shape[1]):
+        if i not in (x_idx, y_idx):
+            X_grid[:, i] = np.mean(X[:, i])
+
+    y_pred_grid = gp.predict(X_grid)
+    y_pred_grid = y_pred_grid.reshape(X1g.shape)
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    cf = ax.contourf(X1g, X2g, y_pred_grid, levels=30, cmap='viridis')
+    cbar = fig.colorbar(cf, ax=ax, label='Predicted Solubility')
+
+    ax.scatter(X[:, x_idx], X[:, y_idx], c='r', s=12, alpha=0.8, marker='x', label='Actual Data')
+
+    ax.set_xlabel(feature_names[x_idx])
+    ax.set_ylabel(feature_names[y_idx])
+    ax.set_title(f'Predicted Solubilities')
+    ax.legend(loc='upper left')
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(x1_min, x1_max)
+    ax.set_ylim(x2_min, x2_max)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
 def main():
     print("="*80)
     print("Tuning/training on AqSolDB")
@@ -309,7 +349,7 @@ def main():
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
         tuner = GPAutoTuner(X_train, y_train, config_path=CONFIG_PATH, sigma_save_path=SIGMA_PATH)
-        tuner.optimize(n_trials=50)
+        tuner.optimize(n_trials=200)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
@@ -331,6 +371,8 @@ def main():
     plot_length_scales(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_length_scales.png')
     plot_sigmas(length_scales, feature_names, sorted_indices, f'{FIGURE_DIR}/kernel_sigmas.png')
     plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap.png')
+    
+    heatmap_predictions(gp, X, sigmas, feature_names, f'{FIGURE_DIR}/solubility_surface.png')
 
     subset_size = min(500, len(X))
     subset_idx = np.random.choice(len(X), subset_size, replace=False)
@@ -348,6 +390,7 @@ def main():
     print(f"- {FIGURE_DIR}/kernel_length_scales.png")
     print(f"- {FIGURE_DIR}/kernel_sigmas.png")
     print(f"- {FIGURE_DIR}/kernel_uncertainty_heatmap.png")
+    print(f"- {FIGURE_DIR}/solubility_surface.png")
     print(f"- {FIGURE_DIR}/learning_evolution.gif")
     print(f"- {CONFIG_PATH}")
     print(f"- {SIGMA_PATH}")
