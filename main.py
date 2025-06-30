@@ -261,8 +261,8 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         ax.set_title(f'Learning Step {step+1}/{n_steps}')
         ax.legend(loc='lower right')
         ax.grid(True, alpha=0.3)
-        ax.set_xlim(np.percentile(full_X[:, x_idx], 5), np.percentile(full_X[:, x_idx], 95))
-        ax.set_ylim(np.percentile(full_X[:, y_idx], 5), np.percentile(full_X[:, y_idx], 95))
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 0.1)
         
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         y_std_grid = y_std_grid.reshape(X1g.shape)
@@ -302,8 +302,8 @@ def surface_plot(gp, X, y, sigmas, feature_names, save_path):
     sorted_indices = np.argsort(length_scales)[::-1]
     x_idx, y_idx = sorted_indices[0], sorted_indices[1]
 
-    x1_min, x1_max = np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99)
-    x2_min, x2_max = np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99)
+    x1_min, x1_max = np.percentile(X[:, x_idx], 5), np.percentile(X[:, x_idx], 95)
+    x2_min, x2_max = np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95)
     x1 = np.linspace(x1_min, x1_max, 80)
     x2 = np.linspace(x2_min, x2_max, 80)
     X1g, X2g = np.meshgrid(x1, x2)
@@ -359,7 +359,7 @@ def surface_plot(gp, X, y, sigmas, feature_names, save_path):
     ax.set_ylim(np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95))
     ax.legend()
     
-    ax.view_init(elev=20, azim=115)
+    ax.view_init(elev=10, azim=30)
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -385,7 +385,7 @@ def main():
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
         tuner = GPAutoTuner(X_train, y_train, config_path=CONFIG_PATH, sigma_save_path=SIGMA_PATH)
-        tuner.optimize(n_trials=1000)
+        tuner.optimize(n_trials=2000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
@@ -423,7 +423,6 @@ def main():
     print("Files:")
     print(f"- {FIGURE_DIR}/solubility_uncertainty.png")
     print(f"- {FIGURE_DIR}/kernel_length_scales.png")
-    print(f"- {FIGURE_DIR}/kernel_sigmas.png")
     print(f"- {FIGURE_DIR}/kernel_uncertainty_heatmap.png")
     print(f"- {FIGURE_DIR}/solubility_surface.png")
     print(f"- {FIGURE_DIR}/learning_evolution.gif")
