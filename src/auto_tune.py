@@ -131,65 +131,65 @@ class GPAutoTuner:
         --------
         float : Cross-validation score (negative BIC for minimization)
         """
-        # Suggest model type (dense vs sparse)
-        if self.force_dense:
-            use_sparse = False
-        else:
-            use_sparse = trial.suggest_categorical('use_sparse', [True, False])
-        
-        # Suggest hyperparameters
-        kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ', 'MATERN'])
-        lmbda = trial.suggest_float('lmbda', 1e-4, 1.0, log=True)
-        
-        # Kernel-specific parameters
-        if kernel_type == 'RQ':
-            alpha = trial.suggest_float('rq_alpha', 0.1, 10.0)
-        elif kernel_type == 'MATERN':
-            alpha = trial.suggest_categorical('matern_nu', [0.5, 1.5, 2.5])
-        else:  # RBF
-            alpha = 1.0
-            
-        sigmas = [trial.suggest_float(f'sigma_{i}', 0.1, 3.0) for i in range(self.n_features)]
-        
-        # Sparse GP specific parameters
-        if use_sparse and not self.force_dense:
-            # Suggest number of inducing points (between 10% and 50% of data size)
-            min_inducing = max(10, int(0.1 * self.n_samples))
-            max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
-            num_inducing = trial.suggest_int('num_inducing', min_inducing, max_inducing)
-            inducing_method = trial.suggest_categorical('inducing_method', ['random', 'uniform'])
-        else:
-            num_inducing = 20
-            inducing_method = 'random'
-        
-        # Create config for this trial
-        config = ConfigParser()
-        config['KERNEL'] = {
-            'type': kernel_type,
-            'lmbda': str(lmbda),
-            'alpha': str(alpha),
-            'use_cache': 'true',
-            'cache_size': '100'
-        }
-        config['SPARSE'] = {
-            'use_sparse': str(use_sparse).lower(),
-            'num_inducing': str(num_inducing),
-            'inducing_method': inducing_method
-        }
-        
-        # Copy parallel settings from main config
-        if 'PARALLEL' in self.config:
-            config['PARALLEL'] = dict(self.config['PARALLEL'])
-        
-        # Perform cross-validation
         try:
+            # Suggest model type (dense vs sparse)
+            if self.force_dense:
+                use_sparse = False
+            else:
+                use_sparse = trial.suggest_categorical('use_sparse', [True, False])
+            
+            # Suggest hyperparameters
+            kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ', 'MATERN'])
+            lmbda = trial.suggest_float('lmbda', 1e-4, 1.0, log=True)
+            
+            # Kernel-specific parameters
+            if kernel_type == 'RQ':
+                alpha = trial.suggest_float('rq_alpha', 0.1, 10.0)
+            elif kernel_type == 'MATERN':
+                alpha = trial.suggest_categorical('matern_nu', [0.5, 1.5, 2.5])
+            else:  # RBF
+                alpha = 1.0
+                
+            sigmas = [trial.suggest_float(f'sigma_{i}', 0.1, 3.0) for i in range(self.n_features)]
+            
+            # Sparse GP specific parameters
+            if use_sparse and not self.force_dense:
+                # Suggest number of inducing points (between 10% and 50% of data size)
+                min_inducing = max(10, int(0.1 * self.n_samples))
+                max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
+                num_inducing = trial.suggest_int('num_inducing', min_inducing, max_inducing)
+                inducing_method = trial.suggest_categorical('inducing_method', ['random', 'uniform'])
+            else:
+                num_inducing = 20
+                inducing_method = 'random'
+            
+            # Create config for this trial
+            config = ConfigParser()
+            config['KERNEL'] = {
+                'type': kernel_type,
+                'lmbda': str(lmbda),
+                'alpha': str(alpha),
+                'use_cache': 'true',
+                'cache_size': '100'
+            }
+            config['SPARSE'] = {
+                'use_sparse': str(use_sparse).lower(),
+                'num_inducing': str(num_inducing),
+                'inducing_method': inducing_method
+            }
+            
+            # Copy parallel settings from main config
+            if 'PARALLEL' in self.config:
+                config['PARALLEL'] = dict(self.config['PARALLEL'])
+            
+            # Perform cross-validation
             cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
 
             if self.metric == 'BIC':
                 return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
             else:  # MSE
                 return np.mean(cv_results['mse'])  # Direct minimization
-            
+                
         except Exception as e:
             print(f"Trial failed: {e}")
             return float('inf')  # Return large value for failed trials

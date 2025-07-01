@@ -36,17 +36,30 @@ def load_parallel_conf(config):
             except ValueError:
                 n_jobs = None
         
+        use_gpu_config = parallel_config.getboolean('use_gpu', fallback=False)
+        gpu_available = use_gpu_config and CUPY_AVAILABLE
+        
+        if use_gpu_config and CUPY_AVAILABLE:
+            try:
+                # Simple GPU test
+                test_array = cp.array([1.0, 2.0, 3.0])
+                test_result = cp.sum(test_array)
+                cp.asnumpy(test_result)  
+                gpu_available = True
+            except Exception as e:
+                print(f"GPU test failed: {e}. Disabling GPU acceleration.")
+                gpu_available = False
+        
         PARALLEL_SETTINGS.update({
             'use_parallel': parallel_config.getboolean('use_parallel', fallback=False),
             'n_jobs': n_jobs,
             'chunk_size': parallel_config.getint('chunk_size', fallback=1000),
-            'use_gpu': parallel_config.getboolean('use_gpu', fallback=False),
+            'use_gpu': gpu_available,
             'min_size_for_parallel': parallel_config.getint('min_size_for_parallel', fallback=500)
         })
         
-        if PARALLEL_SETTINGS['use_gpu'] and not (CUPY_AVAILABLE):
-            warnings.warn("GPU acceleration requested but no GPU libraries available. Falling back to CPU.")
-            PARALLEL_SETTINGS['use_gpu'] = False
+        if use_gpu_config and not gpu_available:
+            warnings.warn("GPU acceleration requested but not available. Falling back to CPU.")
     
     return PARALLEL_SETTINGS
 
@@ -224,7 +237,7 @@ def _compute_matern_chunk(X1_chunk, X2, sigma, alpha):
         return (2**(1-alpha) / np.math.gamma(alpha)) * (np.sqrt(2*alpha) * dist_safe)**alpha * kv(alpha, np.sqrt(2*alpha) * dist_safe)
 
 def _parallel_kernel_computation(X1, X2, sigma, kernel_type, alpha=None, use_cache=True):
-    """Parallelized kernel computation"""
+    """Parallelized kernel computation with improved error handling"""
     n1, n2 = X1.shape[0], X2.shape[0]
     chunk_size = PARALLEL_SETTINGS['chunk_size']
     
@@ -251,13 +264,19 @@ def _parallel_kernel_computation(X1, X2, sigma, kernel_type, alpha=None, use_cac
     n_jobs = _get_n_jobs()
     result_chunks = []
     
-
     # If single chunk, no need for parallel processing
     if len(chunks) == 1:
         result_chunks = [_compute_kernel_chunk(chunks[0])]
     else:
-        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-            result_chunks = list(executor.map(_compute_kernel_chunk, chunks))
+        try:
+            # Use a more conservative approach for multiprocessing
+            with ProcessPoolExecutor(max_workers=min(n_jobs, 4)) as executor:
+                # Add timeout to prevent hanging
+                result_chunks = list(executor.map(_compute_kernel_chunk, chunks, timeout=300))
+        except Exception as e:
+            print(f"Parallel processing failed: {e}. Falling back to sequential computation.")
+            # Fallback to sequential processing
+            result_chunks = [_compute_kernel_chunk(chunk) for chunk in chunks]
     
     result = np.vstack(result_chunks)
     
@@ -272,45 +291,54 @@ def _parallel_kernel_computation(X1, X2, sigma, kernel_type, alpha=None, use_cac
     return result
 
 def _cupy_kernel(X1, X2, sigma, kernel_type, alpha=None):
-    """CuPy kernel computation"""
+    """CuPy kernel computation with improved error handling"""
     if not CUPY_AVAILABLE:
         raise RuntimeError("GPU acceleration not available. Install cupy.")
     
-    X1_gpu = cp.asarray(X1)
-    X2_gpu = cp.asarray(X2)
-    sigma_gpu = cp.asarray(sigma)
-    
-    X1_norm = X1_gpu / sigma_gpu
-    X2_norm = X2_gpu / sigma_gpu
-    
-    # ||x-y||² = ||x||² + ||y||² - 2⟨x,y⟩
-    X1_sq = cp.sum(X1_norm**2, axis=1, keepdims=True)
-    X2_sq = cp.sum(X2_norm**2, axis=1)
-    inner_prod = X1_norm @ X2_norm.T
-    
-    sq_dist = X1_sq + X2_sq - 2 * inner_prod
-    
-    if kernel_type == "RBF":
-        result = cp.exp(-0.5 * sq_dist)
-    elif kernel_type == "RQ":
-        result = (1 + 0.5 * sq_dist / alpha)**(-alpha)
-    elif kernel_type == "MATERN":
-        dist = cp.sqrt(cp.maximum(sq_dist, 0))
-        if alpha == 0.5:
-            result = cp.exp(-dist)
-        elif alpha == 1.5:
-            sqrt3_dist = cp.sqrt(3) * dist
-            result = (1 + sqrt3_dist) * cp.exp(-sqrt3_dist)
-        elif alpha == 2.5:
-            sqrt5_dist = cp.sqrt(5) * dist
-            result = (1 + sqrt5_dist + 5 * dist**2 / 3) * cp.exp(-sqrt5_dist)
+    try:
+        X1_gpu = cp.asarray(X1)
+        X2_gpu = cp.asarray(X2)
+        sigma_gpu = cp.asarray(sigma)
+        
+        X1_norm = X1_gpu / sigma_gpu
+        X2_norm = X2_gpu / sigma_gpu
+        
+        # ||x-y||² = ||x||² + ||y||² - 2⟨x,y⟩
+        X1_sq = cp.sum(X1_norm**2, axis=1, keepdims=True)
+        X2_sq = cp.sum(X2_norm**2, axis=1)
+        inner_prod = X1_norm @ X2_norm.T
+        
+        sq_dist = X1_sq + X2_sq - 2 * inner_prod
+        
+        if kernel_type == "RBF":
+            result = cp.exp(-0.5 * sq_dist)
+        elif kernel_type == "RQ":
+            result = (1 + 0.5 * sq_dist / alpha)**(-alpha)
+        elif kernel_type == "MATERN":
+            dist = cp.sqrt(cp.maximum(sq_dist, 0))
+            if alpha == 0.5:
+                result = cp.exp(-dist)
+            elif alpha == 1.5:
+                sqrt3_dist = cp.sqrt(3) * dist
+                result = (1 + sqrt3_dist) * cp.exp(-sqrt3_dist)
+            elif alpha == 2.5:
+                sqrt5_dist = cp.sqrt(5) * dist
+                result = (1 + sqrt5_dist + 5 * dist**2 / 3) * cp.exp(-sqrt5_dist)
+            else:
+                raise ValueError(f"Matérn kernel with alpha={alpha} not implemented for GPU")
         else:
-            raise ValueError(f"Matérn kernel with alpha={alpha} not implemented for GPU")
-    else:
-        raise ValueError(f"Unknown kernel type: {kernel_type}")
-    
-    # Back to CPU
-    return cp.asnumpy(result)
+            raise ValueError(f"Unknown kernel type: {kernel_type}")
+        
+        # Back to CPU
+        return cp.asnumpy(result)
+        
+    except Exception as e:
+        # Clean up GPU memory if possible
+        try:
+            cp.get_default_memory_pool().free_all_blocks()
+        except:
+            pass
+        raise RuntimeError(f"GPU computation failed: {e}")
 
 def RBF(X1, X2, sigma, use_cache=True):
     """

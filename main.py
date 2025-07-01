@@ -439,7 +439,13 @@ def main():
 
     X, y, feature_names = load_data()
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
-    configure_parallel_settings(use_parallel=True, n_jobs=4, use_gpu=True)
+    
+    try:
+        configure_parallel_settings(use_parallel=True, n_jobs=2, use_gpu=False)
+        print("Parallel processing configured with CPU-only for stability")
+    except Exception as e:
+        print(f"Warning: Could not configure parallel processing: {e}")
+        print("Continuing with sequential processing...")
     
     # Check if optimal parameters already exist
     if os.path.exists(CONFIG_PATH) and os.path.exists(SIGMA_PATH):
