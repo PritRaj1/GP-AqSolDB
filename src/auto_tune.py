@@ -134,9 +134,9 @@ class GPAutoTuner:
         
         # Kernel-specific parameters
         if kernel_type == 'RQ':
-            alpha = trial.suggest_float('alpha', 0.1, 10.0)
+            alpha = trial.suggest_float('rq_alpha', 0.1, 10.0)
         elif kernel_type == 'MATERN':
-            alpha = trial.suggest_categorical('alpha', [0.5, 1.5, 2.5])
+            alpha = trial.suggest_categorical('matern_nu', [0.5, 1.5, 2.5])
         else:  # RBF
             alpha = 1.0
             
@@ -267,9 +267,11 @@ class GPAutoTuner:
         print(f"Best CV BIC: {-best_value:.2f}")
         print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
         print(f"Best kernel: {best_params['kernel_type']}")
-        if best_params['kernel_type'] == 'MATERN' or best_params['kernel_type'] == 'RQ':
-            print(f"Best alpha: {best_params['alpha']}")
-
+        if best_params['kernel_type'] == 'MATERN':
+            print(f"Best nu: {best_params.get('matern_nu', 1.5)}")
+        elif best_params['kernel_type'] == 'RQ':
+            print(f"Best alpha: {best_params.get('rq_alpha', 1.0)}")
+            
         print(f"Best lambda: {best_params['lmbda']}")
         print(f"Best parameters: {best_params}")
         
@@ -296,7 +298,14 @@ class GPAutoTuner:
         use_sparse = best_params['use_sparse']
         kernel_type = best_params['kernel_type']
         lmbda = best_params['lmbda']
-        alpha = best_params.get('alpha', 1.0)
+        
+        # Get alpha based on kernel type
+        if kernel_type == 'RQ':
+            alpha = best_params.get('rq_alpha', 1.0)
+        elif kernel_type == 'MATERN':
+            alpha = best_params.get('matern_nu', 1.5)
+        else:  # RBF
+            alpha = 1.0
         
         if 'KERNEL' not in self.config:
             self.config['KERNEL'] = {}
@@ -329,7 +338,10 @@ class GPAutoTuner:
         print(f"Model type: {'Sparse' if use_sparse else 'Dense'}")
         print(f"Kernel type: {kernel_type}")
         print(f"Lambda: {lmbda}")
-        print(f"Alpha: {alpha}")
+        if kernel_type == 'MATERN':
+            print(f"Nu: {alpha}")
+        elif kernel_type == 'RQ':
+            print(f"Alpha: {alpha}")
         print(f"Sigmas: {sigmas}")
         if use_sparse:
             print(f"Number of inducing points: {best_params.get('num_inducing', 20)}")
