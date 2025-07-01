@@ -490,7 +490,7 @@ def MATERN(X1, X2, sigma, alpha, use_cache=True):
             warnings.warn(f"GPU computation failed, falling back to CPU: {e}")
     
     if _should_use_parallel(n1, n2):
-        return _parallel_kernel_computation(X1, X2, sigma, "MATERN", nu=nu, use_cache=use_cache)
+        return _parallel_kernel_computation(X1, X2, sigma, "MATERN", alpha=alpha, use_cache=use_cache)
     
     # Sequential implementation
     if use_cache:
