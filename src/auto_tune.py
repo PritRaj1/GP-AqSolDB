@@ -290,7 +290,7 @@ class GPAutoTuner:
         print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
         print(f"Best kernel: {best_params['kernel_type']}")
         if best_params['kernel_type'] == 'MATERN':
-            print(f"Best nu: {best_params.get('matern_nu', 1.5)}")
+            print(f"Best alpha: {best_params.get('matern_alpha', 1.5)}")
         elif best_params['kernel_type'] == 'RQ':
             print(f"Best alpha: {best_params.get('rq_alpha', 1.0)}")
         print(f"Best lambda: {best_params['lmbda']}")
@@ -322,11 +322,11 @@ class GPAutoTuner:
         
         # Get alpha based on kernel type
         if kernel_type == 'RQ':
-            alpha = best_params.get('rq_alpha', 1.0)
+            alpha = best_params.get('rq_alpha', best_params.get('alpha', 1.0))
         elif kernel_type == 'MATERN':
-            alpha = best_params.get('matern_nu', 1.5)
+            alpha = best_params.get('matern_alpha', best_params.get('alpha', 1.5))
         else:  # RBF
-            alpha = 1.0
+            alpha = best_params.get('alpha', 1.0)
         
         if 'KERNEL' not in self.config:
             self.config['KERNEL'] = {}
@@ -360,7 +360,7 @@ class GPAutoTuner:
         print(f"Kernel type: {kernel_type}")
         print(f"Lambda: {lmbda}")
         if kernel_type == 'MATERN':
-            print(f"Nu: {alpha}")
+            print(f"Alpha: {alpha}")
         elif kernel_type == 'RQ':
             print(f"Alpha: {alpha}")
         print(f"Sigmas: {sigmas}")
