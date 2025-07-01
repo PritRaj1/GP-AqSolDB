@@ -20,7 +20,8 @@ class GPAutoTuner:
             y_train, 
             config_path="../config/GP.ini", 
             sigma_save_path="../config/optimized_sigmas.pkl",
-            force_dense=False
+            force_dense=False,
+            metric='BIC'
         ):
         """
         Initialize the GP Auto Tuner
@@ -35,6 +36,10 @@ class GPAutoTuner:
             Path to save non-vector hyperparameters
         sigma_save_path : str
             Path to save vector sigma hyperparameters
+        force_dense : bool
+            Force dense GP (disable sparse GP)
+        metric : str
+            Optimization metric: 'BIC' or 'MSE'
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -43,6 +48,10 @@ class GPAutoTuner:
         self.n_features = X_train.shape[1]
         self.n_samples = X_train.shape[0]
         self.force_dense = force_dense
+        self.metric = metric.upper()
+        
+        if self.metric not in ['BIC', 'MSE']:
+            raise ValueError("metric must be 'BIC' or 'MSE'")
         
         # Load existing config
         self.config = ConfigParser()
@@ -175,7 +184,12 @@ class GPAutoTuner:
         # Perform cross-validation
         try:
             cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
-            return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
+
+            if self.metric == 'BIC':
+                return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
+            else:  # MSE
+                return np.mean(cv_results['mse'])  # Direct minimization
+            
         except Exception as e:
             print(f"Trial failed: {e}")
             return float('inf')  # Return large value for failed trials
@@ -248,7 +262,11 @@ class GPAutoTuner:
         print(f"Samples: {self.n_samples}")
         print("Models: Dense GP or Sparse GP (if force_dense is False)")
         print("Kernels: RBF, RQ, Matérn (0.5, 1.5, 2.5)")
-        print("Metric: BIC (Bayesian Information Criterion)")
+        print(f"Metric: {self.metric}")
+        if self.metric == 'BIC':
+            print("  BIC balances accuracy and model complexity")
+        else:
+            print("  MSE optimizes for pure prediction accuracy")
         
         # Create study
         study = optuna.create_study(
@@ -264,14 +282,17 @@ class GPAutoTuner:
         best_value = study.best_value
         
         print(f"\nOptimization completed!")
-        print(f"Best CV BIC: {-best_value:.2f}")
+        if self.metric == 'BIC':
+            print(f"Best CV BIC: {-best_value:.2f}")
+        else:
+            print(f"Best CV MSE: {best_value:.4f}")
+            
         print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
         print(f"Best kernel: {best_params['kernel_type']}")
         if best_params['kernel_type'] == 'MATERN':
             print(f"Best nu: {best_params.get('matern_nu', 1.5)}")
         elif best_params['kernel_type'] == 'RQ':
             print(f"Best alpha: {best_params.get('rq_alpha', 1.0)}")
-            
         print(f"Best lambda: {best_params['lmbda']}")
         print(f"Best parameters: {best_params}")
         

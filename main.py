@@ -456,9 +456,10 @@ def main():
             y_train, 
             config_path=CONFIG_PATH, 
             sigma_save_path=SIGMA_PATH, 
-            force_dense=True # Sparsity is only worth for large datasets, I think we chill to use full
+            force_dense=True, # Sparsity is only worth for large datasets, I think we chill to use full
+            metric='MSE'
             )
-        tuner.optimize(n_trials=2000)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
