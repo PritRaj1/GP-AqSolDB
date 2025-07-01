@@ -19,7 +19,8 @@ class GPAutoTuner:
             X_train, 
             y_train, 
             config_path="../config/GP.ini", 
-            sigma_save_path="../config/optimized_sigmas.pkl"
+            sigma_save_path="../config/optimized_sigmas.pkl",
+            force_dense=False
         ):
         """
         Initialize the GP Auto Tuner
@@ -41,6 +42,7 @@ class GPAutoTuner:
         self.sigma_save_path = sigma_save_path
         self.n_features = X_train.shape[1]
         self.n_samples = X_train.shape[0]
+        self.force_dense = force_dense
         
         # Load existing config
         self.config = ConfigParser()
@@ -121,16 +123,27 @@ class GPAutoTuner:
         float : Cross-validation score (negative BIC for minimization)
         """
         # Suggest model type (dense vs sparse)
-        use_sparse = trial.suggest_categorical('use_sparse', [True, False])
+        if self.force_dense:
+            use_sparse = False
+        else:
+            use_sparse = trial.suggest_categorical('use_sparse', [True, False])
         
         # Suggest hyperparameters
-        kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ'])
+        kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ', 'MATERN'])
         lmbda = trial.suggest_float('lmbda', 1e-4, 1.0, log=True)
-        alpha = trial.suggest_float('alpha', 0.1, 10.0) if kernel_type == 'RQ' else 1.0
+        
+        # Kernel-specific parameters
+        if kernel_type == 'RQ':
+            alpha = trial.suggest_float('alpha', 0.1, 10.0)
+        elif kernel_type == 'MATERN':
+            alpha = trial.suggest_categorical('alpha', [0.5, 1.5, 2.5])
+        else:  # RBF
+            alpha = 1.0
+            
         sigmas = [trial.suggest_float(f'sigma_{i}', 0.1, 3.0) for i in range(self.n_features)]
         
         # Sparse GP specific parameters
-        if use_sparse:
+        if use_sparse and not self.force_dense:
             # Suggest number of inducing points (between 10% and 50% of data size)
             min_inducing = max(10, int(0.1 * self.n_samples))
             max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
@@ -233,7 +246,8 @@ class GPAutoTuner:
         print(f"Starting GP hyperparameter optimization with {n_trials} trials...")
         print(f"Features: {self.n_features}")
         print(f"Samples: {self.n_samples}")
-        print("Models: Dense GP and Sparse GP (FITC)")
+        print("Models: Dense GP or Sparse GP (if force_dense is False)")
+        print("Kernels: RBF, RQ, Matérn (0.5, 1.5, 2.5)")
         print("Metric: BIC (Bayesian Information Criterion)")
         
         # Create study
@@ -251,7 +265,12 @@ class GPAutoTuner:
         
         print(f"\nOptimization completed!")
         print(f"Best CV BIC: {-best_value:.2f}")
-        print(f"Best model type: {'Sparse' if best_params['use_sparse'] else 'Dense'}")
+        print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
+        print(f"Best kernel: {best_params['kernel_type']}")
+        if best_params['kernel_type'] == 'MATERN' or best_params['kernel_type'] == 'RQ':
+            print(f"Best alpha: {best_params['alpha']}")
+
+        print(f"Best lambda: {best_params['lmbda']}")
         print(f"Best parameters: {best_params}")
         
         # Report cache stats
