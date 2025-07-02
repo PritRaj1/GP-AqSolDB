@@ -334,7 +334,12 @@ class GPAutoTuner:
     def _save_best_parameters(self, best_params):
         """Save the best hyperparameters to files"""
 
-        use_sparse = best_params['use_sparse']
+        if self.force_dense:
+            use_sparse = 'false'
+        else:
+            use_sparse = best_params['use_sparse']
+
+
         kernel_type = best_params['kernel_type']
         lmbda = best_params['lmbda']
         

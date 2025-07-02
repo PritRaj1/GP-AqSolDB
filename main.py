@@ -469,7 +469,7 @@ def main():
             chunk_size=500, 
             min_size_for_parallel=500  
             )
-        tuner.optimize(n_trials=100)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
