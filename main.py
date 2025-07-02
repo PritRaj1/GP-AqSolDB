@@ -18,7 +18,7 @@ from src.kernels import configure_parallel_settings
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
 plt.rcParams['figure.figsize'] = (12, 8)
-plt.rcParams['font.size'] = 12
+plt.rcParams['font.size'] = 16
 
 CONFIG_PATH = "config/solubility_gp.ini"
 SIGMA_PATH = "config/solubility_sigmas.pkl"
@@ -341,7 +341,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         ax2 = axes[1]
         ax2.plot(np.arange(1, step+2), mean_uncertainties, '-o', color='purple')
         ax2.set_xlabel('Learning Step')
-        ax2.set_ylabel('Mean Predictive Uncertainty')
+        ax2.set_ylabel('Mean Predictive Variance')
         ax2.set_title('Uncertainty Reduction')
         ax2.set_xlim(1, n_steps)
         ax2.set_ylim(unc_ylim)

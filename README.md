@@ -21,7 +21,7 @@ Run:
 bash setup/auto.sh
 ```
 
-NOTE: This will create a conda environment for the Python dependencies called 'GP_sol'. The terminal multiplexer 'tmux' will also be installed in GP_sol - which is my personall preferred method of running long programs.
+NOTE: This will create a conda environment for the Python dependencies called 'GP_sol'. The terminal multiplexer 'tmux' will also be installed in GP_sol, which is my personally preferred method of running long programs.
 
 ## Scripts
 
