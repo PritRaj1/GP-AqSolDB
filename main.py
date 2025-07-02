@@ -223,7 +223,7 @@ def plot_uncertainty_heatmap(gp, X, y, feature_names, sigmas, X_train, save_path
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=100, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
+def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=300, gif_path=f'{FIGURE_DIR}/learning_evolution.gif'):
     np.random.seed(42)
     os.makedirs(FIGURE_DIR, exist_ok=True)
     frames = []
@@ -326,7 +326,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         ax.set_xlabel(x_name)
         ax.set_ylabel(y_name)
         ax.set_title(f'Learning Step {step+1}/{n_steps}')
-        ax.legend(loc='lower right')
+        ax.legend(loc='lower left')
         ax.grid(True, alpha=0.3)
         ax.set_xlim(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99))
         ax.set_ylim(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99))
@@ -355,7 +355,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         frames.append(imageio.v2.imread(frame_path))
         os.remove(frame_path)
     
-    imageio.mimsave(gif_path, frames, duration=2)
+    imageio.mimsave(gif_path, frames, duration=3)
     print(f"Active learning GIF saved to {gif_path}")
     
     for f in glob.glob(f'{FIGURE_DIR}/_al_frame_*.png'):
@@ -441,8 +441,7 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
     
     try:
-        configure_parallel_settings(use_parallel=True, n_jobs=2, use_gpu=False)
-        print("Parallel processing configured with CPU-only for stability")
+        configure_parallel_settings(use_parallel=True, n_jobs=4, use_gpu=True)
     except Exception as e:
         print(f"Warning: Could not configure parallel processing: {e}")
         print("Continuing with sequential processing...")
