@@ -1,6 +1,13 @@
 # GaussianProcess-Solubility
 UQ with Gaussian Processes modeling drug solubility.
 
+<p align="center">
+  <img src="figures/learning_evolution.gif" alt="Active Learning">
+  <br>
+  <em>Active Learning of Gaussian Process</em>
+</p>
+
+
 ## Setup
 
 Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer and run: 
