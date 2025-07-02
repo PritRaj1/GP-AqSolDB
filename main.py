@@ -245,8 +245,8 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
 
     grid_size = 60
-    x1 = np.linspace(0, 10, grid_size)
-    x2 = np.linspace(0, 0.1, grid_size)
+    x1 = np.linspace(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), grid_size)
+    x2 = np.linspace(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), grid_size)
     X1g, X2g = np.meshgrid(x1, x2)
     X_grid = np.zeros((X1g.size, X.shape[1]))
     X_grid[:, x_idx] = X1g.ravel()
@@ -328,8 +328,8 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         ax.set_title(f'Learning Step {step+1}/{n_steps}')
         ax.legend(loc='lower right')
         ax.grid(True, alpha=0.3)
-        ax.set_xlim(0, 10)
-        ax.set_ylim(0, 0.1)
+        ax.set_xlim(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99))
+        ax.set_ylim(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99))
         
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         y_std_grid = y_std_grid.reshape(X1g.shape)
