@@ -21,7 +21,11 @@ class GPAutoTuner:
             config_path="../config/GP.ini", 
             sigma_save_path="../config/optimized_sigmas.pkl",
             force_dense=False,
-            metric='BIC'
+            metric='BIC',
+            n_jobs=2,
+            use_gpu=False,
+            chunk_size=500,
+            min_size_for_parallel=1000
         ):
         """
         Initialize the GP Auto Tuner
@@ -40,6 +44,14 @@ class GPAutoTuner:
             Force dense GP (disable sparse GP)
         metric : str
             Optimization metric: 'BIC' or 'MSE'
+        n_jobs : int
+            Number of jobs for kernel parallelization
+        use_gpu : bool
+            Whether to use GPU 
+        chunk_size : int
+            Size of chunks for parallel processing 
+        min_size_for_parallel : int
+            Minimum matrix size to trigger parallel processing 
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -49,6 +61,12 @@ class GPAutoTuner:
         self.n_samples = X_train.shape[0]
         self.force_dense = force_dense
         self.metric = metric.upper()
+        
+        # Resource management parameters
+        self.n_jobs = n_jobs
+        self.use_gpu = use_gpu
+        self.chunk_size = chunk_size
+        self.min_size_for_parallel = min_size_for_parallel
         
         if self.metric not in ['BIC', 'MSE']:
             raise ValueError("metric must be 'BIC' or 'MSE'")
@@ -86,7 +104,7 @@ class GPAutoTuner:
             print(f"Warning: Could not load parallel settings: {e}")
     
     def _create_default_config(self):
-        """Create default configuration"""
+        """Create default configuration with resource management"""
         self.config['KERNEL'] = {
             'type': 'RBF',
             'lmbda': '0.1',
@@ -101,10 +119,10 @@ class GPAutoTuner:
         }
         self.config['PARALLEL'] = {
             'use_parallel': 'true',
-            'n_jobs': 'None',
-            'chunk_size': '1000',
-            'use_gpu': 'false',
-            'min_size_for_parallel': '500'
+            'n_jobs': str(self.n_jobs),
+            'chunk_size': str(self.chunk_size),
+            'use_gpu': str(self.use_gpu).lower(),
+            'min_size_for_parallel': str(self.min_size_for_parallel)
         }
     
     def calculate_bic(self, mse, n_params, n_samples):
