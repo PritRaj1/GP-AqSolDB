@@ -7,8 +7,8 @@ from configparser import ConfigParser
 from sklearn.metrics import mean_squared_error
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import DenseGP
-from src.sparse_gp import SparseGP
+from src.multivar_gp.dense_gp import DenseGP
+from src.multivar_gp.sparse_gp import SparseGP
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, 
                   cache_size=100, sparse=False, num_inducing=20):

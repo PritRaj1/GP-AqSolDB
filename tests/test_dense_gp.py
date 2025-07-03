@@ -17,7 +17,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import DenseGP
+from src.multivar_gp.dense_gp import DenseGP
 from tests.fcn import get_data
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0):

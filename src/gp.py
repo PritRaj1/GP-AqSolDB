@@ -14,12 +14,13 @@ class GP:
         
         self.use_sparse = config.getboolean("SPARSE", "use_sparse", fallback=False)
         
+        # Only import when needed
         if self.use_sparse:
-            from src.sparse_gp import SparseGP
+            from src.multivar_gp.sparse_gp import SparseGP
             self.gp_impl = SparseGP(config, sigma)
             self.model_type = "sparse"
         else:
-            from src.dense_gp import DenseGP
+            from src.multivar_gp.dense_gp import DenseGP
             self.gp_impl = DenseGP(config, sigma)
             self.model_type = "dense"
     

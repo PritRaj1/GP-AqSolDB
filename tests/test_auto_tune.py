@@ -18,7 +18,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import DenseGP
+from src.multivar_gp.dense_gp import DenseGP
 from src.auto_tune import GPAutoTuner, load_sigmas_from_file
 
 def test_auto_tuner_initialization():
