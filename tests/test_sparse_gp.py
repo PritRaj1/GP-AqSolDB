@@ -7,7 +7,7 @@ from configparser import ConfigParser
 from sklearn.metrics import mean_squared_error
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import GP
+from src.dense_gp import DenseGP
 from src.sparse_gp import SparseGP
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, 
@@ -38,7 +38,7 @@ def test_sparse_vs_full_gp():
     config_full = create_config("RBF", lmbda=0.1, sparse=False)
     
     start_time = time.time()
-    gp_full = GP(config_full, sigma)
+    gp_full = DenseGP(config_full, sigma)
     gp_full.fit(X_train, y_train)
     fit_time_full = time.time() - start_time
     
@@ -117,7 +117,7 @@ def test_sparse_gp_with_uncertainty():
     
     # Full GP with uncertainty
     config_full = create_config("RBF", lmbda=0.1, sparse=False)
-    gp_full = GP(config_full, sigma)
+    gp_full = DenseGP(config_full, sigma)
     gp_full.fit(X_train, y_train)
     y_pred_full, y_std_full = gp_full.predict(X_test, return_std=True)
     
@@ -171,7 +171,7 @@ def test_sparse_gp_with_different_kernels(kernel_type):
     
     # Full GP
     config_full = create_config(kernel_type, lmbda=0.1, alpha=2.0, sparse=False)
-    gp_full = GP(config_full, sigma)
+    gp_full = DenseGP(config_full, sigma)
     gp_full.fit(X_train, y_train)
     y_pred_full = gp_full.predict(X_test)
     mse_full = mean_squared_error(y_test, y_pred_full)

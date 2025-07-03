@@ -18,7 +18,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import GP
+from src.dense_gp import DenseGP
 from src.auto_tune import GPAutoTuner, load_sigmas_from_file
 
 def test_auto_tuner_initialization():
@@ -347,7 +347,7 @@ def test_gp_with_optimized_parameters():
                 best_params['inducing_method'] = 'random'
             tuner._save_best_parameters(best_params)
             config, sigmas = tuner.load_optimized_parameters()
-            gp = GP(config, sigmas)
+            gp = DenseGP(config, sigmas)
             gp.fit(X_train, y_train)
             X_test = np.random.uniform(0, 5, (10, 2))
             y_pred, y_std = gp.predict(X_test, return_std=True)
@@ -376,7 +376,7 @@ def visualize_auto_tune_results():
                            sigma_save_path=temp_sigma_path)
         best_params = tuner.optimize(n_trials=20)
         config, sigmas = tuner.load_optimized_parameters()
-        gp = GP(config, sigmas)
+        gp = DenseGP(config, sigmas)
         gp.fit(X_train, y_train)
         x1 = np.linspace(0, 5, 50)
         x2 = np.linspace(0, 5, 50)

@@ -3,7 +3,7 @@ from src.kernels import get_kernel, get_cache_stats, clear_kernel_cache
 from scipy import stats
 from scipy import linalg
 
-class GP:
+class DenseGP:
     def __init__(self, config, sigma):
         self.config = config
         self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)

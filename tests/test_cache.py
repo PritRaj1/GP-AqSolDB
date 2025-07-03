@@ -6,7 +6,7 @@ import pytest
 from configparser import ConfigParser
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import GP
+from src.dense_gp import DenseGP
 from src.kernels import get_cache_stats, clear_kernel_cache
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache_size=100):
@@ -34,7 +34,7 @@ def test_repeated_predictions_caching():
     config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
     
     start_time = time.time()
-    gp_no_cache = GP(config_no_cache, sigma)
+    gp_no_cache = DenseGP(config_no_cache, sigma)
     gp_no_cache.fit(X_train, y_train)
     
     for i in range(20):  
@@ -47,7 +47,7 @@ def test_repeated_predictions_caching():
     config_cache = create_config("RBF", lmbda=0.1, use_cache=True)
     
     start_time = time.time()
-    gp_cache = GP(config_cache, sigma)
+    gp_cache = DenseGP(config_cache, sigma)
     gp_cache.fit(X_train, y_train)
     
     for i in range(20):  
@@ -75,7 +75,7 @@ def test_large_dataset_caching():
     config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
     
     start_time = time.time()
-    gp_no_cache = GP(config_no_cache, sigma)
+    gp_no_cache = DenseGP(config_no_cache, sigma)
     gp_no_cache.fit(X_train, y_train)
     
     for i in range(5):  
@@ -88,7 +88,7 @@ def test_large_dataset_caching():
     config_cache = create_config("RBF", lmbda=0.1, use_cache=True)
     
     start_time = time.time()
-    gp_cache = GP(config_cache, sigma)
+    gp_cache = DenseGP(config_cache, sigma)
     gp_cache.fit(X_train, y_train)
     
     for i in range(5):  
@@ -110,7 +110,7 @@ def test_cache_config_options():
     clear_kernel_cache()
     config_cache = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=50)
     
-    gp_cache = GP(config_cache, sigma)
+    gp_cache = DenseGP(config_cache, sigma)
     gp_cache.fit(X_train, y_train)
     
     # Multiple predictions required to make cache hits (after first misses)
@@ -126,7 +126,7 @@ def test_cache_config_options():
     clear_kernel_cache()
     config_no_cache = create_config("RBF", lmbda=0.1, use_cache=False)
     
-    gp_no_cache = GP(config_no_cache, sigma)
+    gp_no_cache = DenseGP(config_no_cache, sigma)
     gp_no_cache.fit(X_train, y_train)
     
     for i in range(10):
@@ -144,7 +144,7 @@ def test_cache_clearing():
     sigma = np.array([1.0, 1.0])
     
     config = create_config("RBF", lmbda=0.1, use_cache=True)
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     for i in range(5):
@@ -167,7 +167,7 @@ def test_cache_with_different_kernels(kernel_type):
     clear_kernel_cache()
     config = create_config(kernel_type, lmbda=0.1, alpha=2.0, use_cache=True)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     for i in range(5):
@@ -189,7 +189,7 @@ def test_cache_size_configuration(cache_size):
     clear_kernel_cache()
     config = create_config("RBF", lmbda=0.1, use_cache=True, cache_size=cache_size)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     for i in range(10):
@@ -207,7 +207,7 @@ def test_cache_hit_rate():
     sigma = np.array([1.0, 1.0])
     
     config = create_config("RBF", lmbda=0.1, use_cache=True)
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     # First prediction (should be cache miss)

@@ -19,7 +19,7 @@ class GP:
             self.gp_impl = SparseGP(config, sigma)
             self.model_type = "sparse"
         else:
-            from src.dense_gp import GP as DenseGP
+            from src.dense_gp import DenseGP
             self.gp_impl = DenseGP(config, sigma)
             self.model_type = "dense"
     

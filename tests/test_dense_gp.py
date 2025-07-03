@@ -17,7 +17,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.dense_gp import GP
+from src.dense_gp import DenseGP
 from tests.fcn import get_data
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0):
@@ -53,7 +53,7 @@ def test_gp_basic_functionality(kernel_type, sigma, sample_data_1d):
     X_train, y_train = sample_data_1d
     X_test = np.linspace(0, 10, 50).reshape(-1, 1)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred = gp.predict(X_test, return_std=False)
@@ -79,7 +79,7 @@ def test_gp_sigma_types(sigma_type, sample_data_1d, sample_data_2d):
         X1, X2 = np.meshgrid(x1, x2)
         X_test = np.column_stack([X1.ravel(), X2.ravel()])
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred, y_std = gp.predict(X_test, return_std=True)
@@ -102,7 +102,7 @@ def test_uncertainty_behavior():
     # Test points including and beyond training points
     X_test = np.linspace(0, 10, 50).reshape(-1, 1)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     y_pred, y_std = gp.predict(X_test, return_std=True)
     
@@ -125,7 +125,7 @@ def test_uncertainty_distance_relationship(sample_data_1d):
     X_train, y_train = sample_data_1d
     X_test = np.linspace(0, 10, 100).reshape(-1, 1)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred, y_std = gp.predict(X_test, return_std=True)
@@ -145,7 +145,7 @@ def test_gp_fit_attributes(sample_data_1d):
     
     X_train, y_train = sample_data_1d
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     assert gp.X_train is not None
@@ -158,7 +158,7 @@ def test_gp_invalid_inputs():
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     
     # Test with empty training data
     with pytest.raises(ValueError):
@@ -176,7 +176,7 @@ def test_gp_univariate_sigma(return_data=False):
     X_train, y_train = get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
     X_test = np.linspace(0, 10, 100).reshape(-1, 1)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred, y_std = gp.predict(X_test, return_std=True)
@@ -210,7 +210,7 @@ def test_gp_multivariate_sigma(return_data=False):
     X1, X2 = np.meshgrid(x1, x2)
     X_test = np.column_stack([X1.ravel(), X2.ravel()])
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred, y_std = gp.predict(X_test, return_std=True)
@@ -233,7 +233,7 @@ def test_gp_rational_quadratic_kernel(return_data=False):
     X_train, y_train = get_data(num_points=25, noise=True, noise_std=0.1, x_range=(0, 10))
     X_test = np.linspace(0, 10, 100).reshape(-1, 1)
     
-    gp = GP(config, sigma)
+    gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     
     y_pred, y_std = gp.predict(X_test, return_std=True)
