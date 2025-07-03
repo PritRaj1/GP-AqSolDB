@@ -12,7 +12,6 @@ warnings.filterwarnings('ignore')
 from src.gp import GP
 from src.kernels import load_parallel_conf, get_parallel_info
 
-
 class GPAutoTuner:
     def __init__(
             self, 

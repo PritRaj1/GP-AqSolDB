@@ -2,10 +2,6 @@ import numpy as np
 from configparser import ConfigParser
 
 class GP:
-    """
-    Unified Gaussian Process class that switches between 
-    dense and sparse based on config.
-    """
     
     def __init__(self, config, sigma):
 
@@ -25,7 +21,6 @@ class GP:
             self.model_type = "dense"
     
     def fit(self, X, y):
-        """Fit the GP model to the training data."""
         if self.use_sparse:
             inducing_method = self.config.get("SPARSE", "inducing_method", fallback="random")
             self.gp_impl.fit(X, y, inducing_method=inducing_method)
@@ -35,23 +30,18 @@ class GP:
         return self
     
     def predict(self, X_test, return_std=False):
-        """Predict using the fitted GP model."""
         return self.gp_impl.predict(X_test, return_std=return_std)
     
     def eval_fit(self, y_pred, y_true):
-        """Evaluate fit quality using linear regression statistics."""
         return self.gp_impl.eval_fit(y_pred, y_true)
     
     def get_cache_stats(self):
-        """Get kernel cache statistics if caching is enabled."""
         return self.gp_impl.get_cache_stats()
     
     def clear_cache(self):
-        """Clear the kernel cache if caching is enabled."""
         return self.gp_impl.clear_cache()
     
     def get_model_info(self):
-        """Get information about the current model."""
         info = {
             'model_type': self.model_type,
             'use_sparse': self.use_sparse
@@ -66,7 +56,6 @@ class GP:
         return info
     
     def get_model_complexity(self):
-        """Get model complexity for BIC calculation."""
         if self.use_sparse:
             num_inducing = self.config.getint("SPARSE", "num_inducing", fallback=20)
             n_params = len(self.sigma) + 1  # sigmas + lambda
