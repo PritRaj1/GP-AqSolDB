@@ -19,6 +19,9 @@ class GP:
             from src.multivar_gp.dense_gp import DenseGP
             self.gp_impl = DenseGP(config, sigma)
             self.model_type = "dense"
+
+    def __repr__(self):
+        return f"GP(sparse: {self.use_sparse}), kernel: {self.config.get('KERNEL', 'type')}, gpu: {self.config.get('PARALLEL', 'use_gpu')}"
     
     def fit(self, X, y):
         if self.use_sparse:

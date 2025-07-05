@@ -61,4 +61,5 @@ The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this reposit
 
 - [GPs](https://direct.mit.edu/books/oa-monograph/2320/Gaussian-Processes-for-Machine-Learning)
 - [Sparse FITC GPs](https://arxiv.org/abs/1606.04820)
+- [GP-Kolmogorov-Arnold Networks](https://arxiv.org/abs/2407.18397)
 - [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1)

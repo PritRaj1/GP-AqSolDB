@@ -14,7 +14,10 @@ requirements = [
     'seaborn',
     'pandas',
     'imageio',
-    'cupy-cuda12x', # Replace with your CUDA version
+
+    # Replace with your CUDA version
+    'cupy-cuda12x', 
+    'jax[cuda12]',
 ]
 
 for package in requirements:
