@@ -4,38 +4,51 @@ import matplotlib.pyplot as plt
 from typing import Optional, Callable
 from dataclasses import dataclass
 
-from .normal_dist import NormalDist
+from src.gp_kan.normal_dist import NormalDist
 
-# Constants
-DEFAULT_NUM_OF_PTS = 10
-Z_INIT_LOW = -2
-Z_INIT_HIGH = 2
-H_INIT_LOW = -1
-H_INIT_HIGH = 1
-GLOBAL_LENGTH_SCALE = 0.4
-MIN_LENGTH_SCALE = 0.2
-GLOBAL_COVARIANCE_SCALE = 1
-MIN_COVARIANCE_SCALE = 0.1
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
-
 @dataclass
-class HYP_CTX:
-    """Hyperparameters that can be set"""
-    GLOBAL_JITTER: float = 1e-3
-    BASELINE_JITTER: float = 1e-2
-
+class GPConfig:
+    default_num_gp_pts: int = 10
+    z_init_low: float = -2.0
+    z_init_high: float = 2.0
+    h_init_low: float = -1.0
+    h_init_high: float = 1.0
+    
+    global_length_scale: float = 0.4
+    min_length_scale: float = 0.2
+    global_covariance_scale: float = 1.0
+    min_covariance_scale: float = 0.1
+    
+    global_jitter: float = 1e-3
+    baseline_jitter: float = 1e-2
+    
     @classmethod
-    def to_dict(cls) -> dict:
+    def from_dict(cls, config_dict: dict) -> 'GPConfig':
+        return cls(**config_dict)
+    
+    def to_dict(self) -> dict:
         return {
-            "GLOBAL_JITTER": cls.GLOBAL_JITTER,
-            "BASELINE_JITTER": cls.BASELINE_JITTER,
+            'default_num_gp_pts': self.default_num_gp_pts,
+            'z_init_low': self.z_init_low,
+            'z_init_high': self.z_init_high,
+            'h_init_low': self.h_init_low,
+            'h_init_high': self.h_init_high,
+            'global_length_scale': self.global_length_scale,
+            'min_length_scale': self.min_length_scale,
+            'global_covariance_scale': self.global_covariance_scale,
+            'min_covariance_scale': self.min_covariance_scale,
+            'global_jitter': self.global_jitter,
+            'baseline_jitter': self.baseline_jitter,
         }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        cls.GLOBAL_JITTER = d["GLOBAL_JITTER"]
-        cls.BASELINE_JITTER = d["BASELINE_JITTER"]
+    
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Unknown config parameter: {key}")
 
 
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
@@ -54,19 +67,23 @@ def get_kmatrix(x1: jax.Array, x2: jax.Array, kernel_func: Callable) -> jax.Arra
 
 class DenseGPLayer:
     """
-    Layer univariate GP neurons.
+    Layer univariate GP neurons with configurable hyperparameters.
     """
 
     def __init__(
         self, 
         input_size: int, 
         output_size: int, 
-        num_gp_pts: int = DEFAULT_NUM_OF_PTS,
+        num_gp_pts: Optional[int] = None,
+        config: Optional[GPConfig] = None,
         key: Optional[jax.random.PRNGKey] = None
     ) -> None:
         self.I = input_size
         self.O = output_size
-        self.P = num_gp_pts
+        
+        # Use config or default
+        self.config = config if config is not None else GPConfig()
+        self.P = num_gp_pts if num_gp_pts is not None else self.config.default_num_gp_pts
         self.num_neurons = input_size * output_size
         
         if key is None:
@@ -74,15 +91,17 @@ class DenseGPLayer:
         
         z_key, h_key, l_key, s_key, jitter_key = jax.random.split(key, 5)
         
-        _z_single_neuron = jnp.linspace(Z_INIT_LOW, Z_INIT_HIGH, self.P)
+        # Initialize z using config parameters
+        _z_single_neuron = jnp.linspace(self.config.z_init_low, self.config.z_init_high, self.P)
         _z = jnp.zeros((self.I, self.O, self.P)) + _z_single_neuron[jnp.newaxis, jnp.newaxis, :]
         self.z = _z # (I, O, P)
 
+        # Initialize h using config parameters
         self.h = jax.random.uniform(
             h_key, 
             (self.I, self.O, self.P), 
-            minval=H_INIT_LOW, 
-            maxval=H_INIT_HIGH
+            minval=self.config.h_init_low, 
+            maxval=self.config.h_init_high
         )  # (I, O, P)
 
         self.l = jnp.ones((self.I, self.O))  # (I, O)
@@ -93,13 +112,13 @@ class DenseGPLayer:
 
     # Getters to ensure consistent transformation applied
     def get_jitter(self) -> jax.Array:
-        return jnp.exp(self.jitter) + HYP_CTX.BASELINE_JITTER
+        return jnp.exp(self.jitter) + self.config.baseline_jitter
 
     def get_s(self) -> jax.Array:
-        return jnp.exp(self.s) + MIN_COVARIANCE_SCALE
+        return jnp.exp(self.s) + self.config.min_covariance_scale
 
     def get_l(self) -> jax.Array:
-        return jnp.exp(self.l) + MIN_LENGTH_SCALE
+        return jnp.exp(self.l) + self.config.min_length_scale
 
     def get_z(self) -> jax.Array:
         return jnp.tanh(self.z)
@@ -111,8 +130,8 @@ class DenseGPLayer:
         new_lengthscale = (max_z - min_z) / self.P
         
         self.l = jnp.log(new_lengthscale)  # (I, O)
-        self.s = jnp.log(jnp.ones((self.I, self.O)) * GLOBAL_COVARIANCE_SCALE)  # (I, O)
-        self.jitter = jnp.log(jnp.ones((self.I, self.O)) * HYP_CTX.GLOBAL_JITTER)  # (I, O)
+        self.s = jnp.log(jnp.ones((self.I, self.O)) * self.config.global_covariance_scale)  # (I, O)
+        self.jitter = jnp.log(jnp.ones((self.I, self.O)) * self.config.global_jitter)  # (I, O)
 
     def get_params(self) -> dict:
         return {
@@ -188,7 +207,7 @@ class DenseGPLayer:
         # t5: (N, I, O, 1, 1)
         t5 = A @ A_T
         t6 = t5.reshape(N, I, O, 1)  # (N, I, O, 1)
-        t7 = t3 - t4 * t6 + HYP_CTX.GLOBAL_JITTER  # (N, I, O, 1)
+        t7 = t3 - t4 * t6 + self.config.global_jitter  # (N, I, O, 1)
         # out_var: (N, O)
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
 
@@ -302,3 +321,12 @@ class DenseGPLayer:
 
     def __repr__(self) -> str:
         return f"DenseGPLayer(in={self.I} out={self.O} gp_pts_per_neuron={self.P})"
+    
+# Breakpoint testing - temporary
+if __name__ == "__main__":
+    layer = DenseGPLayer(input_size=2, output_size=3, num_gp_pts=5)
+    print(layer)
+    print(layer.get_params())
+    print(layer.forward(NormalDist(jnp.array([0.0, 1.0]), jnp.array([1.0, 1.0]))))
+    print(layer.loglikelihood())
+    print(layer.save_fig("test.png"))
