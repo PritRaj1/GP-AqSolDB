@@ -1,11 +1,10 @@
 import jax
 import jax.numpy as jnp
-from typing import Optional, Union
+from typing import Optional
 from dataclasses import dataclass
 
 @dataclass
 class NormalDist:
-    """Normal distribution with a mean function and covariance function."""
     mean: jax.Array
     var: jax.Array
     
@@ -33,7 +32,7 @@ class NormalDist:
             var = 1e-6 * jnp.ones_like(mean)
         return cls(mean, var)
     
-    def __add__(self, other: 'GPDist') -> 'GPDist':
+    def __add__(self, other: 'NormalDist') -> 'NormalDist':
         """
         Add two NormalDist.
         
@@ -49,7 +48,7 @@ class NormalDist:
         NormalDist : Sum of the two
         """
         if not isinstance(other, NormalDist):
-            raise TypeError(f"Cannot add GPDist with {type(other)}")
+            raise TypeError(f"Cannot add NormalDist with {type(other)}")
         
         mean = self.mean + other.mean
         var = self.var + other.var
