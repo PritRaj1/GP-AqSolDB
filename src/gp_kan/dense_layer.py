@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 from typing import Optional, Callable
 from dataclasses import dataclass
 
-from src.gp_kan.normal_dist import NormalDist
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from normal_dist import NormalDist
 
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
@@ -50,19 +52,24 @@ class GPConfig:
             else:
                 raise ValueError(f"Unknown config parameter: {key}")
 
-
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
     return jnp.exp(-0.5 * (x1 - x2) ** 2 / var) / jnp.sqrt(2 * jnp.pi * var)
 
+def get_kmatrix(
+    x1: jax.Array,
+    x2: jax.Array,
+    func: Callable[[jax.Array, jax.Array], jax.Array],
+) -> jax.Array:
+    N1 = x1.shape[-1]
+    N2 = x2.shape[-1]
 
-def get_kmatrix(x1: jax.Array, x2: jax.Array, kernel_func: Callable) -> jax.Array:
-    """Compute kernel matrix between x1 and x2 using kernel_func"""
-    # Vectorized kernel computation
-    x1_expanded = x1[..., jnp.newaxis, :]  # Add dimension for broadcasting
-    x2_expanded = x2[..., jnp.newaxis, :, :]  # Add dimension for broadcasting
-    
-    # Apply kernel function element-wise
-    return jax.vmap(jax.vmap(kernel_func, in_axes=(None, 0)), in_axes=(0, None))(x1_expanded, x2_expanded)
+    extra_dims = x1.shape[:-1]
+
+    x1_repeat = jnp.repeat(x1, N2, axis=-1).reshape(*extra_dims, N2, N1).transpose(*range(len(extra_dims)), -1, -2).reshape(*extra_dims, N1 * N2)
+    x2_repeat = jnp.repeat(x2, N1, axis=-1)
+
+    k_matrix = func(x1_repeat, x2_repeat)
+    return k_matrix.reshape(*extra_dims, N1, N2)
 
 
 class DenseGPLayer:
@@ -81,7 +88,6 @@ class DenseGPLayer:
         self.I = input_size
         self.O = output_size
         
-        # Use config or default
         self.config = config if config is not None else GPConfig()
         self.P = num_gp_pts if num_gp_pts is not None else self.config.default_num_gp_pts
         self.num_neurons = input_size * output_size
@@ -91,12 +97,10 @@ class DenseGPLayer:
         
         z_key, h_key, l_key, s_key, jitter_key = jax.random.split(key, 5)
         
-        # Initialize z using config parameters
         _z_single_neuron = jnp.linspace(self.config.z_init_low, self.config.z_init_high, self.P)
         _z = jnp.zeros((self.I, self.O, self.P)) + _z_single_neuron[jnp.newaxis, jnp.newaxis, :]
         self.z = _z # (I, O, P)
 
-        # Initialize h using config parameters
         self.h = jax.random.uniform(
             h_key, 
             (self.I, self.O, self.P), 
@@ -171,7 +175,7 @@ class DenseGPLayer:
 
         Q_hh = get_kmatrix(z, z, kernel_func2)  # (1, I, O, P, P)
         q_xh = get_kmatrix(
-            x_mean.repeat(1, 1, self.O).reshape(N, I, O, 1), z, kernel_func1
+            jnp.repeat(x_mean, self.O, axis=1).reshape(N, I, O, 1), z, kernel_func1
         )  # (N, I, O, 1, P)
         
         Q_hh_noise = Q_hh + (
@@ -304,7 +308,7 @@ class DenseGPLayer:
         MAX_NEURONS_SHOWN = 5
         plot_num = min(self.num_neurons, MAX_NEURONS_SHOWN)
 
-        fig, axes = plt.subplots(1, 2, squeeze=False)
+        fig, axes = plt.subplots(1, plot_num, squeeze=False)
 
         axes_idx = 0
         for i_idx in range(self.I):
@@ -327,6 +331,8 @@ if __name__ == "__main__":
     layer = DenseGPLayer(input_size=2, output_size=3, num_gp_pts=5)
     print(layer)
     print(layer.get_params())
-    print(layer.forward(NormalDist(jnp.array([0.0, 1.0]), jnp.array([1.0, 1.0]))))
+    input_mean = jnp.array([[0.0, 1.0]])
+    input_var = jnp.array([[1.0, 1.0]])
+    print(layer.forward(NormalDist(input_mean, input_var)))
     print(layer.loglikelihood())
     print(layer.save_fig("test.png"))
