@@ -12,7 +12,7 @@ SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
 @dataclass
 class GPConfig:
-    default_num_gp_pts: int = 10
+    num_inducing_points: int = 10
     z_init_low: float = -2.0
     z_init_high: float = 2.0
     h_init_low: float = -1.0
@@ -32,7 +32,7 @@ class GPConfig:
     
     def to_dict(self) -> dict:
         return {
-            'default_num_gp_pts': self.default_num_gp_pts,
+            'num_inducing_points': self.num_inducing_points,
             'z_init_low': self.z_init_low,
             'z_init_high': self.z_init_high,
             'h_init_low': self.h_init_low,
@@ -73,15 +73,12 @@ def get_kmatrix(
 
 
 class DenseGPLayer:
-    """
-    Layer univariate GP neurons with configurable hyperparameters.
-    """
+    """Layer of univariate GP neurons."""
 
     def __init__(
         self, 
         input_size: int, 
         output_size: int, 
-        num_gp_pts: Optional[int] = None,
         config: Optional[GPConfig] = None,
         key: Optional[jax.random.PRNGKey] = None
     ) -> None:
@@ -89,7 +86,7 @@ class DenseGPLayer:
         self.O = output_size
         
         self.config = config if config is not None else GPConfig()
-        self.P = num_gp_pts if num_gp_pts is not None else self.config.default_num_gp_pts
+        self.P = self.config.num_inducing_points
         self.num_neurons = input_size * output_size
         
         if key is None:
@@ -97,10 +94,12 @@ class DenseGPLayer:
         
         z_key, h_key, l_key, s_key, jitter_key = jax.random.split(key, 5)
         
+        # Inducing points 
         _z_single_neuron = jnp.linspace(self.config.z_init_low, self.config.z_init_high, self.P)
         _z = jnp.zeros((self.I, self.O, self.P)) + _z_single_neuron[jnp.newaxis, jnp.newaxis, :]
         self.z = _z # (I, O, P)
 
+        # Fcn values @ inducing points
         self.h = jax.random.uniform(
             h_key, 
             (self.I, self.O, self.P), 
