@@ -11,9 +11,9 @@ import glob
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import cdist
 
-from src.auto_tune import GPAutoTuner
-from src.gp import GP
-from src.kernels import configure_parallel_settings
+from src.multivar_gp.auto_tune import GPAutoTuner
+from src.multivar_gp.gp import GP
+from src.multivar_gp.kernels import configure_parallel_settings
 
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
