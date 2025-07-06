@@ -89,7 +89,6 @@ def load_data():
         X_final = np.delete(X_enhanced, 6, axis=1)
         feature_names = [name for i, name in enumerate(enhanced_names) if i != 6]
     
-    # I think stadnardizing also helps performance - need to check tho
     scaler = StandardScaler()
     X_final = scaler.fit_transform(X_final)
     

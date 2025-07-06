@@ -2,53 +2,48 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from typing import Optional, Callable
-from dataclasses import dataclass
+from configparser import ConfigParser
 
 from src.gp_kan.normal_dist import NormalDist
 
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
-@dataclass
-class GPConfig:
-    num_inducing_points: int = 10
-    z_init_low: float = -2.0
-    z_init_high: float = 2.0
-    h_init_low: float = -1.0
-    h_init_high: float = 1.0
+def load_gp_config(config: ConfigParser) -> dict:
+    if 'GP' not in config:
+        raise ValueError("GP section not found in config")
     
-    global_length_scale: float = 0.4
-    min_length_scale: float = 0.2
-    global_covariance_scale: float = 1.0
-    min_covariance_scale: float = 0.1
+    gp_section = config['GP']
     
-    global_jitter: float = 1e-3
-    baseline_jitter: float = 1e-2
-    
-    @classmethod
-    def from_dict(cls, config_dict: dict) -> 'GPConfig':
-        return cls(**config_dict)
-    
-    def to_dict(self) -> dict:
-        return {
-            'num_inducing_points': self.num_inducing_points,
-            'z_init_low': self.z_init_low,
-            'z_init_high': self.z_init_high,
-            'h_init_low': self.h_init_low,
-            'h_init_high': self.h_init_high,
-            'global_length_scale': self.global_length_scale,
-            'min_length_scale': self.min_length_scale,
-            'global_covariance_scale': self.global_covariance_scale,
-            'min_covariance_scale': self.min_covariance_scale,
-            'global_jitter': self.global_jitter,
-            'baseline_jitter': self.baseline_jitter,
-        }
-    
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            else:
-                raise ValueError(f"Unknown config parameter: {key}")
+    return {
+        'num_inducing_points': int(gp_section.get('num_inducing_points', '10')),
+        'z_init_low': float(gp_section.get('z_init_low', '-2.0')),
+        'z_init_high': float(gp_section.get('z_init_high', '2.0')),
+        'h_init_low': float(gp_section.get('h_init_low', '-1.0')),
+        'h_init_high': float(gp_section.get('h_init_high', '1.0')),
+        'global_length_scale': float(gp_section.get('global_length_scale', '0.4')),
+        'min_length_scale': float(gp_section.get('min_length_scale', '0.2')),
+        'global_covariance_scale': float(gp_section.get('global_covariance_scale', '1.0')),
+        'min_covariance_scale': float(gp_section.get('min_covariance_scale', '0.1')),
+        'global_jitter': float(gp_section.get('global_jitter', '0.001')),
+        'baseline_jitter': float(gp_section.get('baseline_jitter', '0.01')),
+    }
+
+def create_default_conf() -> ConfigParser:
+    config = ConfigParser()
+    config['GP'] = {
+        'num_inducing_points': '10',
+        'z_init_low': '-2.0',
+        'z_init_high': '2.0',
+        'h_init_low': '-1.0',
+        'h_init_high': '1.0',
+        'global_length_scale': '0.4',
+        'min_length_scale': '0.2',
+        'global_covariance_scale': '1.0',
+        'min_covariance_scale': '0.1',
+        'global_jitter': '0.001',
+        'baseline_jitter': '0.01'
+    }
+    return config
 
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
     return jnp.exp(-0.5 * (x1 - x2) ** 2 / var) / jnp.sqrt(2 * jnp.pi * var)
@@ -77,15 +72,31 @@ class DenseGPLayer:
         self, 
         input_size: int, 
         output_size: int, 
-        config: Optional[GPConfig] = None,
+        config: Optional[ConfigParser] = None,
         key: Optional[jax.random.PRNGKey] = None
     ) -> None:
         self.I = input_size
         self.O = output_size
         
-        self.config = config if config is not None else GPConfig()
-        self.P = self.config.num_inducing_points
+        if config is None:
+            config = create_default_conf()
+        
+        self.config = config
+        gp_params = load_gp_config(config)
+        
+        self.P = gp_params['num_inducing_points']
         self.num_neurons = input_size * output_size
+        
+        self.z_init_low = gp_params['z_init_low']
+        self.z_init_high = gp_params['z_init_high']
+        self.h_init_low = gp_params['h_init_low']
+        self.h_init_high = gp_params['h_init_high']
+        self.global_length_scale = gp_params['global_length_scale']
+        self.min_length_scale = gp_params['min_length_scale']
+        self.global_covariance_scale = gp_params['global_covariance_scale']
+        self.min_covariance_scale = gp_params['min_covariance_scale']
+        self.global_jitter = gp_params['global_jitter']
+        self.baseline_jitter = gp_params['baseline_jitter']
         
         if key is None:
             key = jax.random.PRNGKey(0)
@@ -93,7 +104,7 @@ class DenseGPLayer:
         h_key = jax.random.split(key, 1)[0]
         
         # Inducing points 
-        _z_single_neuron = jnp.linspace(self.config.z_init_low, self.config.z_init_high, self.P)
+        _z_single_neuron = jnp.linspace(self.z_init_low, self.z_init_high, self.P)
         _z = jnp.zeros((self.I, self.O, self.P)) + _z_single_neuron[jnp.newaxis, jnp.newaxis, :]
         self.z = _z # (I, O, P)
 
@@ -101,8 +112,8 @@ class DenseGPLayer:
         self.h = jax.random.uniform(
             h_key, 
             (self.I, self.O, self.P), 
-            minval=self.config.h_init_low, 
-            maxval=self.config.h_init_high
+            minval=self.h_init_low, 
+            maxval=self.h_init_high
         )  # (I, O, P)
 
         self.l = jnp.ones((self.I, self.O))  # (I, O)
@@ -113,13 +124,13 @@ class DenseGPLayer:
 
     # Getters to ensure consistent transformation applied
     def get_jitter(self) -> jax.Array:
-        return jnp.exp(self.jitter) + self.config.baseline_jitter
+        return jnp.exp(self.jitter) + self.baseline_jitter
 
     def get_s(self) -> jax.Array:
-        return jnp.exp(self.s) + self.config.min_covariance_scale
+        return jnp.exp(self.s) + self.min_covariance_scale
 
     def get_l(self) -> jax.Array:
-        return jnp.exp(self.l) + self.config.min_length_scale
+        return jnp.exp(self.l) + self.min_length_scale
 
     def get_z(self) -> jax.Array:
         return jnp.tanh(self.z)
@@ -131,8 +142,8 @@ class DenseGPLayer:
         new_lengthscale = (max_z - min_z) / self.P
         
         self.l = jnp.log(new_lengthscale)  # (I, O)
-        self.s = jnp.log(jnp.ones((self.I, self.O)) * self.config.global_covariance_scale)  # (I, O)
-        self.jitter = jnp.log(jnp.ones((self.I, self.O)) * self.config.global_jitter)  # (I, O)
+        self.s = jnp.log(jnp.ones((self.I, self.O)) * self.global_covariance_scale)  # (I, O)
+        self.jitter = jnp.log(jnp.ones((self.I, self.O)) * self.global_jitter)  # (I, O)
 
     def get_params(self) -> dict:
         return {
@@ -204,7 +215,7 @@ class DenseGPLayer:
         t4 = SQRT_2PI * (s**2) * jnp.abs(l)  # (1, I, O, 1)
         t5 = A @ A_T # (N, I, O, 1, 1)
         t6 = t5.reshape(N, I, O, 1)  # (N, I, O, 1)
-        t7 = t3 - t4 * t6 + self.config.global_jitter  # (N, I, O, 1)
+        t7 = t3 - t4 * t6 + self.global_jitter  # (N, I, O, 1)
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
 
         return NormalDist(out_mean, out_var)
@@ -313,3 +324,4 @@ class DenseGPLayer:
 
     def __repr__(self) -> str:
         return f"DenseGPLayer(in={self.I} out={self.O} num_inducing_points={self.P})"
+    

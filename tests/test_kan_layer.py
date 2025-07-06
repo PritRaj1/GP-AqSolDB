@@ -1,13 +1,11 @@
-import numpy as np
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import pytest
 import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.gp_kan.dense_layer import DenseGPLayer, GPConfig
+from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
 from src.gp_kan.normal_dist import NormalDist
 
 def test_layer_initialization(sample_gp_config):
@@ -15,7 +13,7 @@ def test_layer_initialization(sample_gp_config):
     
     assert layer.I == 2, "Input size should be 2"
     assert layer.O == 3, "Output size should be 3"
-    assert layer.P == sample_gp_config.num_inducing_points, "Number of inducing points should match config"
+    assert layer.P == 5, "Number of inducing points should match config"
     assert layer.num_neurons == 6, "Number of neurons should be input_size * output_size"
     
     params = layer.get_params()
@@ -37,9 +35,9 @@ def test_layer_parameter_transformations(sample_layer):
     assert l.shape == (3, 2), "l should have shape (I, O)"
     assert z.shape == (3, 2, 5), "z should have shape (I, O, P)"
     
-    assert jnp.all(jitter > sample_layer.config.baseline_jitter), "jitter should be positive after exp"
-    assert jnp.all(s > sample_layer.config.min_covariance_scale), "s should be positive after exp"
-    assert jnp.all(l > sample_layer.config.min_length_scale), "l should be positive after exp"
+    assert jnp.all(jitter > sample_layer.baseline_jitter), "jitter should be positive after exp"
+    assert jnp.all(s > sample_layer.min_covariance_scale), "s should be positive after exp"
+    assert jnp.all(l > sample_layer.min_length_scale), "l should be positive after exp"
     assert jnp.all(z >= -1) and jnp.all(z <= 1), "z should be in [-1, 1] after tanh"
 
 
@@ -141,8 +139,13 @@ def test_invalid_input_shapes(sample_layer):
 
 
 def test_different_configurations():
-    config1 = GPConfig(num_inducing_points=3, global_length_scale=0.1)
-    config2 = GPConfig(num_inducing_points=7, global_length_scale=0.8)
+    config1 = create_default_conf()
+    config1['GP']['num_inducing_points'] = '3'
+    config1['GP']['global_length_scale'] = '0.1'
+    
+    config2 = create_default_conf()
+    config2['GP']['num_inducing_points'] = '7'
+    config2['GP']['global_length_scale'] = '0.8'
     
     layer1 = DenseGPLayer(input_size=2, output_size=2, config=config1)
     layer2 = DenseGPLayer(input_size=2, output_size=2, config=config2)
@@ -185,24 +188,9 @@ def test_layer_repr(sample_layer):
     assert "in=3" in layer_str, "String representation should contain input size"
     assert "out=2" in layer_str, "String representation should contain output size"
 
-
-def test_config_serialization(sample_gp_config):
-    config_dict = sample_gp_config.to_dict()
-    assert isinstance(config_dict, dict), "to_dict should return a dictionary"
-    assert 'num_inducing_points' in config_dict, "Config should contain num_inducing_points"
-    
-    new_config = GPConfig.from_dict(config_dict)
-    assert new_config.num_inducing_points == sample_gp_config.num_inducing_points, "Config should be reconstructed correctly"
-    
-    sample_gp_config.update(num_inducing_points=15)
-    assert sample_gp_config.num_inducing_points == 15, "Update should modify the config"
-    
-    with pytest.raises(ValueError):
-        sample_gp_config.update(invalid_param=1.0)
-
-
 def test_random_seed_consistency():
-    config = GPConfig(num_inducing_points=5)
+    config = create_default_conf()
+    config['GP']['num_inducing_points'] = '5'
     key = jax.random.PRNGKey(42)
     
     layer1 = DenseGPLayer(input_size=2, output_size=2, config=config, key=key)
@@ -217,19 +205,18 @@ def test_random_seed_consistency():
 if __name__ == "__main__":
     print("\nRunning KAN layer tests...")
     
-    sample_gp_config = GPConfig(
-        num_inducing_points=5,
-        z_init_low=-2.0,
-        z_init_high=2.0,
-        h_init_low=-1.0,
-        h_init_high=1.0,
-        global_length_scale=0.4,
-        min_length_scale=0.2,
-        global_covariance_scale=1.0,
-        min_covariance_scale=0.1,
-        global_jitter=1e-3,
-        baseline_jitter=1e-2
-    )
+    sample_gp_config = create_default_conf()
+    sample_gp_config['GP']['num_inducing_points'] = '5'
+    sample_gp_config['GP']['z_init_low'] = '-2.0'
+    sample_gp_config['GP']['z_init_high'] = '2.0'
+    sample_gp_config['GP']['h_init_low'] = '-1.0'
+    sample_gp_config['GP']['h_init_high'] = '1.0'
+    sample_gp_config['GP']['global_length_scale'] = '0.4'
+    sample_gp_config['GP']['min_length_scale'] = '0.2'
+    sample_gp_config['GP']['global_covariance_scale'] = '1.0'
+    sample_gp_config['GP']['min_covariance_scale'] = '0.1'
+    sample_gp_config['GP']['global_jitter'] = '0.001'
+    sample_gp_config['GP']['baseline_jitter'] = '0.01'
     
     sample_input_dist = NormalDist(
         jnp.array([[0.0, 1.0, -0.5]]),
@@ -256,7 +243,6 @@ if __name__ == "__main__":
     test_individual_gp_distribution(sample_layer)
     test_plotting_functionality(sample_layer)
     test_layer_repr(sample_layer)
-    test_config_serialization(sample_gp_config)
     test_random_seed_consistency()
 
     print("All KAN layer tests passed!")

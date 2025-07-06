@@ -1,61 +1,88 @@
 import jax
-import jax.numpy as jnp
 from typing import List, Dict, Any
-from dataclasses import dataclass
+from configparser import ConfigParser
 
 from src.gp_kan.normal_dist import NormalDist
-from src.gp_kan.dense_layer import DenseGPLayer, GPConfig
+from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.invariant_acts import NormaliseGaussian
 
-@dataclass
-class GP_KANConfig:
-    input_size: int
-    hidden_sizes: List[int]
-    output_size: int
+def load_kan_conf(config: ConfigParser) -> dict:
+    if 'NETWORK' not in config:
+        raise ValueError("NETWORK section not found in config")
+    if 'GP' not in config:
+        raise ValueError("GP section not found in config")
+    if 'NORMALIZATION' not in config:
+        raise ValueError("NORMALIZATION section not found in config")
+    if 'TRAINING' not in config:
+        raise ValueError("TRAINING section not found in config")
     
-    num_inducing_points: int = 10
-    z_init_low: float = -2.0
-    z_init_high: float = 2.0
-    h_init_low: float = -1.0
-    h_init_high: float = 1.0
+    network_section = config['NETWORK']
+    normalization_section = config['NORMALIZATION']
+    training_section = config['TRAINING']
     
-    global_length_scale: float = 0.4
-    min_length_scale: float = 0.2
-    global_covariance_scale: float = 1.0
-    min_covariance_scale: float = 0.1
-    global_jitter: float = 1e-3
-    baseline_jitter: float = 1e-2
-    
-    min_var: float = 0.2
-    
-    seed: int = 42
+    return {
+        'input_size': int(network_section.get('input_size')),
+        'output_size': int(network_section.get('output_size')),
+        'num_inducing_points': int(config['GP'].get('num_inducing_points', '10')),
+        'z_init_low': float(config['GP'].get('z_init_low', '-2.0')),
+        'z_init_high': float(config['GP'].get('z_init_high', '2.0')),
+        'h_init_low': float(config['GP'].get('h_init_low', '-1.0')),
+        'h_init_high': float(config['GP'].get('h_init_high', '1.0')),
+        'global_length_scale': float(config['GP'].get('global_length_scale', '0.4')),
+        'min_length_scale': float(config['GP'].get('min_length_scale', '0.2')),
+        'global_covariance_scale': float(config['GP'].get('global_covariance_scale', '1.0')),
+        'min_covariance_scale': float(config['GP'].get('min_covariance_scale', '0.1')),
+        'global_jitter': float(config['GP'].get('global_jitter', '0.001')),
+        'baseline_jitter': float(config['GP'].get('baseline_jitter', '0.01')),
+        'min_var': float(normalization_section.get('min_var', '0.2')),
+        'seed': int(training_section.get('seed', '42'))
+    }
+
+def create_default_conf() -> ConfigParser:
+    config = ConfigParser()
+    config['NETWORK'] = {
+        'input_size': '3',
+        'output_size': '1'
+    }
+    config['GP'] = {
+        'num_inducing_points': '10',
+        'z_init_low': '-2.0',
+        'z_init_high': '2.0',
+        'h_init_low': '-1.0',
+        'h_init_high': '1.0',
+        'global_length_scale': '0.4',
+        'min_length_scale': '0.2',
+        'global_covariance_scale': '1.0',
+        'min_covariance_scale': '0.1',
+        'global_jitter': '0.001',
+        'baseline_jitter': '0.01'
+    }
+    config['NORMALIZATION'] = {
+        'min_var': '0.2'
+    }
+    config['TRAINING'] = {
+        'seed': '42'
+    }
+    return config
 
 
 class GP_KAN:
     
-    def __init__(self, config: GP_KANConfig):
+    def __init__(self, config: ConfigParser, hidden_sizes: List[int] = None):
         self.config = config
         self.layers = []
         self.normalizers = []
         
+        config_params = load_kan_conf(config)
+        self.input_size = config_params['input_size']
+        self.output_size = config_params['output_size']
+        self.hidden_sizes = hidden_sizes if hidden_sizes is not None else []
+        self.seed = config_params['seed']
+        
         self._build_network()
     
     def _build_network(self):
-        layer_sizes = [self.config.input_size] + self.config.hidden_sizes + [self.config.output_size]
-        
-        gp_config = GPConfig(
-            num_inducing_points=self.config.num_inducing_points,
-            z_init_low=self.config.z_init_low,
-            z_init_high=self.config.z_init_high,
-            h_init_low=self.config.h_init_low,
-            h_init_high=self.config.h_init_high,
-            global_length_scale=self.config.global_length_scale,
-            min_length_scale=self.config.min_length_scale,
-            global_covariance_scale=self.config.global_covariance_scale,
-            min_covariance_scale=self.config.min_covariance_scale,
-            global_jitter=self.config.global_jitter,
-            baseline_jitter=self.config.baseline_jitter,
-        )
+        layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
         
         for i in range(len(layer_sizes) - 1):
             input_size = layer_sizes[i]
@@ -64,13 +91,14 @@ class GP_KAN:
             layer = DenseGPLayer(
                 input_size=input_size,
                 output_size=output_size,
-                config=gp_config,
-                key=jax.random.PRNGKey(self.config.seed + i)
+                config=self.config,
+                key=jax.random.PRNGKey(self.seed + i)
             )
             self.layers.append(layer)
             
             if i < len(layer_sizes) - 2:
-                normalizer = NormaliseGaussian(min_var=self.config.min_var)
+                min_var = float(self.config['NORMALIZATION'].get('min_var', '0.2'))
+                normalizer = NormaliseGaussian(min_var=min_var)
                 self.normalizers.append(normalizer)
             else:
                 self.normalizers.append(None)

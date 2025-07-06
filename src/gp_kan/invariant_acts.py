@@ -1,14 +1,36 @@
 import jax
 import jax.numpy as jnp
-from typing import List
+from typing import List, Optional
+from configparser import ConfigParser
 
 from src.gp_kan.normal_dist import NormalDist
+
+def load_normalization_config(config: ConfigParser) -> dict:
+    if 'NORMALIZATION' not in config:
+        raise ValueError("NORMALIZATION section not found in config")
+    
+    normalization_section = config['NORMALIZATION']
+    
+    return {
+        'min_var': float(normalization_section.get('min_var', '0.2'))
+    }
+
+def create_default_conf() -> ConfigParser:
+    config = ConfigParser()
+    config['NORMALIZATION'] = {
+        'min_var': '0.2'
+    }
+    return config
 
 class NormaliseGaussian:
     """Normalize - tanh for mean and sigmoid for variance."""
     
-    def __init__(self, min_var=0.2):
-        self.min_var = min_var
+    def __init__(self, min_var: float = 0.2, config: Optional[ConfigParser] = None):
+        if config is not None:
+            norm_params = load_normalization_config(config)
+            self.min_var = norm_params['min_var']
+        else:
+            self.min_var = min_var
 
     @staticmethod
     def inverse_sigmoid(x: float):
