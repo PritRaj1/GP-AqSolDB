@@ -449,7 +449,7 @@ def main():
     # Check if optimal parameters already exist
     if os.path.exists(CONFIG_PATH) and os.path.exists(SIGMA_PATH):
         print("Loading previously optimized hyperparameters...")
-        from src.auto_tune import load_sigmas_from_file
+        from src.multivar_gp.auto_tune import load_sigmas_from_file
         from configparser import ConfigParser
         config = ConfigParser()
         config.read(CONFIG_PATH)
