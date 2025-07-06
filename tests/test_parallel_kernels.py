@@ -6,7 +6,7 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
+from src.multivar_gp.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
 
 def create_test_data(n_samples, n_features):
     """Create test data for kernel computation"""

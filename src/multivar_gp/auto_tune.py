@@ -1,7 +1,6 @@
 import optuna
 import numpy as np
 import os
-import sys
 from configparser import ConfigParser
 import pickle
 from sklearn.model_selection import KFold
@@ -9,8 +8,8 @@ from sklearn.metrics import mean_squared_error
 import warnings
 warnings.filterwarnings('ignore')
 
-from src.gp import GP
-from src.kernels import load_parallel_conf, get_parallel_info
+from src.multivar_gp.gp import GP
+from src.multivar_gp.kernels import load_parallel_conf, get_parallel_info
 
 class GPAutoTuner:
     def __init__(
@@ -315,7 +314,7 @@ class GPAutoTuner:
         
         # Report cache stats
         try:
-            from src.kernels import get_cache_stats
+            from src.multivar_gp.kernels import get_cache_stats
             cache_stats = get_cache_stats()
             total_requests = cache_stats['hits'] + cache_stats['misses']
             if total_requests > 0:

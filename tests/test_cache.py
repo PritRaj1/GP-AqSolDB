@@ -7,7 +7,7 @@ from configparser import ConfigParser
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.multivar_gp.dense_gp import DenseGP
-from src.kernels import get_cache_stats, clear_kernel_cache
+from src.multivar_gp.kernels import get_cache_stats, clear_kernel_cache
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache_size=100):
     """Create test config"""

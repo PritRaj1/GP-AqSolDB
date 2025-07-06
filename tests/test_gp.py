@@ -6,7 +6,7 @@ from configparser import ConfigParser
 from sklearn.metrics import mean_squared_error
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.gp import GP
+from src.multivar_gp.gp import GP
 
 def create_config(use_sparse=False, num_inducing=20, inducing_method='random'):
     """Create a configuration object for testing"""

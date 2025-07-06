@@ -17,7 +17,7 @@ plt.rcParams.update({
 })
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.kernels import get_kernel
+from src.multivar_gp.kernels import get_kernel
 
 figures_dir = os.path.join(os.path.dirname(__file__), 'figures')
 if not os.path.exists(figures_dir):
@@ -28,7 +28,7 @@ if not os.path.exists(figures_dir):
 def test_vectorized_kernel_shape(kernel_type):
     """Test vectorized kernel output shape for different kernel types"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -53,7 +53,7 @@ def test_vectorized_kernel_shape(kernel_type):
 def test_vectorized_kernel_symmetry(kernel_type):
     """Test that vectorized kernels are symmetric"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -70,7 +70,7 @@ def test_vectorized_kernel_symmetry(kernel_type):
 def test_vectorized_kernel_identity(kernel_type):
     """Test that vectorized kernel at same point equals 1"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -84,7 +84,7 @@ def test_vectorized_kernel_identity(kernel_type):
 def test_vectorized_kernel_sigma_scaling(sigma):
     """Test that vectorized kernel values scale properly with sigma"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", "RBF")
     kernel = get_kernel(config, np.array([sigma, sigma, sigma]))
     
@@ -103,7 +103,7 @@ def test_vectorized_kernel_sigma_scaling(sigma):
 def test_vectorized_kernel_matrix_shape():
     """Test vectorized kernel matrix computation and shape"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", "RBF")
     kernel = get_kernel(config, np.array([1.0, 1.0, 1.0]))
     
@@ -127,7 +127,7 @@ def test_vectorized_kernel_matrix_shape():
 def test_vectorized_multivariate_kernel(sigma_type):
     """Test vectorized kernels with multivariate sigma"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     
     config.set("KERNEL", "type", "RBF")
     
@@ -154,7 +154,7 @@ def test_vectorized_multivariate_kernel(sigma_type):
 def test_invalid_kernel_type():
     """Test that invalid kernel type raises error"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     config.set("KERNEL", "type", "INVALID_KERNEL")
     
     with pytest.raises(ValueError, match="Unknown kernel type"):
@@ -163,7 +163,7 @@ def test_invalid_kernel_type():
 def test_visual():
     """Visualize vectorized kernels with seaborn styling"""
     config = configparser.ConfigParser()
-    config.read('config/GP.ini')
+    config.read('config/test.ini')
     
     x = np.linspace(-5, 5, 100).reshape(-1, 1)  # Reshape for vectorized kernels
     x0 = np.array([[0]])  # Reference point (population of one)

@@ -1,5 +1,5 @@
 import numpy as np
-from src.kernels import get_kernel, get_cache_stats, clear_kernel_cache
+from src.multivar_gp.kernels import get_kernel, get_cache_stats, clear_kernel_cache
 from scipy import stats
 from scipy import linalg
 

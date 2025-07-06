@@ -1,5 +1,4 @@
 import numpy as np
-from configparser import ConfigParser
 
 class GP:
     

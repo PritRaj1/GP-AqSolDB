@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import linalg
-from src.kernels import get_kernel
+from src.multivar_gp.kernels import get_kernel, get_cache_stats, clear_kernel_cache
 
 class SparseGP:
     """
@@ -181,12 +181,10 @@ class SparseGP:
     
     def get_cache_stats(self):
         if self.use_cache:
-            from src.kernels import get_cache_stats
             return get_cache_stats()
         else:
             return None
     
     def clear_cache(self):
         if self.use_cache:
-            from src.kernels import clear_kernel_cache
             clear_kernel_cache() 
