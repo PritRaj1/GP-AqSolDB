@@ -193,13 +193,13 @@ class DenseGPLayer:
         L_inv_T = jnp.transpose(L_inv, (0, 1, 2, 4, 3))
         Q_hh_inv = L_inv_T @ L_inv
 
-        # mean
+        # Mean
         t1 = q_xh @ Q_hh_inv # (N, I, O, 1, P)
         h = self.h.reshape(1, I, O, P, 1) # (1, I, O, P, 1)
         t2 = t1 @ h # (N, I, O, 1, 1)
         out_mean = jnp.sum(t2, axis=1).reshape(N, O) # (N, O)
 
-        # variance
+        # Variance
         A = q_xh @ L_inv_T
         A_T = jnp.transpose(A, (0, 1, 2, 4, 3))  # (N, I, O, P, 1)
         t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var))  # (N, I, O, 1)
@@ -262,13 +262,13 @@ class DenseGPLayer:
         L_inv_T = jnp.transpose(L_inv, (0, 2, 1))
         K_hh_inv = L_inv_T @ L_inv
 
-        # mean
+        # Mean
         t1 = k_xh @ K_hh_inv # (1, 1, P)
         h_reshaped = h.reshape(1, self.P, 1)
         t2 = t1 @ h_reshaped # (1, 1, 1)
         mean = t2.reshape(1)
 
-        # variance
+        # Variance
         A = k_xh @ L_inv_T # (1, 1, P)
         A_T = jnp.transpose(A, (0, 2, 1))
         Kxx = covar_func(x, x) # (1)
@@ -318,7 +318,7 @@ class DenseGPLayer:
     
 # Breakpoint testing - temporary
 if __name__ == "__main__":
-    layer = DenseGPLayer(input_size=2, output_size=3, num_gp_pts=5)
+    layer = DenseGPLayer(input_size=2, output_size=3)
     print(layer)
     print(layer.get_params())
     input_mean = jnp.array([[0.0, 1.0]])
