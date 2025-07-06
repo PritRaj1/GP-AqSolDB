@@ -4,9 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Optional, Callable
 from dataclasses import dataclass
 
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from normal_dist import NormalDist
+from src.gp_kan.normal_dist import NormalDist
 
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
@@ -315,14 +313,3 @@ class DenseGPLayer:
 
     def __repr__(self) -> str:
         return f"DenseGPLayer(in={self.I} out={self.O} num_inducing_points={self.P})"
-    
-# Breakpoint testing - temporary
-if __name__ == "__main__":
-    layer = DenseGPLayer(input_size=2, output_size=3)
-    print(layer)
-    print(layer.get_params())
-    input_mean = jnp.array([[0.0, 1.0]])
-    input_var = jnp.array([[1.0, 1.0]])
-    print(layer.forward(NormalDist(input_mean, input_var)))
-    print(layer.loglikelihood())
-    print(layer.save_fig("test.png"))

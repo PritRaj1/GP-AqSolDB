@@ -102,12 +102,3 @@ class NormalDist:
     def to_numpy(self):
         return NormalDist(jnp.array(self.mean), jnp.array(self.var))
     
-
-# Breakpoint testing - temporary
-if __name__ == "__main__":
-    normal_dist = NormalDist(jnp.array([0.0, 1.0, 2.0]), jnp.array([1.0, 1.0, 1.0]))
-    print(normal_dist)
-    print(normal_dist.sample(jax.random.PRNGKey(0)))
-    print(normal_dist.log_prob(jnp.array([0.0, 1.0, 2.0])))
-    print(normal_dist.std)
-    print(normal_dist.to_numpy())

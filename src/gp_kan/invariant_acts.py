@@ -2,9 +2,7 @@ import jax
 import jax.numpy as jnp
 from typing import List
 
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from normal_dist import NormalDist
+from src.gp_kan.normal_dist import NormalDist
 
 class NormaliseGaussian:
     """Normalize - tanh for mean and sigmoid for variance."""

@@ -3,12 +3,9 @@ import jax.numpy as jnp
 from typing import List, Dict, Any
 from dataclasses import dataclass
 
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from normal_dist import NormalDist
-from dense_layer import DenseGPLayer, GPConfig
-from invariant_acts import NormaliseGaussian, ReshapeGaussian
+from src.gp_kan.normal_dist import NormalDist
+from src.gp_kan.dense_layer import DenseGPLayer, GPConfig
+from src.gp_kan.invariant_acts import NormaliseGaussian
 
 @dataclass
 class GP_KANConfig:
@@ -133,27 +130,3 @@ class GP_KAN:
         layer_info = [f"{layer.I}→{layer.O}" for layer in self.layers]
         return f"GP_KAN({' → '.join(layer_info)})"
 
-
-# Breakpoint testing - temporary
-if __name__ == "__main__":
-    config = GP_KANConfig(
-        input_size=2,
-        hidden_sizes=[4, 3],
-        output_size=1,
-        num_inducing_points=5,
-        seed=42 # TODO: remove
-    )
-    
-    network = GP_KAN(config)
-    print(network)
-    
-    input_mean = jnp.array([[0.0, 1.0]])  # Shape: (1, 2)
-    input_var = jnp.array([[0.1, 0.1]])   # Shape: (1, 2)
-    input_dist = NormalDist(input_mean, input_var)
-    
-    output_dist = network.forward(input_dist)
-    print(f"Input: {input_dist}")
-    print(f"Output: {output_dist}")
-    print(f"Log-likelihood: {network.loglikelihood()}")
-    
-    network.save_fig("gp_kan_visualization.png")
