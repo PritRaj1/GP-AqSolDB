@@ -8,7 +8,7 @@ UQ with Gaussian Processes modeling drug solubility.
 </p>
 
 <p align="center">
-  <img src="figures/uncertainty" alt="Active Learning">
+  <img src="figures/solubility_uncertainty.png" alt="Uncertainty Distributions">
   <br>
   <em>Uncertainty distribution in most important features</em>
 </p>
