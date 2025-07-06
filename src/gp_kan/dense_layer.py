@@ -55,7 +55,7 @@ class GPConfig:
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
     return jnp.exp(-0.5 * (x1 - x2) ** 2 / var) / jnp.sqrt(2 * jnp.pi * var)
 
-def get_kmatrix(
+def build_kernel_mat(
     x1: jax.Array,
     x2: jax.Array,
     func: Callable[[jax.Array, jax.Array], jax.Array],
@@ -92,7 +92,7 @@ class DenseGPLayer:
         if key is None:
             key = jax.random.PRNGKey(0)
         
-        z_key, h_key, l_key, s_key, jitter_key = jax.random.split(key, 5)
+        h_key = jax.random.split(key, 1)[0]
         
         # Inducing points 
         _z_single_neuron = jnp.linspace(self.config.z_init_low, self.config.z_init_high, self.P)
@@ -172,8 +172,8 @@ class DenseGPLayer:
         kernel_func1 = lambda x1, x2: normal_pdf(x1, x2, x_var + l**2)
         kernel_func2 = lambda x1, x2: normal_pdf(x1, x2, l**2)
 
-        Q_hh = get_kmatrix(z, z, kernel_func2)  # (1, I, O, P, P)
-        q_xh = get_kmatrix(
+        Q_hh = build_kernel_mat(z, z, kernel_func2)  # (1, I, O, P, P)
+        q_xh = build_kernel_mat(
             jnp.repeat(x_mean, self.O, axis=1).reshape(N, I, O, 1), z, kernel_func1
         )  # (N, I, O, 1, P)
         
@@ -225,21 +225,23 @@ class DenseGPLayer:
         def covar_func(x1, x2):
             return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
-        K_hh = get_kmatrix(z, z, covar_func)  # (I, O, P, P)
-        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, jnp.newaxis, :, :]
+        K_hh = build_kernel_mat(z, z, covar_func)  # (I, O, P, P)
+        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, jnp.newaxis, :, :] # (I, O, P, P)
 
         # L: (I, O, P, P)
         L = jax.scipy.linalg.cholesky(K_hh_noise)
         L_inv = jax.scipy.linalg.inv(L)
         L_inv_T = jnp.transpose(L_inv, (0, 1, 3, 2))
+
         # A: (I, O, 1, P)
         h = self.h.reshape(self.I, self.O, 1, self.P)
         A = h @ L_inv_T
         A_T = jnp.transpose(A, (0, 1, 3, 2))
-        # t1: (I, O, 1)
-        t1 = jnp.log(jnp.linalg.det(L))
-        # t2: (I, O, 1, 1)
-        t2 = A @ A_T
+
+        
+        t1 = jnp.log(jnp.linalg.det(L)) # t1: (I, O, 1)
+        t2 = A @ A_T # t2: (I, O, 1, 1)
+
         loglik = -0.5 * t2 - t1 - self.P * jnp.log(SQRT_2PI)  # (I, O, 1, 1)
         loglik_sum = jnp.sum(loglik)  # (1)
 
@@ -257,9 +259,9 @@ class DenseGPLayer:
         def covar_func(x1, x2):
             return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
-        K_hh = get_kmatrix(z, z, covar_func)  # (1, P, P)
-        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, :, :]
-        k_xh = get_kmatrix(x.reshape(1, 1), z, covar_func)  # (1, 1, P)
+        K_hh = build_kernel_mat(z, z, covar_func)  # (1, P, P)
+        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, :, :] # (1, P, P)
+        k_xh = build_kernel_mat(x.reshape(1, 1), z, covar_func)  # (1, 1, P)
 
         L = jax.scipy.linalg.cholesky(K_hh_noise)
         L_inv = jax.scipy.linalg.inv(L)
@@ -267,29 +269,25 @@ class DenseGPLayer:
         K_hh_inv = L_inv_T @ L_inv
 
         # mean
-        # t1: (1, 1, P)
-        t1 = k_xh @ K_hh_inv
-        # t2: (1, 1, 1)
+        t1 = k_xh @ K_hh_inv # t1: (1, 1, P)
         h_reshaped = h.reshape(1, self.P, 1)
-        t2 = t1 @ h_reshaped
+        t2 = t1 @ h_reshaped # t2: (1, 1, 1)
         mean = t2.reshape(1)
 
         # variance
-        # A: (1, 1, P)
-        A = k_xh @ L_inv_T
+        A = k_xh @ L_inv_T # A: (1, 1, P)
         A_T = jnp.transpose(A, (0, 2, 1))
-        Kxx = covar_func(x, x)  # (1)
+        Kxx = covar_func(x, x) # Kxx: (1)
         t3 = Kxx - A @ A_T
         var = t3.reshape(1)
 
         return NormalDist(mean, var)
 
-    def plot_neuron(self, axes: plt.Axes, I_idx: int, O_idx: int):
+    def plot_neuron(self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100):
         """Shows the (I_idx, O_idx)-th neuron's current GP"""
         z = self.get_z()[I_idx, O_idx]  # (P)
         h = self.h[I_idx, O_idx]  # (P)
-        NUM_PLT_PTS = 100
-        x_pts = jnp.linspace(jnp.min(z) - 1, jnp.max(z) + 1, NUM_PLT_PTS)  # (NUM_PLT_PTS)
+        x_pts = jnp.linspace(jnp.min(z) - 1, jnp.max(z) + 1, num_pts)  # (num_pts)
         
         gp_dist_pts = [self.__gp_dist(x.reshape(1), I_idx, O_idx) for x in x_pts]
 
@@ -303,9 +301,8 @@ class DenseGPLayer:
 
         axes.scatter(z, h, color="red")
 
-    def save_fig(self, path: str):
-        MAX_NEURONS_SHOWN = 5
-        plot_num = min(self.num_neurons, MAX_NEURONS_SHOWN)
+    def save_fig(self, path: str, max_neurons_shown: int = 5):
+        plot_num = min(self.num_neurons, max_neurons_shown)
 
         fig, axes = plt.subplots(1, plot_num, squeeze=False)
 
