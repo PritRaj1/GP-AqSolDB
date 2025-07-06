@@ -323,7 +323,7 @@ class DenseGPLayer:
         plt.close(fig)
 
     def __repr__(self) -> str:
-        return f"DenseGPLayer(in={self.I} out={self.O} gp_pts_per_neuron={self.P})"
+        return f"DenseGPLayer(in={self.I} out={self.O} num_inducing_points={self.P})"
     
 # Breakpoint testing - temporary
 if __name__ == "__main__":
