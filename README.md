@@ -7,6 +7,10 @@ UQ with Gaussian Processes modeling drug solubility.
   <em>Active Learning of Gaussian Process</em>
 </p>
 
+Understanding solubility is important in drug discovery because it reflects a drug's ADME, (absorption, distribution, metabolism, excretion), and thus its effectiveness in therapy.
+
+Uncertainty quantification is also important, (in pretty much any clinical setting), since you want drug development to progress quickly and in a trustworthy manner. It's not enough to simply make decisions, you must also quantify the validity of them.
+
 
 ## Setup
 
