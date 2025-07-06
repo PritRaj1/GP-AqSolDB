@@ -153,6 +153,7 @@ class DenseGPLayer:
         self.jitter = params['jitter']
 
     def forward(self, x: NormalDist) -> NormalDist:
+        """Evaluate mean and variance functions on input distribution x. These Eqs are best understood from the GP-KAN paper."""
         assert x.mean.ndim == 2
         assert x.mean.shape[1] == self.I
 
@@ -193,25 +194,19 @@ class DenseGPLayer:
         Q_hh_inv = L_inv_T @ L_inv
 
         # mean
-        # t1: (N, I, O, 1, P)
-        t1 = q_xh @ Q_hh_inv
-        h = self.h.reshape(1, I, O, P, 1)
-        # t2: (N, I, O, 1, 1)
-        t2 = t1 @ h
-        # out_mean: (N, O)
-        out_mean = jnp.sum(t2, axis=1).reshape(N, O)
+        t1 = q_xh @ Q_hh_inv # (N, I, O, 1, P)
+        h = self.h.reshape(1, I, O, P, 1) # (1, I, O, P, 1)
+        t2 = t1 @ h # (N, I, O, 1, 1)
+        out_mean = jnp.sum(t2, axis=1).reshape(N, O) # (N, O)
 
         # variance
-        # A: (N, I, O, 1, P)
         A = q_xh @ L_inv_T
         A_T = jnp.transpose(A, (0, 1, 2, 4, 3))  # (N, I, O, P, 1)
         t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var))  # (N, I, O, 1)
         t4 = SQRT_2PI * (s**2) * jnp.abs(l)  # (1, I, O, 1)
-        # t5: (N, I, O, 1, 1)
-        t5 = A @ A_T
+        t5 = A @ A_T # (N, I, O, 1, 1)
         t6 = t5.reshape(N, I, O, 1)  # (N, I, O, 1)
         t7 = t3 - t4 * t6 + self.config.global_jitter  # (N, I, O, 1)
-        # out_var: (N, O)
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
 
         return NormalDist(out_mean, out_var)
@@ -238,9 +233,8 @@ class DenseGPLayer:
         A = h @ L_inv_T
         A_T = jnp.transpose(A, (0, 1, 3, 2))
 
-        
-        t1 = jnp.log(jnp.linalg.det(L)) # t1: (I, O, 1)
-        t2 = A @ A_T # t2: (I, O, 1, 1)
+        t1 = jnp.log(jnp.linalg.det(L)) # (I, O, 1)
+        t2 = A @ A_T # (I, O, 1, 1)
 
         loglik = -0.5 * t2 - t1 - self.P * jnp.log(SQRT_2PI)  # (I, O, 1, 1)
         loglik_sum = jnp.sum(loglik)  # (1)
@@ -269,15 +263,15 @@ class DenseGPLayer:
         K_hh_inv = L_inv_T @ L_inv
 
         # mean
-        t1 = k_xh @ K_hh_inv # t1: (1, 1, P)
+        t1 = k_xh @ K_hh_inv # (1, 1, P)
         h_reshaped = h.reshape(1, self.P, 1)
-        t2 = t1 @ h_reshaped # t2: (1, 1, 1)
+        t2 = t1 @ h_reshaped # (1, 1, 1)
         mean = t2.reshape(1)
 
         # variance
-        A = k_xh @ L_inv_T # A: (1, 1, P)
+        A = k_xh @ L_inv_T # (1, 1, P)
         A_T = jnp.transpose(A, (0, 2, 1))
-        Kxx = covar_func(x, x) # Kxx: (1)
+        Kxx = covar_func(x, x) # (1)
         t3 = Kxx - A @ A_T
         var = t3.reshape(1)
 
