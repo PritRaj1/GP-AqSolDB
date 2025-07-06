@@ -1,5 +1,4 @@
 # GaussianProcess-Solubility
-UQ with Gaussian Processes modeling drug solubility.
 
 <p align="center">
   <img src="figures/learning_evolution.gif" alt="Active Learning">
