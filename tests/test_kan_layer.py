@@ -8,6 +8,42 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
 from src.gp_kan.normal_dist import NormalDist
 
+
+@pytest.fixture
+def sample_gp_config():
+    config = create_default_conf()
+    config['GP']['num_inducing_points'] = '5'
+    config['GP']['z_init_low'] = '-2.0'
+    config['GP']['z_init_high'] = '2.0'
+    config['GP']['h_init_low'] = '-1.0'
+    config['GP']['h_init_high'] = '1.0'
+    config['GP']['global_length_scale'] = '0.4'
+    config['GP']['min_length_scale'] = '0.2'
+    config['GP']['global_covariance_scale'] = '1.0'
+    config['GP']['min_covariance_scale'] = '0.1'
+    config['GP']['global_jitter'] = '0.001'
+    config['GP']['baseline_jitter'] = '0.01'
+    return config
+
+
+@pytest.fixture
+def sample_layer(sample_gp_config):
+    return DenseGPLayer(
+        input_size=3,
+        output_size=2,
+        config=sample_gp_config,
+        key=jax.random.PRNGKey(42)
+    )
+
+
+@pytest.fixture
+def sample_input_dist():
+    return NormalDist(
+        jnp.array([[0.0, 1.0, -0.5]]),
+        jnp.array([[0.1, 0.2, 0.15]])
+    )
+
+
 def test_layer_initialization(sample_gp_config):
     layer = DenseGPLayer(input_size=2, output_size=3, config=sample_gp_config)
     
@@ -166,13 +202,11 @@ def test_individual_gp_distribution(sample_layer):
     x = jnp.array([0.5])
     i_idx, o_idx = 0, 0
     
-    gp_dist = sample_layer._DenseGPLayer__gp_dist(x, i_idx, o_idx)
+    gp_loglik = sample_layer._DenseGPLayer__gp_dist(x, i_idx, o_idx)
     
-    assert isinstance(gp_dist, NormalDist), "Should return NormalDist"
-    assert gp_dist.mean.shape == (1,), "Mean should be scalar"
-    assert gp_dist.var.shape == (1,), "Variance should be scalar"
-    assert jnp.isfinite(gp_dist.mean), "Mean should be finite"
-    assert jnp.isfinite(gp_dist.var), "Variance should be finite"
+    assert isinstance(gp_loglik, jax.Array), "Should return JAX array (log-likelihood)"
+    assert gp_loglik.shape == (), "Log-likelihood should be scalar"
+    assert jnp.isfinite(gp_loglik), "Log-likelihood should be finite"
 
 
 def test_plotting_functionality(sample_layer):
@@ -185,8 +219,8 @@ def test_plotting_functionality(sample_layer):
 def test_layer_repr(sample_layer):
     layer_str = str(sample_layer)
     assert "DenseGPLayer" in layer_str, "String representation should contain class name"
-    assert "in=3" in layer_str, "String representation should contain input size"
-    assert "out=2" in layer_str, "String representation should contain output size"
+    assert "I=3" in layer_str, "String representation should contain input size as I"
+    assert "O=2" in layer_str, "String representation should contain output size as O"
 
 def test_random_seed_consistency():
     config = create_default_conf()

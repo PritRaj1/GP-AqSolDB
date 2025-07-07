@@ -58,15 +58,35 @@ def build_kernel_mat(
     x2: jax.Array,
     func: Callable[[jax.Array, jax.Array], jax.Array],
 ) -> jax.Array:
-    N1 = x1.shape[-1]
-    N2 = x2.shape[-1]
-    extra_dims = x1.shape[:-1]
-
-    x1_expanded = x1[..., jnp.newaxis, :]  # (..., N1, 1, dim)
-    x2_expanded = x2[..., jnp.newaxis, :, :]  # (..., 1, N2, dim)
+    """Always returns (..., N1, N2) where N1 = x1.shape[-1], N2 = x2.shape[-1]."""
+    if x1.ndim == 1 and x2.ndim == 1:
+        x1_expanded = x1[:, None]  # (N1, 1)
+        x2_expanded = x2[None, :]  # (1, N2)
+    elif x1.ndim == x2.ndim:
+        if x1.ndim == 1:
+            x1_expanded = x1[:, None]  # (N1, 1)
+            x2_expanded = x2[None, :]  # (1, N2)
+        else:
+            x1_expanded = x1[..., :, None]  # (..., N1, 1)
+            x2_expanded = x2[..., None, :]  # (..., 1, N2)
+    else:
+        if x1.ndim > x2.ndim:
+            if x2.ndim == 1:
+                x1_expanded = x1[..., :, None]  # (..., N1, 1)
+                x2_expanded = x2[None, :]  # (1, N2)
+            else:
+                x1_expanded = x1[..., :, None]  # (..., N1, 1)
+                x2_expanded = x2[None, :]  # (1, N2)
+        else:
+            if x1.ndim == 1:
+                x1_expanded = x1[:, None]  # (N1, 1)
+                x2_expanded = x2[..., None, :]  # (..., 1, N2)
+            else:
+                x1_expanded = x1[None, :]  # (1, N1)
+                x2_expanded = x2[..., :, None]  # (..., N2, 1)
     
     k_matrix = func(x1_expanded, x2_expanded)
-    return k_matrix.reshape(*extra_dims, N1, N2)
+    return k_matrix
 
 
 class DenseGPLayer:
@@ -181,7 +201,6 @@ class DenseGPLayer:
         self.jitter = params['jitter']
 
     def forward(self, x: NormalDist) -> NormalDist:
-        """Evaluate mean and variance functions on input x. These Eqs are best understood from the GP-KAN paper."""
         assert x.mean.ndim == 2
         assert x.mean.shape[1] == self.I
 
@@ -190,81 +209,75 @@ class DenseGPLayer:
         O = self.O
         P = self.P
 
-        # Top level JIT, (most expensive, array-heavy part)
-        def _forward_core(x_mean, x_var, s, l, jitter, z, h):
-            kernel_func1 = lambda x1, x2: normal_pdf(x1, x2, x_var + l**2)
-            kernel_func2 = lambda x1, x2: normal_pdf(x1, x2, l**2)
-
-            Q_hh = build_kernel_mat(z, z, kernel_func2)  # (1, I, O, P, P)
-            q_xh = build_kernel_mat(
-                jnp.repeat(x_mean, O, axis=1).reshape(N, I, O, 1), z, kernel_func1
-            )  # (N, I, O, 1, P)
-            
-            Q_hh_noise = Q_hh + (
-                (jitter**2)
-                / (
-                    s.reshape(1, I, O, 1, 1) ** 2
-                    * jnp.abs(l.reshape(1, I, O, 1, 1))
-                    * SQRT_2PI
-                )
-            ) * jnp.eye(P)[jnp.newaxis, jnp.newaxis, jnp.newaxis, :, :]
-
-            L = jax.scipy.linalg.cholesky(Q_hh_noise)
-            L_inv = jax.scipy.linalg.inv(L)
-            L_inv_T = jnp.transpose(L_inv, (0, 1, 2, 4, 3)) # (1, I, O, P, P)
-            Q_hh_inv = L_inv_T @ L_inv
-
-            # Mean
-            t1 = q_xh @ Q_hh_inv # (N, I, O, 1, P)
-            h_ = h.reshape(1, I, O, P, 1) # (1, I, O, P, 1)
-            t2 = t1 @ h_ # (N, I, O, 1, 1)
-            out_mean = jnp.sum(t2, axis=1).reshape(N, O) # (N, O)
-
-            # Variance
-            A = q_xh @ L_inv_T
-            A_T = jnp.transpose(A, (0, 1, 2, 4, 3))  # (N, I, O, P, 1)
-            t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var))  # (N, I, O, 1)
-            t4 = SQRT_2PI * (s**2) * jnp.abs(l)  # (1, I, O, 1)
-            t5 = A @ A_T # (N, I, O, 1, 1)
-            t6 = t5.reshape(N, I, O, 1)  # (N, I, O, 1)
-            t7 = t3 - t4 * t6 + self.global_jitter  # (N, I, O, 1)
-            out_var = jnp.sum(t7, axis=1).reshape(N, O)
-
-            return out_mean, out_var
-
-        # JIT compile ONCE - won't be recompiled every forward
-        if not hasattr(self, '_forward_core_jit'):
-            self._forward_core_jit = jax.jit(_forward_core)
+        x_mean = x.mean.reshape(N, I, 1)  # (N, I, 1)
+        x_var = x.var.reshape(N, I, 1, 1)  # (N, I, 1, 1)
 
         s = self.get_s().reshape(1, I, O, 1)
         l = self.get_l().reshape(1, I, O, 1)
         jitter = self.get_jitter().reshape(1, I, O, 1, 1)
-        z = self.get_z().reshape(1, I, O, P)
-        h = self.h
+        z = self.get_z().reshape(1, I, O, P)  # (1, I, O, P)
 
-        out_mean, out_var = self._forward_core_jit(
-            x.mean.reshape(N, I, 1),
-            x.var.reshape(N, I, 1, 1),
-            s, l, jitter, z, h
-        )
-
-        result = NormalDist(out_mean, out_var)
+        def kernel_func1(x1, x2):
+            N = x_var.shape[0]
+            x_var_reshaped = x_var.reshape(N, I, 1, 1, 1)
+            var = jnp.broadcast_to(x_var_reshaped, x1.shape)
+            l_b = jnp.broadcast_to(l.reshape(1, I, O, 1, 1), x1.shape)
+            return normal_pdf(x1, x2, var + l_b**2)
         
-        if self.device_config['use_gpu']:
-            return result.to_device('gpu')
-        return result
+        def kernel_func2(x1, x2):
+            l_reshaped = l.reshape(1, I, O, 1, 1)  # (1, I, O, 1, 1)
+            l_b = jnp.broadcast_to(l_reshaped, x1.shape)
+            return normal_pdf(x1, x2, l_b**2)
+
+        Q_hh = build_kernel_mat(z, z, kernel_func2)  # (1, I, O, P, P)
+        q_xh = build_kernel_mat(
+            jnp.repeat(x_mean, O, axis=2).reshape(N, I, O, 1), z, kernel_func1
+        )  # (N, I, O, 1, P)
+        
+        Q_hh_noise = Q_hh + (
+            (jitter**2)
+            / (
+                s.reshape(1, I, O, 1, 1) ** 2
+                * jnp.abs(l.reshape(1, I, O, 1, 1))
+                * SQRT_2PI
+            )
+        ) * jnp.eye(P)[jnp.newaxis, jnp.newaxis, jnp.newaxis, :, :]
+
+        L = jax.scipy.linalg.cholesky(Q_hh_noise)
+        L_inv = jax.scipy.linalg.inv(L)
+        L_inv_T = jnp.transpose(L_inv, (0, 1, 2, 4, 3)) # (1, I, O, P, P)
+        Q_hh_inv = L_inv_T @ L_inv
+
+        t1 = q_xh @ Q_hh_inv # (N, I, O, 1, P)
+        h = self.h.reshape(1, I, O, P, 1)
+        t2 = t1 @ h # (N, I, O, 1, 1)
+        out_mean = jnp.sum(t2, axis=1).reshape(N, O) # (N, O)
+
+        A = q_xh @ L_inv_T
+        A_T = jnp.transpose(A, (0, 1, 2, 4, 3)) # (N, I, O, P, 1)
+        t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var)) # (N, I, O, 1)
+        t4 = SQRT_2PI * (s**2) * jnp.abs(l) # (1, I, O, 1)
+        t5 = A @ A_T
+        t6 = t5.reshape(N, I, O, 1) # (N, I, O, 1)
+        t7 = t3 - t4 * t6 + self.global_jitter
+        out_var = jnp.sum(t7, axis=1).reshape(N, O)
+
+        return NormalDist(out_mean, out_var)
 
     def loglikelihood(self) -> jax.Array:
         
         # Top level JIT 
         def _loglikelihood_core(s, l, jitter, z, h):
-            I, O, P = s.shape[0], s.shape[1], z.shape[2]
+            I, O, P = z.shape
             
             def covar_func(x1, x2):
-                return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
+                # x1, x2: (I, O, P, 1) and (I, O, 1, P)
+                l_b = jnp.broadcast_to(l.reshape(I, O, 1, 1), (I, O, P, P))
+                s_b = jnp.broadcast_to(s.reshape(I, O, 1, 1), (I, O, P, P))
+                return s_b**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l_b**2))
 
             K_hh = build_kernel_mat(z, z, covar_func)  # (I, O, P, P)
-            K_hh_noise = K_hh + (jitter**2) * jnp.eye(P)[jnp.newaxis, jnp.newaxis, :, :] # (I, O, P, P)
+            K_hh_noise = K_hh + (jitter.reshape(I, O, 1, 1) ** 2) * jnp.eye(P)[jnp.newaxis, jnp.newaxis, :, :] # (I, O, P, P)
 
             L = jax.scipy.linalg.cholesky(K_hh_noise)
             L_inv = jax.scipy.linalg.inv(L)
@@ -286,16 +299,15 @@ class DenseGPLayer:
         if not hasattr(self, '_loglikelihood_core_jit'):
             self._loglikelihood_core_jit = jax.jit(_loglikelihood_core)
         
-        s = self.get_s().reshape(self.I, self.O, 1)
-        l = self.get_l().reshape(self.I, self.O, 1)
-        jitter = self.get_jitter().reshape(self.I, self.O, 1, 1)
-        z = self.get_z()  # (I, O, P)
+        s = self.get_s()
+        l = self.get_l()
+        jitter = self.get_jitter()
+        z = self.get_z()
         h = self.h
         
         return self._loglikelihood_core_jit(s, l, jitter, z, h)
 
     def __gp_dist(self, x: jax.Array, I_idx: int, O_idx: int) -> NormalDist:
-        """Compute GP distribution for a single neuron."""
         z = self.get_z()[I_idx, O_idx, :]  # (P,)
         h = self.h[I_idx, O_idx, :]  # (P,)
         l = self.get_l()[I_idx, O_idx]  # scalar
@@ -308,15 +320,13 @@ class DenseGPLayer:
         K_hh = build_kernel_mat(z, z, covar_func)  # (P, P)
         K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P) # (P, P)
 
-        # L: (P, P)
         L = jax.scipy.linalg.cholesky(K_hh_noise)
         L_inv = jax.scipy.linalg.inv(L)
-        L_inv_T = jnp.transpose(L_inv, (1, 0))
+        L_inv_T = jnp.transpose(L_inv, (1, 0)) # (P, P)
 
-        # A: (1, P)
         h = h.reshape(1, self.P)
         A = h @ L_inv_T
-        A_T = jnp.transpose(A, (1, 0))
+        A_T = jnp.transpose(A, (1, 0)) # (P, 1)
 
         t1 = jnp.log(jnp.linalg.det(L)) # scalar
         t2 = A @ A_T # (1, 1)
@@ -362,7 +372,7 @@ class DenseGPLayer:
         
         axes.plot(x_plot, mean.flatten(), 'b-', label='Mean')
         axes.fill_between(x_plot, mean.flatten() - 2*jnp.sqrt(var), 
-                         mean.flatten() + 2*jnp.sqrt(var), alpha=0.3, label='±2σ')
+                         mean.flatten() + 2*jnp.sqrt(var), alpha=0.3, label=r'$\pm 2\sigma$')
         axes.scatter(z, h, c='red', s=50, label='Inducing points')
         axes.legend()
         axes.grid(True, alpha=0.3)
