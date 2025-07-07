@@ -14,6 +14,7 @@ requirements = [
     'seaborn',
     'pandas',
     'imageio',
+    'optax',
 
     # Replace with your CUDA version
     'cupy-cuda12x', 
