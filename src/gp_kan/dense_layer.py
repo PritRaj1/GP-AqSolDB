@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Optional, Callable
 from configparser import ConfigParser
 
-from src.gp_kan.normal_dist import NormalDist
+from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
@@ -43,6 +43,11 @@ def create_default_conf() -> ConfigParser:
         'global_jitter': '0.001',
         'baseline_jitter': '0.01'
     }
+    config['DEVICE'] = {
+        'use_gpu': 'false',
+        'device': 'cpu',
+        'precision': 'float32'
+    }
     return config
 
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
@@ -55,13 +60,12 @@ def build_kernel_mat(
 ) -> jax.Array:
     N1 = x1.shape[-1]
     N2 = x2.shape[-1]
-
     extra_dims = x1.shape[:-1]
 
-    x1_repeat = jnp.repeat(x1, N2, axis=-1).reshape(*extra_dims, N2, N1).transpose(*range(len(extra_dims)), -1, -2).reshape(*extra_dims, N1 * N2)
-    x2_repeat = jnp.repeat(x2, N1, axis=-1)
-
-    k_matrix = func(x1_repeat, x2_repeat)
+    x1_expanded = x1[..., jnp.newaxis, :]  # (..., N1, 1, dim)
+    x2_expanded = x2[..., jnp.newaxis, :, :]  # (..., 1, N2, dim)
+    
+    k_matrix = func(x1_expanded, x2_expanded)
     return k_matrix.reshape(*extra_dims, N1, N2)
 
 
@@ -83,6 +87,9 @@ class DenseGPLayer:
         
         self.config = config
         gp_params = load_gp_config(config)
+        
+        self.device_config = get_device_config(config)
+        setup_jax_device(config)
         
         self.P = gp_params['num_inducing_points']
         self.num_neurons = input_size * output_size
@@ -120,7 +127,19 @@ class DenseGPLayer:
         self.s = jnp.ones((self.I, self.O))  # (I, O)
         self.jitter = jnp.ones((self.I, self.O))  # (I, O)
 
+        if self.device_config['use_gpu']:
+            self._move_to_gpu()
+
         self.reset_gp_hyp()
+
+    def _move_to_gpu(self):
+        """Move all parameters to GPU."""
+        gpu_device = jax.devices('gpu')[0]
+        self.z = jax.device_put(self.z, gpu_device)
+        self.h = jax.device_put(self.h, gpu_device)
+        self.l = jax.device_put(self.l, gpu_device)
+        self.s = jax.device_put(self.s, gpu_device)
+        self.jitter = jax.device_put(self.jitter, gpu_device)
 
     # Getters to ensure consistent transformation applied
     def get_jitter(self) -> jax.Array:
@@ -162,7 +181,7 @@ class DenseGPLayer:
         self.jitter = params['jitter']
 
     def forward(self, x: NormalDist) -> NormalDist:
-        """Evaluate mean and variance functions on input distribution x. These Eqs are best understood from the GP-KAN paper."""
+        """Evaluate mean and variance functions on input x. These Eqs are best understood from the GP-KAN paper."""
         assert x.mean.ndim == 2
         assert x.mean.shape[1] == self.I
 
@@ -218,7 +237,11 @@ class DenseGPLayer:
         t7 = t3 - t4 * t6 + self.global_jitter  # (N, I, O, 1)
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
 
-        return NormalDist(out_mean, out_var)
+        result = NormalDist(out_mean, out_var)
+        
+        if self.device_config['use_gpu']:
+            return result.to_device('gpu')
+        return result
 
     def loglikelihood(self) -> jax.Array:
         s = self.get_s().reshape(self.I, self.O, 1)
@@ -230,6 +253,7 @@ class DenseGPLayer:
             return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
         K_hh = build_kernel_mat(z, z, covar_func)  # (I, O, P, P)
+            
         K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, jnp.newaxis, :, :] # (I, O, P, P)
 
         # L: (I, O, P, P)
@@ -247,81 +271,104 @@ class DenseGPLayer:
 
         loglik = -0.5 * t2 - t1 - self.P * jnp.log(SQRT_2PI)  # (I, O, 1, 1)
         loglik_sum = jnp.sum(loglik)  # (1)
-
-        return loglik_sum / (self.I * self.P) # Avg ll per neuron
+        
+        return loglik_sum
 
     def __gp_dist(self, x: jax.Array, I_idx: int, O_idx: int) -> NormalDist:
-        assert x.ndim == 1 and x.shape[0] == 1
-        
-        l = self.get_l()[I_idx, O_idx]  # (1)
-        s = self.get_s()[I_idx, O_idx]  # (1)
-        jitter = self.get_jitter()[I_idx, O_idx]  # (1)
-        z = self.get_z()[I_idx, O_idx].reshape(1, self.P)  # (1, P)
-        h = self.h[I_idx, O_idx].reshape(1, self.P)  # (1, P)
+        """Compute GP distribution for a single neuron."""
+        z = self.get_z()[I_idx, O_idx, :]  # (P,)
+        h = self.h[I_idx, O_idx, :]  # (P,)
+        l = self.get_l()[I_idx, O_idx]  # scalar
+        s = self.get_s()[I_idx, O_idx]  # scalar
+        jitter = self.get_jitter()[I_idx, O_idx]  # scalar
         
         def covar_func(x1, x2):
             return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
-        K_hh = build_kernel_mat(z, z, covar_func)  # (1, P, P)
-        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)[jnp.newaxis, :, :] # (1, P, P)
-        k_xh = build_kernel_mat(x.reshape(1, 1), z, covar_func)  # (1, 1, P)
+        K_hh = build_kernel_mat(z, z, covar_func)  # (P, P)
+        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P) # (P, P)
 
+        # L: (P, P)
         L = jax.scipy.linalg.cholesky(K_hh_noise)
         L_inv = jax.scipy.linalg.inv(L)
-        L_inv_T = jnp.transpose(L_inv, (0, 2, 1))
-        K_hh_inv = L_inv_T @ L_inv
+        L_inv_T = jnp.transpose(L_inv, (1, 0))
 
-        # Mean
-        t1 = k_xh @ K_hh_inv # (1, 1, P)
-        h_reshaped = h.reshape(1, self.P, 1)
-        t2 = t1 @ h_reshaped # (1, 1, 1)
-        mean = t2.reshape(1)
+        # A: (1, P)
+        h = h.reshape(1, self.P)
+        A = h @ L_inv_T
+        A_T = jnp.transpose(A, (1, 0))
 
-        # Variance
-        A = k_xh @ L_inv_T # (1, 1, P)
-        A_T = jnp.transpose(A, (0, 2, 1))
-        Kxx = covar_func(x, x) # (1)
-        t3 = Kxx - A @ A_T
-        var = t3.reshape(1)
+        t1 = jnp.log(jnp.linalg.det(L)) # scalar
+        t2 = A @ A_T # (1, 1)
 
-        return NormalDist(mean, var)
+        loglik = -0.5 * t2 - t1 - self.P * jnp.log(SQRT_2PI)  # (1, 1)
+        loglik_sum = jnp.sum(loglik)  # scalar
+        
+        return loglik_sum
 
     def plot_neuron(self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100):
-        """Shows the (I_idx, O_idx)-th neuron's current GP"""
-        z = self.get_z()[I_idx, O_idx]  # (P)
-        h = self.h[I_idx, O_idx]  # (P)
-        x_pts = jnp.linspace(jnp.min(z) - 1, jnp.max(z) + 1, num_pts)  # (num_pts)
+        """Plot a single neuron's function."""
+        z = self.get_z()[I_idx, O_idx, :]  # (P,)
+        h = self.h[I_idx, O_idx, :]  # (P,)
+        l = self.get_l()[I_idx, O_idx]  # scalar
+        s = self.get_s()[I_idx, O_idx]  # scalar
+        jitter = self.get_jitter()[I_idx, O_idx]  # scalar
         
-        gp_dist_pts = [self.__gp_dist(x.reshape(1), I_idx, O_idx) for x in x_pts]
+        x_plot = jnp.linspace(jnp.min(z) - 2*l, jnp.max(z) + 2*l, num_pts)
+        
+        def covar_func(x1, x2):
+            return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
-        mean = jnp.array([p.mean for p in gp_dist_pts]).reshape(-1)
-        std_dev = jnp.array([jnp.sqrt(p.var) for p in gp_dist_pts]).reshape(-1)
+        K_hh = build_kernel_mat(z, z, covar_func)  # (P, P)
+        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P) # (P, P)
 
-        axes.plot(x_pts, mean, color="black")
-        axes.fill_between(
-            x_pts, mean + 2 * std_dev, mean - 2 * std_dev, color="gray"
-        )
+        # L: (P, P)
+        L = jax.scipy.linalg.cholesky(K_hh_noise)
+        L_inv = jax.scipy.linalg.inv(L)
+        L_inv_T = jnp.transpose(L_inv, (1, 0))
 
-        axes.scatter(z, h, color="red")
+        # A: (num_pts, P)
+        k_xh = build_kernel_mat(x_plot, z, covar_func)  # (num_pts, P)
+        A = k_xh @ L_inv_T
+        A_T = jnp.transpose(A, (1, 0))
+
+        # Mean
+        h = h.reshape(1, self.P)
+        mean = A @ h.T  # (num_pts, 1)
+        
+        # Variance
+        k_xx = build_kernel_mat(x_plot, x_plot, covar_func)  # (num_pts, num_pts)
+        var = jnp.diag(k_xx) - jnp.sum(A * A, axis=1)  # (num_pts,)
+        
+        axes.plot(x_plot, mean.flatten(), 'b-', label='Mean')
+        axes.fill_between(x_plot, mean.flatten() - 2*jnp.sqrt(var), 
+                         mean.flatten() + 2*jnp.sqrt(var), alpha=0.3, label='±2σ')
+        axes.scatter(z, h, c='red', s=50, label='Inducing points')
+        axes.legend()
+        axes.grid(True, alpha=0.3)
 
     def save_fig(self, path: str, max_neurons_shown: int = 5):
-        plot_num = min(self.num_neurons, max_neurons_shown)
-
-        fig, axes = plt.subplots(1, plot_num, squeeze=False)
-
-        axes_idx = 0
-        for i_idx in range(self.I):
-            for o_idx in range(self.O):
-                if axes_idx < plot_num:
-                    self.plot_neuron(axes[0, axes_idx], i_idx, o_idx)
-                    axes_idx += 1
-
-        fig.set_figwidth(20)
-        fig.set_figheight(5)
-        fig.savefig(path)
-
-        plt.close(fig)
+        """Save a figure showing neuron functions."""
+        import matplotlib.pyplot as plt
+        
+        num_neurons = min(max_neurons_shown, self.num_neurons)
+        fig, axes = plt.subplots(1, num_neurons, figsize=(5*num_neurons, 4))
+        
+        if num_neurons == 1:
+            axes = [axes]
+        
+        for neuron_idx in range(num_neurons):
+            i_idx = neuron_idx // self.O
+            o_idx = neuron_idx % self.O
+            
+            if i_idx < self.I:
+                self.plot_neuron(axes[neuron_idx], i_idx, o_idx)
+                axes[neuron_idx].set_title(f'Neuron ({i_idx},{o_idx})')
+        
+        plt.tight_layout()
+        plt.savefig(path)
+        plt.close()
 
     def __repr__(self) -> str:
-        return f"DenseGPLayer(in={self.I} out={self.O} num_inducing_points={self.P})"
+        return f"DenseGPLayer(I={self.I}, O={self.O}, P={self.P}, GPU={self.device_config['use_gpu']})"
     

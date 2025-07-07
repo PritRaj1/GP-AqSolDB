@@ -2,7 +2,7 @@ import jax
 from typing import List, Dict, Any
 from configparser import ConfigParser
 
-from src.gp_kan.normal_dist import NormalDist
+from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.invariant_acts import NormaliseGaussian
 
@@ -63,15 +63,24 @@ def create_default_conf() -> ConfigParser:
     config['TRAINING'] = {
         'seed': '42'
     }
+    config['DEVICE'] = {
+        'use_gpu': 'false',
+        'device': 'cpu',
+        'precision': 'float32'
+    }
     return config
 
 
 class GP_KAN:
+    """Gaussian Process Kolmogorov-Arnold Network."""
     
     def __init__(self, config: ConfigParser, hidden_sizes: List[int] = None):
         self.config = config
         self.layers = []
         self.normalizers = []
+        
+        self.device_config = get_device_config(config)
+        setup_jax_device(config)
         
         config_params = load_kan_conf(config)
         self.input_size = config_params['input_size']
@@ -98,10 +107,13 @@ class GP_KAN:
             
             if i < len(layer_sizes) - 2:
                 min_var = float(self.config['NORMALIZATION'].get('min_var', '0.2'))
-                normalizer = NormaliseGaussian(min_var=min_var)
+                normalizer = NormaliseGaussian(min_var=min_var, config=self.config)
                 self.normalizers.append(normalizer)
             else:
                 self.normalizers.append(None)
+
+        if self.device_config['use_gpu']:
+            self._compile_JIT()
     
     def forward(self, x: NormalDist) -> NormalDist:
         current = x
@@ -154,7 +166,33 @@ class GP_KAN:
         plt.savefig(path)
         plt.close()
     
+    def to_device(self, device: str):
+        """Move the entire network to a specific device."""
+        if device == 'gpu':
+            for layer in self.layers:
+                layer._move_to_gpu()
+            
+            for normalizer in self.normalizers:
+                if normalizer is not None and hasattr(normalizer, 'device_config'):
+                    normalizer.device_config['use_gpu'] = True
+        else:
+            cpu_device = jax.devices('cpu')[0]
+            for layer in self.layers:
+                layer.z = jax.device_put(layer.z, cpu_device)
+                layer.h = jax.device_put(layer.h, cpu_device)
+                layer.l = jax.device_put(layer.l, cpu_device)
+                layer.s = jax.device_put(layer.s, cpu_device)
+                layer.jitter = jax.device_put(layer.jitter, cpu_device)
+    
     def __repr__(self) -> str:
         layer_info = [f"{layer.I}→{layer.O}" for layer in self.layers]
-        return f"GP_KAN({' → '.join(layer_info)})"
+        device_info = f"GPU={self.device_config['use_gpu']}"
+        return f"GP_KAN({' → '.join(layer_info)}, {device_info})"
+
+    def _compile_JIT(self):
+        self.forward = jax.jit(self.forward)
+        self.loglikelihood = jax.jit(self.loglikelihood)
+        
+        for layer in self.layers:
+            layer.forward = jax.jit(layer.forward)
 

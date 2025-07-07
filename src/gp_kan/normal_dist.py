@@ -2,6 +2,31 @@ import jax
 import jax.numpy as jnp
 from typing import Optional
 from dataclasses import dataclass
+from configparser import ConfigParser
+
+def get_device_config(config: ConfigParser) -> dict:
+    if 'DEVICE' not in config:
+        return {'use_gpu': False, 'device': 'cpu'}
+    
+    device_section = config['DEVICE']
+    return {
+        'use_gpu': device_section.getboolean('use_gpu', False),
+        'device': device_section.get('device', 'cpu'),
+        'precision': device_section.get('precision', 'float32')
+    }
+
+def setup_jax_device(config: ConfigParser):
+    device_config = get_device_config(config)
+    
+    if device_config['use_gpu']:
+        jax.config.update('jax_platform_name', 'gpu')
+        
+        if device_config['precision'] == 'float64':
+            jax.config.update('jax_enable_x64', True)
+        elif device_config['precision'] == 'float32':
+            jax.config.update('jax_enable_x64', False)
+    else:
+        jax.config.update('jax_platform_name', 'cpu')
 
 @dataclass
 class NormalDist:
@@ -101,4 +126,14 @@ class NormalDist:
     
     def to_numpy(self):
         return NormalDist(jnp.array(self.mean), jnp.array(self.var))
+    
+    def to_device(self, device: str):
+        if device == 'gpu':
+            mean_gpu = jax.device_put(self.mean, jax.devices('gpu')[0])
+            var_gpu = jax.device_put(self.var, jax.devices('gpu')[0])
+            return NormalDist(mean_gpu, var_gpu)
+        else:
+            mean_cpu = jax.device_put(self.mean, jax.devices('cpu')[0])
+            var_cpu = jax.device_put(self.var, jax.devices('cpu')[0])
+            return NormalDist(mean_cpu, var_cpu)
     
