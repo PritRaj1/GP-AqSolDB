@@ -77,9 +77,13 @@ class GPKANAutoTuner:
     
     def _load_device_settings(self):
         try:
-            device_section = self.config.get('DEVICE', {})
-            use_gpu = device_section.get('use_gpu', 'false').lower() == 'true'
-            precision = device_section.get('precision', 'float32')
+            if 'DEVICE' in self.config:
+                device_section = self.config['DEVICE']
+                use_gpu = device_section.get('use_gpu', 'false').lower() == 'true'
+                precision = device_section.get('precision', 'float32')
+            else:
+                use_gpu = False
+                precision = 'float32'
             
             print(f"Device configuration:")
             print(f"  Use GPU: {use_gpu}")
