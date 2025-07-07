@@ -17,7 +17,12 @@ requirements = [
 
     # Replace with your CUDA version
     'cupy-cuda12x', 
-    'jax[cuda12]',
+]
+
+# Install JAX separately
+jax_gpu_packages = [
+    'jax[cuda12_pip]',
+    'jaxlib[cuda12_pip]',
 ]
 
 for package in requirements:
@@ -27,6 +32,22 @@ for package in requirements:
         print(f"{package} installed successfully.")
     except subprocess.CalledProcessError:
         print(f"Failed to install {package}.")
+
+print("Installing JAX with GPU support...")
+try:
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", 
+        "--upgrade", "jax[cuda12_pip]", 
+        "-f", "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+    ])
+    print("JAX with GPU support installed successfully.")
+except subprocess.CalledProcessError:
+    print("Failed to install JAX with GPU support. Falling back to CPU version.")
+    try:
+        install('jax')
+        print("JAX CPU version installed as fallback.")
+    except subprocess.CalledProcessError:
+        print("Failed to install JAX.")
 
 if __name__ == "__main__":
     for r in requirements:
