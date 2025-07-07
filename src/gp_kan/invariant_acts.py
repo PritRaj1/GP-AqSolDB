@@ -49,13 +49,24 @@ class NormaliseGaussian:
         return t2
 
     def __call__(self, x: NormalDist) -> NormalDist:
-        out_mean = jnp.tanh(x.mean)
-        out_var = jax.nn.sigmoid(x.var - x.mean**2 + self.sigmoid_offset)
+        
+        # JIT once
+        def _normalize_core(x_mean, x_var, sigmoid_offset, min_var):
+            out_mean = jnp.tanh(x_mean)
+            out_var = jax.nn.sigmoid(x_var - x_mean**2 + sigmoid_offset)
+            out_var = jnp.maximum(out_var, min_var)
+            return out_mean, out_var
+        
+        if not hasattr(self, '_normalize_core_jit'):
+            self._normalize_core_jit = jax.jit(_normalize_core)
+        
+        out_mean, out_var = self._normalize_core_jit(x.mean, x.var, self.sigmoid_offset, self.min_var)
+        result = NormalDist(out_mean, out_var)
         
         if self.device_config['use_gpu']:
-            return NormalDist(out_mean, out_var).to_device('gpu')
+            return result.to_device('gpu')
 
-        return NormalDist(out_mean, out_var)
+        return result
 
 
 class ReshapeGaussian:
