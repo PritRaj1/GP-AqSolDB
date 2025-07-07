@@ -2,6 +2,9 @@ import jax
 from typing import List, Dict, Any
 from configparser import ConfigParser
 import matplotlib.pyplot as plt
+import jax.numpy as jnp
+from jax import grad, jit
+import optax
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 from src.gp_kan.dense_layer import DenseGPLayer
@@ -170,6 +173,141 @@ class GP_KAN:
         for layer in self.layers:
             total_ll += layer.loglikelihood()
         return total_ll
+    
+    def train(self, X_train: jax.Array, y_train: jax.Array, 
+              X_val: jax.Array = None, y_val: jax.Array = None,
+              learning_rate: float = 0.001, num_epochs: int = 30, 
+              batch_size: int = 32, patience: int = 10, pretrain_iters: int = 10):
+        """
+        Train the GP-KAN network using gradient descent.
+        
+        Parameters:
+        -----------
+        X_train : jax.Array
+            Training features
+        y_train : jax.Array
+            Training targets
+        X_val : jax.Array, optional
+            Validation features
+        y_val : jax.Array, optional
+            Validation targets
+        learning_rate : float
+            Learning rate for optimization
+        num_epochs : int
+            Number of training epochs
+        batch_size : int
+            Batch size for training
+        patience : int
+            Early stopping patience
+        pretrain_iters : int
+            Number of pretraining iterations for GP hyperparameters
+        """
+        X_train = jnp.array(X_train, dtype=jnp.float32)
+        y_train = jnp.array(y_train, dtype=jnp.float32).reshape(-1, 1)
+        
+        if X_val is not None:
+            X_val = jnp.array(X_val, dtype=jnp.float32)
+            y_val = jnp.array(y_val, dtype=jnp.float32).reshape(-1, 1)
+        
+        # Pretrain hps
+        print("Pretraining GP hyperparameters...")
+        self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
+        
++        optimizer = optax.adam(learning_rate)        
+        params = self.get_params()
+        opt_state = optimizer.init(params)
+        
+=        key = jax.random.PRNGKey(self.seed)
+        
+        def loss_fn(params, X_batch, y_batch):
+            self.set_params(params)
+            
+            X_batch_mean = X_batch
+            X_batch_var = jnp.zeros_like(X_batch)
+            X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
+            
+            output_dist = self.forward(X_batch_dist)
+            
+            loglik = self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
+            negloglik = -jnp.mean(loglik)
+            
+            return negloglik
+        
+        grad_fn = jit(grad(loss_fn))
+        
+        best_val_loss = float('inf')
+        patience_counter = 0
+        
+        for epoch in range(num_epochs):
+=           key, subkey = jax.random.split(key)
+            indices = jax.random.permutation(subkey, len(X_train))
+            X_train_shuffled = X_train[indices]
+            y_train_shuffled = y_train[indices]
+            
+            total_loss = 0.0
+            num_batches = 0
+            
+            for i in range(0, len(X_train), batch_size):
+                X_batch = X_train_shuffled[i:i+batch_size]
+                y_batch = y_train_shuffled[i:i+batch_size]
+                
+                grads = grad_fn(params, X_batch, y_batch)                
+                updates, opt_state = optimizer.update(grads, opt_state)
+                params = optax.apply_updates(params, updates)
+                
+                loss = loss_fn(params, X_batch, y_batch)
+                total_loss += loss
+                num_batches += 1
+            
+            avg_loss = total_loss / num_batches
+            
+            if X_val is not None:
+                val_loss = loss_fn(params, X_val, y_val)
+                
+                if epoch % 5 == 0:
+                    print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}, Val Loss = {val_loss:.4f}")
+                
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    patience_counter = 0
+                    best_params = params.copy()
+                else:
+                    patience_counter += 1
+                    
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {epoch}")
+                    self.set_params(best_params)
+                    break
+            else:
+                if epoch % 5 == 0:
+                    print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
+        
+        self.set_params(params)
+    
+    def _pretrain_gp_hyperparameters(self, X_train: jax.Array, y_train: jax.Array, num_iters: int):
+        """Pretrain GP hyperparameters by maximizing ll of inducing points."""
+        
+        def pretrain_loss_fn(params):
+            self.set_params(params)
+            return -self.loglikelihood()
+        
+        optimizer = optax.adam(0.001)
+        params = self.get_params()
+        opt_state = optimizer.init(params)
+        
+        for i in range(num_iters):
+            grads = grad(pretrain_loss_fn)(params)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            params = optax.apply_updates(params, updates)
+            
+            if i % 2 == 0:
+                loss = pretrain_loss_fn(params)
+                print(f"  Pretrain {i}: internal loglik {-loss:.4f}")
+        
+        self.set_params(params)
+    
+    def _log_likelihood(self, mean: jax.Array, var: jax.Array, targets: jax.Array) -> jax.Array:
+        return -0.5 * jnp.log(2 * jnp.pi * var) - 0.5 * (targets - mean) ** 2 / var
     
     def save_fig(self, path: str, max_neurons_per_layer: int = 3):
         
