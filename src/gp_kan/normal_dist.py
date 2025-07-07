@@ -40,12 +40,10 @@ class NormalDist:
             raise ValueError(f"Mean shape {self.mean.shape} must match variance shape {self.var.shape}")
     
     def tree_flatten(self):
-        """Flatten the PyTree for JAX."""
         return ((self.mean, self.var), None)
     
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        """Unflatten the PyTree for JAX."""
         return cls(*children)
     
     @classmethod
@@ -112,6 +110,7 @@ class NormalDist:
             sample_shape = self.mean.shape
         else:
             sample_shape = shape + self.mean.shape
+            
         std_samples = jax.random.normal(key, sample_shape)
         samples = self.mean + jnp.sqrt(self.var) * std_samples
         return samples
