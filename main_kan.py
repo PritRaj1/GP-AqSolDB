@@ -106,9 +106,8 @@ def load_data():
     return X_final, y, feature_names
 
 def uncertainty_plot(gp_kan, X_train, X_test, y_test):
-    # Convert test data to NormalDist format
     X_test_mean = X_test
-    X_test_var = np.zeros_like(X_test)  # Zero variance for input data
+    X_test_var = np.zeros_like(X_test)  
     X_test_dist = NormalDist(X_test_mean, X_test_var)
     
     # Forward pass through GP-KAN
@@ -143,7 +142,6 @@ def uncertainty_plot(gp_kan, X_train, X_test, y_test):
     plt.close()
 
 def plot_uncertainty_heatmap(gp_kan, X, y, feature_names, X_train, save_path):
-    # Find top 2 features by variance in the first layer
     first_layer = gp_kan.layers[0]
     layer_variances = np.var(first_layer.get_z(), axis=(1, 2))  # Variance across inducing points for each input
     sorted_indices = np.argsort(layer_variances)[::-1]
@@ -177,7 +175,6 @@ def plot_uncertainty_heatmap(gp_kan, X, y, feature_names, X_train, save_path):
             closest_indices = np.argmin(distances, axis=1)
             X_grid[:, i] = X_sample[closest_indices, i]
     
-    # Forward pass through GP-KAN for uncertainty
     X_grid_mean = X_grid
     X_grid_var = np.zeros_like(X_grid)
     X_grid_dist = NormalDist(X_grid_mean, X_grid_var)
@@ -219,7 +216,6 @@ def plot_uncertainty_heatmap(gp_kan, X, y, feature_names, X_train, save_path):
     plt.close()
 
 def surface_plot(gp_kan, X, y, feature_names, save_path):
-    # Find top 2 features by variance in the first layer
     first_layer = gp_kan.layers[0]
     layer_variances = np.var(first_layer.get_z(), axis=(1, 2))
     sorted_indices = np.argsort(layer_variances)[::-1]
@@ -250,7 +246,6 @@ def surface_plot(gp_kan, X, y, feature_names, save_path):
             closest_indices = np.argmin(distances, axis=1)
             X_grid[:, i] = X_sample[closest_indices, i]
 
-    # Forward pass through GP-KAN
     X_grid_mean = X_grid
     X_grid_var = np.zeros_like(X_grid)
     X_grid_dist = NormalDist(X_grid_mean, X_grid_var)
@@ -258,7 +253,6 @@ def surface_plot(gp_kan, X, y, feature_names, save_path):
     y_pred_grid = output_dist.mean.flatten()
     y_pred_grid = y_pred_grid.reshape(X1g.shape)
 
-    # Sample actual data points for overlay
     n_data_points = min(200, len(X))
     if len(X) > n_data_points:
         np.random.seed(42)
@@ -301,7 +295,6 @@ def main():
     X, y, feature_names = load_data()
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
     
-    # Check if optimal parameters already exist
     if os.path.exists(CONFIG_PATH) and os.path.exists(PARAMS_PATH):
         print("Loading previously optimized hyperparameters...")
         from src.gp_kan.auto_tune import load_gpkan_params_from_file, create_optimized_network
@@ -321,25 +314,22 @@ def main():
             use_gpu=True, 
             max_hidden_layers=4,
             max_hidden_size=16,
-            num_epochs=50  # Fixed number of epochs for auto-tuning
+            num_epochs=20
         )
-        tuner.optimize(n_trials=50)  # Reduced for faster testing
-        config, params = tuner.load_optimized_parameters()
+        tuner.optimize(n_trials=100)          config, params = tuner.load_optimized_parameters()
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
-    # Train the network with proper gradient descent
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
         learning_rate=0.001,
-        num_epochs=200,  # More epochs for final training
+        num_epochs=200,  
         batch_size=32,
         patience=20,
         pretrain_iters=10
     )
 
-    # Test predictions
     X_test_mean = X_test
     X_test_var = np.zeros_like(X_test)
     X_test_dist = NormalDist(X_test_mean, X_test_var)
@@ -355,12 +345,8 @@ def main():
     print(f"Mean uncertainty: {np.mean(y_std):.4f}")
 
     uncertainty_plot(gp_kan, X_train, X_test, y_test)
-    
     plot_uncertainty_heatmap(gp_kan, X, y, feature_names, X_train, f'{FIGURE_DIR}/kernel_uncertainty_heatmap_kan.png')
-    
     surface_plot(gp_kan, X, y, feature_names, f'{FIGURE_DIR}/solubility_surface_kan.png')
-    
-    # Save network architecture
     gp_kan.save_fig(f'{FIGURE_DIR}/gp_kan_architecture.png', max_neurons_per_layer=3)
 
     print("\n" + "="*80)
