@@ -9,7 +9,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.multivar_gp.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
 
 def create_test_data(n_samples, n_features):
-    """Create test data for kernel computation"""
     np.random.seed(42)
     X1 = np.random.randn(n_samples, n_features)
     X2 = np.random.randn(n_samples // 2, n_features)
@@ -17,7 +16,6 @@ def create_test_data(n_samples, n_features):
     return X1, X2, sigma
 
 def bench_kernel(kernel_func, X1, X2, sigma, alpha=None, n_runs=3):
-    """Benchmark kernel computation"""
     times = []
     
     for i in range(n_runs):
@@ -31,13 +29,7 @@ def bench_kernel(kernel_func, X1, X2, sigma, alpha=None, n_runs=3):
     
     return np.mean(times), np.std(times), result.shape
 
-@pytest.fixture
-def sample_kernel_data():
-    """Fixture for gen test data"""
-    return create_test_data(1000, 5)
-
 def test_parallel_info():
-    """Test that info is displaued correctly"""
     parallel_info = get_parallel_info()
     
     assert 'parallel_available' in parallel_info
@@ -52,7 +44,6 @@ def test_parallel_info():
     assert isinstance(parallel_info['cupy_available'], bool)
 
 def test_conf():
-    """Test config"""
     configure_parallel_settings()
     parallel_info = get_parallel_info()
     settings = parallel_info['settings']
@@ -81,7 +72,6 @@ def test_conf():
     assert settings['min_size_for_parallel'] == 300
 
 def test_conf_load():
-    """Test loading config"""
     config = ConfigParser()
     config['PARALLEL'] = {
         'use_parallel': 'true',
@@ -103,7 +93,6 @@ def test_conf_load():
     assert settings['min_size_for_parallel'] == 300
 
 def test_conf_load_missing():
-    """Test fallback when LEF section is missing"""
     config = ConfigParser()
     config['KERNEL'] = {'type': 'RBF'}
     
@@ -121,7 +110,6 @@ def test_conf_load_missing():
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_sequential_vs_parallel(kernel_type, sample_kernel_data):
-    """Test sequential and parallel produces same results"""
     X1, X2, sigma = sample_kernel_data
         
     # Sequential
@@ -144,7 +132,6 @@ def test_sequential_vs_parallel(kernel_type, sample_kernel_data):
     assert result_seq.shape == result_par.shape
 
 def test_gpu():
-    """Test GPU kernel"""
     X1, X2, sigma = create_test_data(500, 3)
     
     # Force GPU usage
@@ -178,7 +165,6 @@ def test_gpu():
         print(f"GPU RQ computation failed (fine if no GPU): {e}")
 
 def test_gpu_vs_cpu():
-    """Test that GPU and CPU produce consistent results when both are available"""
     X1, X2, sigma = create_test_data(300, 3)
     
     # CPU 
@@ -203,7 +189,6 @@ def test_gpu_vs_cpu():
 
 @pytest.mark.parametrize("matrix_size", [100, 500, 1000])
 def test_parallel_performance_scaling(matrix_size):
-    """Test that parallel processing scales with matrix size"""
     n_features = 5
     X1, X2, sigma = create_test_data(matrix_size, n_features)
     
@@ -224,7 +209,6 @@ def test_parallel_performance_scaling(matrix_size):
         assert True
 
 def test_gpu_performance():
-    """Test GPU performance vs CPU when available"""
     X1, X2, sigma = create_test_data(1000, 5)
     
     # CPU btime
@@ -255,7 +239,6 @@ def test_gpu_performance():
         print(f"GPU computation failed: {e}")
 
 def test_gpu_fallback():
-    """Test that GPU computation falls back to CPU when GPU is not available"""
     X1, X2, sigma = create_test_data(500, 3)
     
     # Force GPU 
@@ -275,7 +258,6 @@ def test_gpu_fallback():
         assert True
 
 def test_chunks():
-    """Test different chunk sizes"""
     X1, X2, sigma = create_test_data(1000, 5)
     
     for chunk_size in [100, 500, 1000]:
@@ -291,7 +273,6 @@ def test_chunks():
         assert not np.any(np.isnan(result))
 
 def test_min_size_for_parallel():
-    """Test that minimum size does stuff"""
 
     # Small matrices should not use parallel 
     X1, X2, sigma = create_test_data(50, 3)  
@@ -321,7 +302,6 @@ def test_min_size_for_parallel():
 
 @pytest.mark.parametrize("n_jobs", [1, 2, 4])
 def test_different_n_jobs(n_jobs):
-    """Test kernel computation with different numbers of jobs"""
     X1, X2, sigma = create_test_data(800, 4)
     
     configure_parallel_settings(
@@ -350,7 +330,6 @@ def test_cache():
     assert np.allclose(result1, result2, rtol=1e-10)
 
 def test_errors():
-    """Test error handling"""
     X1 = np.random.randn(100, 3)
     X2 = np.random.randn(50, 3)
     sigma = np.array([1.0, 1.0]) 
@@ -362,7 +341,6 @@ def test_errors():
         RBF(X1, X2, sigma)
 
 def test_memory_efficiency():
-    """Test that parallel doesn't cause memory issues"""
     X1, X2, sigma = create_test_data(2000, 10)
     
     configure_parallel_settings(

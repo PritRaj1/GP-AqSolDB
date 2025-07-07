@@ -26,7 +26,6 @@ if not os.path.exists(figures_dir):
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_shape(kernel_type):
-    """Test vectorized kernel output shape for different kernel types"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
@@ -51,7 +50,6 @@ def test_vectorized_kernel_shape(kernel_type):
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_symmetry(kernel_type):
-    """Test that vectorized kernels are symmetric"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
@@ -68,7 +66,6 @@ def test_vectorized_kernel_symmetry(kernel_type):
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_vectorized_kernel_identity(kernel_type):
-    """Test that vectorized kernel at same point equals 1"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", kernel_type)
@@ -82,7 +79,6 @@ def test_vectorized_kernel_identity(kernel_type):
 
 @pytest.mark.parametrize("sigma", [0.5, 1.0, 2.0])
 def test_vectorized_kernel_sigma_scaling(sigma):
-    """Test that vectorized kernel values scale properly with sigma"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", "RBF")
@@ -101,7 +97,6 @@ def test_vectorized_kernel_sigma_scaling(sigma):
         assert k_value > 0.5  # Should be larger for large sigma
 
 def test_vectorized_kernel_matrix_shape():
-    """Test vectorized kernel matrix computation and shape"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", "RBF")
@@ -125,7 +120,6 @@ def test_vectorized_kernel_matrix_shape():
 
 @pytest.mark.parametrize("sigma_type", ["scalar", "array"])
 def test_vectorized_multivariate_kernel(sigma_type):
-    """Test vectorized kernels with multivariate sigma"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     
@@ -152,7 +146,6 @@ def test_vectorized_multivariate_kernel(sigma_type):
     assert np.allclose(K_xx[0, 0], 1.0, rtol=1e-10)
 
 def test_invalid_kernel_type():
-    """Test that invalid kernel type raises error"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     config.set("KERNEL", "type", "INVALID_KERNEL")
@@ -161,7 +154,6 @@ def test_invalid_kernel_type():
         get_kernel(config, np.array([1.0, 1.0, 1.0]))
 
 def test_visual():
-    """Visualize vectorized kernels with seaborn styling"""
     config = configparser.ConfigParser()
     config.read('config/test.ini')
     

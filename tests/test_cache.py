@@ -10,7 +10,6 @@ from src.multivar_gp.dense_gp import DenseGP
 from src.multivar_gp.kernels import get_cache_stats, clear_kernel_cache
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache_size=100):
-    """Create test config"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': kernel_type,
@@ -22,7 +21,6 @@ def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, cache
     return config
 
 def test_repeated_predictions_caching():
-    """Test caching benefits for repeated predictions"""
     np.random.seed(42)
     X_train = np.random.randn(200, 5)
     y_train = np.random.randn(200)
@@ -63,7 +61,6 @@ def test_repeated_predictions_caching():
         assert time_with_cache <= time_no_cache, "Caching should not be slower than no caching"
 
 def test_large_dataset_caching():
-    """Test caching benefits with larger datasets"""
     np.random.seed(42)
     X_train = np.random.randn(500, 3)
     y_train = np.random.randn(500)
@@ -100,7 +97,6 @@ def test_large_dataset_caching():
     assert cache_stats['hits'] > 0, "Should have cache hits for repeated predictions"
 
 def test_cache_config_options():
-    """Test that cache config works"""
     np.random.seed(42)
     X_train = np.random.randn(100, 2)
     y_train = np.random.randn(100)
@@ -136,7 +132,6 @@ def test_cache_config_options():
     assert cache_stats is None, "Cache stats should be None when caching is disabled"
 
 def test_cache_clearing():
-    """Test cache clearing functionality"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)
@@ -157,7 +152,6 @@ def test_cache_clearing():
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_cache_with_different_kernels(kernel_type):
-    """Test caching works with different kernels"""
     np.random.seed(42)
     X_train = np.random.randn(100, 3)
     y_train = np.random.randn(100)
@@ -179,7 +173,6 @@ def test_cache_with_different_kernels(kernel_type):
 
 @pytest.mark.parametrize("cache_size", [5, 50, 100])
 def test_cache_size_configuration(cache_size):
-    """Test that cache sizing works - more entries than cache size should be LRU evicted"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)
@@ -199,7 +192,6 @@ def test_cache_size_configuration(cache_size):
     assert cache_stats['cache_size'] <= cache_size, f"Cache size should respect configuration limit of {cache_size}"
 
 def test_cache_hit_rate():
-    """Test that cache hit rate increases with repeated preds"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)

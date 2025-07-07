@@ -12,7 +12,6 @@ from src.multivar_gp.sparse_gp import SparseGP
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True, 
                   cache_size=100, sparse=False, num_inducing=20):
-    """Create a configuration object for testing"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': kernel_type,
@@ -26,7 +25,6 @@ def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0, use_cache=True,
     return config
 
 def test_sparse_vs_full_gp():
-    """Test sparse GP vs full GP performance and accuracy"""
     np.random.seed(42)
     X_train = np.random.randn(300, 3)
     y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 300)
@@ -81,7 +79,6 @@ def test_sparse_vs_full_gp():
 
 @pytest.mark.parametrize("num_inducing", [10, 20, 50, 100])
 def test_different_inducing_points(num_inducing):
-    """Test different numbers of inducing points"""
     np.random.seed(42)
     X_train = np.random.randn(200, 2)
     y_train = np.sin(X_train[:, 0]) * np.cos(X_train[:, 1]) + np.random.normal(0, 0.1, 200)
@@ -107,7 +104,6 @@ def test_different_inducing_points(num_inducing):
     assert sparse_info['compression_ratio'] <= 1.0, "Compression ratio should be <= 1"
 
 def test_sparse_gp_with_uncertainty():
-    """Test sparse GP uncertainty quantification"""
     np.random.seed(42)
     X_train = np.random.randn(150, 2)
     y_train = np.sin(X_train[:, 0]) + np.random.normal(0, 0.1, 150)
@@ -138,7 +134,6 @@ def test_sparse_gp_with_uncertainty():
     assert np.mean(y_std_sparse) > 0, "Sparse GP mean uncertainty should be positive"
 
 def test_sparse_gp_edge_cases():
-    """Test edge cases for sparse GP"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)
@@ -160,7 +155,6 @@ def test_sparse_gp_edge_cases():
 
 @pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
 def test_sparse_gp_with_different_kernels(kernel_type):
-    """Test sparse GP with different kernel types"""
     np.random.seed(42)
     X_train = np.random.randn(200, 3)
     y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 200)
@@ -191,7 +185,6 @@ def test_sparse_gp_with_different_kernels(kernel_type):
 
 @pytest.mark.parametrize("method", ['random', 'uniform'])
 def test_inducing_point_selection_methods(method):
-    """Test different inducing point selection methods"""
     np.random.seed(42)
     X_train = np.random.randn(100, 2)
     y_train = np.sin(X_train[:, 0]) + np.random.normal(0, 0.1, 100)
@@ -213,7 +206,6 @@ def test_inducing_point_selection_methods(method):
     assert sparse_info['compression_ratio'] <= 1.0, f"Compression ratio should be <= 1 for {method} method"
 
 def test_sparse_gp_complexity():
-    """Test that sparse GP complexity calculation is correct"""
     np.random.seed(42)
     X_train = np.random.randn(100, 3)
     y_train = np.random.randn(100)
@@ -237,7 +229,6 @@ def test_sparse_gp_complexity():
         assert sparse_info['num_inducing'] == num_inducing, f"Number of inducing points should be {num_inducing}"
 
 def test_sparse_gp_cache_integration():
-    """Test that sparse GP works with caching"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)
@@ -258,7 +249,6 @@ def test_sparse_gp_cache_integration():
     gp.clear_cache()
 
 def test_sparse_gp_fit_predict_cycle():
-    """Test that sparse GP fit and predict work correctly in sequence"""
     np.random.seed(42)
     X_train = np.random.randn(80, 2)
     y_train = np.random.randn(80)

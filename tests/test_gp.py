@@ -9,7 +9,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.multivar_gp.gp import GP
 
 def create_config(use_sparse=False, num_inducing=20, inducing_method='random'):
-    """Create a configuration object for testing"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': 'RBF',
@@ -26,7 +25,6 @@ def create_config(use_sparse=False, num_inducing=20, inducing_method='random'):
     return config
 
 def test_unified_gp_switching():
-    """Test that the unified GP correctly switches between dense and sparse"""
     np.random.seed(42)
     X_train = np.random.randn(200, 3)
     y_train = np.sin(X_train[:, 0]) * np.cos(X_train[:, 1]) + np.random.normal(0, 0.1, 200)
@@ -71,7 +69,6 @@ def test_unified_gp_switching():
 
 @pytest.mark.parametrize("method", ['random', 'uniform'])
 def test_different_inducing_methods(method):
-    """Test different inducing point selection methods"""
     np.random.seed(42)
     X_train = np.random.randn(150, 2)
     y_train = np.sin(X_train[:, 0]) + np.random.normal(0, 0.1, 150)
@@ -93,7 +90,6 @@ def test_different_inducing_methods(method):
     assert model_info['num_inducing'] == 30, "Number of inducing points should match config"
 
 def test_uncertainty_quantification():
-    """Test uncertainty quantification for both dense and sparse GPs"""
     np.random.seed(42)
     X_train = np.random.randn(100, 2)
     y_train = np.sin(X_train[:, 0]) + np.random.normal(0, 0.1, 100)
@@ -124,7 +120,6 @@ def test_uncertainty_quantification():
     assert np.all(np.isfinite(y_std_sparse)), "Sparse GP uncertainties should be finite"
 
 def test_config_loading():
-    """Test loading configurations from ConfigParser objects"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': 'RBF',
@@ -153,7 +148,6 @@ def test_config_loading():
     assert model_info['inducing_method'] == 'uniform', "Inducing method should be uniform"
 
 def test_model_complexity():
-    """Test model complexity calculation for both dense and sparse GPs"""
     sigma = np.array([1.0, 1.0, 1.0])
     
     # Dense GP complexity
@@ -171,7 +165,6 @@ def test_model_complexity():
     assert sparse_complexity > dense_complexity, "Sparse GP should have higher complexity than dense GP"
 
 def test_prediction_without_fitting():
-    """Test that prediction raises error when model is not fitted"""
     config = create_config(use_sparse=False)
     sigma = np.array([1.0, 1.0])
     gp = GP(config, sigma)
@@ -182,7 +175,6 @@ def test_prediction_without_fitting():
         gp.predict(X_test)
 
 def test_fit_predict_cycle():
-    """Test that fit and predict work correctly in sequence"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)
@@ -208,7 +200,6 @@ def test_fit_predict_cycle():
     assert np.all(np.isfinite(y_pred_sparse)), "Predictions should be finite"
 
 def test_cache_integration():
-    """Test that cache functionality works with unified GP"""
     np.random.seed(42)
     X_train = np.random.randn(50, 2)
     y_train = np.random.randn(50)

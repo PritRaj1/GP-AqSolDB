@@ -21,7 +21,6 @@ from src.multivar_gp.dense_gp import DenseGP
 from tests.fcn import get_data
 
 def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0):
-    """Create a variable config object for testing"""
     config = ConfigParser()
     config['KERNEL'] = {
         'type': kernel_type,
@@ -32,12 +31,10 @@ def create_config(kernel_type="RBF", lmbda=0.1, alpha=1.0):
 
 @pytest.fixture
 def sample_data_1d():
-    """Fixture for 1D test data"""
     return get_data(num_points=20, noise=True, noise_std=0.1, x_range=(0, 10))
 
 @pytest.fixture
 def sample_data_2d():
-    """Fixture for 2D test data"""
     np.random.seed(42)
     X_train = np.random.uniform(0, 5, (30, 2))
     y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1]/5) + np.random.normal(0, 0.1, 30)
@@ -48,7 +45,6 @@ def sample_data_2d():
     ("RQ", 1.0),
 ])
 def test_gp_basic_functionality(kernel_type, sigma, sample_data_1d):
-    """Test basic GP functionality with different kernels"""
     config = create_config(kernel_type=kernel_type, lmbda=0.1)
     X_train, y_train = sample_data_1d
     X_test = np.linspace(0, 10, 50).reshape(-1, 1)
@@ -64,7 +60,6 @@ def test_gp_basic_functionality(kernel_type, sigma, sample_data_1d):
 
 @pytest.mark.parametrize("sigma_type", ["univariate", "multivariate"])
 def test_gp_sigma_types(sigma_type, sample_data_1d, sample_data_2d):
-    """Test GP with different sigma types"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     
     if sigma_type == "univariate":
@@ -91,7 +86,6 @@ def test_gp_sigma_types(sigma_type, sample_data_1d, sample_data_2d):
     assert not np.any(np.isnan(y_std))
 
 def test_uncertainty_behavior():
-    """Test that uncertainty behaves as expected"""
     config = create_config(kernel_type="RBF", lmbda=0.01)
     sigma = 1.0
     
@@ -118,7 +112,6 @@ def test_uncertainty_behavior():
         assert np.mean(training_uncertainty) < np.mean(other_uncertainty)
 
 def test_uncertainty_distance_relationship(sample_data_1d):
-    """Test that uncertainty increases with distance from training points"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0
     
@@ -139,7 +132,6 @@ def test_uncertainty_distance_relationship(sample_data_1d):
         assert np.mean(y_std[far_points]) > np.mean(y_std[near_points])
 
 def test_gp_fit_attributes(sample_data_1d):
-    """Test that GP fit method sets all required attributes"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0
     
@@ -154,7 +146,6 @@ def test_gp_fit_attributes(sample_data_1d):
     assert gp.y_train.shape[0] == len(y_train)
 
 def test_gp_invalid_inputs():
-    """Test GP error handling for invalid inputs"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0
     
@@ -169,7 +160,6 @@ def test_gp_invalid_inputs():
         gp.fit(np.array([[1], [2]]), np.array([1]))
 
 def test_gp_univariate_sigma(return_data=False):
-    """Test GP with univariate sigma (single length scale)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = 1.0 
     
@@ -197,7 +187,6 @@ def test_gp_univariate_sigma(return_data=False):
         return X_train, y_train, X_test, y_pred, y_std
 
 def test_gp_multivariate_sigma(return_data=False):
-    """Test GP with multivariate sigma (different length scales per feature)"""
     config = create_config(kernel_type="RBF", lmbda=0.1)
     sigma = np.array([1.0, 0.5])  
     
@@ -226,7 +215,6 @@ def test_gp_multivariate_sigma(return_data=False):
         return X_train, y_train, X_test, y_pred_grid, y_std_grid, X1, X2
 
 def test_gp_rational_quadratic_kernel(return_data=False):
-    """Test GP with Rational Quadratic kernel"""
     config = create_config(kernel_type="RQ", lmbda=0.1, alpha=2.0)
     sigma = 1.0
     
@@ -245,8 +233,7 @@ def test_gp_rational_quadratic_kernel(return_data=False):
     if return_data:
         return X_train, y_train, X_test, y_pred, y_std
 
-def visualize_gp_results():
-    """Create visualizations for GP testing"""
+def visualize_gp_results(): 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     
     X_train, y_train, X_test, y_pred, y_std = test_gp_univariate_sigma(return_data=True)
