@@ -213,11 +213,11 @@ class GP_KAN:
         print("Pretraining GP hyperparameters...")
         self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
         
-+        optimizer = optax.adam(learning_rate)        
+        optimizer = optax.adam(learning_rate)        
         params = self.get_params()
         opt_state = optimizer.init(params)
         
-=        key = jax.random.PRNGKey(self.seed)
+        key = jax.random.PRNGKey(self.seed)
         
         def loss_fn(params, X_batch, y_batch):
             self.set_params(params)
@@ -239,7 +239,7 @@ class GP_KAN:
         patience_counter = 0
         
         for epoch in range(num_epochs):
-=           key, subkey = jax.random.split(key)
+            key, subkey = jax.random.split(key)
             indices = jax.random.permutation(subkey, len(X_train))
             X_train_shuffled = X_train[indices]
             y_train_shuffled = y_train[indices]
