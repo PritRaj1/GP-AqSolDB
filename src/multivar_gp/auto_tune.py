@@ -60,7 +60,6 @@ class GPAutoTuner:
         self.force_dense = force_dense
         self.metric = metric.upper()
         
-        # Resource management parameters
         self.n_jobs = n_jobs
         self.use_gpu = use_gpu
         self.chunk_size = chunk_size
@@ -69,7 +68,6 @@ class GPAutoTuner:
         if self.metric not in ['BIC', 'MSE']:
             raise ValueError("metric must be 'BIC' or 'MSE'")
         
-        # Load existing config
         self.config = ConfigParser()
         if os.path.exists(config_path):
             self.config.read(config_path)
@@ -79,7 +77,6 @@ class GPAutoTuner:
         self._load_parallel_settings()
     
     def _load_parallel_settings(self):
-        """Load and display parallel processing settings"""
         try:
             load_parallel_conf(self.config)
             parallel_info = get_parallel_info()
@@ -102,7 +99,6 @@ class GPAutoTuner:
             print(f"Warning: Could not load parallel settings: {e}")
     
     def _create_default_config(self):
-        """Create default configuration with resource management"""
         self.config['KERNEL'] = {
             'type': 'RBF',
             'lmbda': '0.1',
@@ -148,17 +144,14 @@ class GPAutoTuner:
         float : Cross-validation score (negative BIC for minimization)
         """
         try:
-            # Suggest model type (dense vs sparse)
             if self.force_dense:
                 use_sparse = False
             else:
                 use_sparse = trial.suggest_categorical('use_sparse', [True, False])
             
-            # Suggest hyperparameters
             kernel_type = trial.suggest_categorical('kernel_type', ['RBF', 'RQ', 'MATERN'])
             lmbda = trial.suggest_float('lmbda', 1e-4, 1.0, log=True)
             
-            # Kernel-specific parameters
             if kernel_type == 'RQ':
                 alpha = trial.suggest_float('rq_alpha', 0.1, 10.0)
             elif kernel_type == 'MATERN':
@@ -168,9 +161,8 @@ class GPAutoTuner:
                 
             sigmas = [trial.suggest_float(f'sigma_{i}', 0.1, 3.0) for i in range(self.n_features)]
             
-            # Sparse GP specific parameters
+            # Sparse GP specific parameters - suggest number of inducing points (between 10% and 50% of data size)
             if use_sparse and not self.force_dense:
-                # Suggest number of inducing points (between 10% and 50% of data size)
                 min_inducing = max(10, int(0.1 * self.n_samples))
                 max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
                 num_inducing = trial.suggest_int('num_inducing', min_inducing, max_inducing)
@@ -179,7 +171,6 @@ class GPAutoTuner:
                 num_inducing = 20
                 inducing_method = 'random'
             
-            # Create config for this trial
             config = ConfigParser()
             config['KERNEL'] = {
                 'type': kernel_type,
@@ -194,16 +185,14 @@ class GPAutoTuner:
                 'inducing_method': inducing_method
             }
             
-            # Copy parallel settings from main config
             if 'PARALLEL' in self.config:
                 config['PARALLEL'] = dict(self.config['PARALLEL'])
             
-            # Perform cross-validation
             cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
 
             if self.metric == 'BIC':
                 return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
-            else:  # MSE
+            else:  
                 return np.mean(cv_results['mse'])  # Direct minimization
                 
         except Exception as e:
@@ -238,14 +227,11 @@ class GPAutoTuner:
             X_val_fold = self.X_train[val_idx]
             y_val_fold = self.y_train[val_idx]
             
-            # Create GP and fit
             gp = GP(config, np.array(sigmas))
             gp.fit(X_train_fold, y_train_fold)
             
-            # Get model complexity for BIC calculation
             n_params = gp.get_model_complexity()
             
-            # Predict and calculate score
             y_pred = gp.predict(X_val_fold)
             mse = mean_squared_error(y_val_fold, y_pred)
             bic = self.calculate_bic(mse, n_params, len(y_val_fold))
@@ -284,14 +270,12 @@ class GPAutoTuner:
         else:
             print("  MSE optimizes for pure prediction accuracy")
         
-        # Create study
         study = optuna.create_study(
             direction='minimize',
             sampler=optuna.samplers.TPESampler(seed=42),
             pruner=optuna.pruners.MedianPruner()
         )
         
-        # Optimize
         study.optimize(self.objective, n_trials=n_trials, timeout=timeout)
         
         best_params = study.best_params
@@ -330,7 +314,6 @@ class GPAutoTuner:
         return best_params
     
     def _save_best_parameters(self, best_params):
-        """Save the best hyperparameters to files"""
 
         if self.force_dense:
             use_sparse = 'false'
@@ -341,12 +324,11 @@ class GPAutoTuner:
         kernel_type = best_params['kernel_type']
         lmbda = best_params['lmbda']
         
-        # Get alpha based on kernel type
         if kernel_type == 'RQ':
             alpha = best_params.get('rq_alpha', best_params.get('alpha', 1.0))
         elif kernel_type == 'MATERN':
             alpha = best_params.get('matern_alpha', best_params.get('alpha', 1.5))
-        else:  # RBF
+        else:  
             alpha = best_params.get('alpha', 1.0)
         
         if 'KERNEL' not in self.config:
@@ -358,7 +340,6 @@ class GPAutoTuner:
         self.config['KERNEL']['lmbda'] = str(lmbda)
         self.config['KERNEL']['alpha'] = str(alpha)
         
-        # Save sparse GP parameters if applicable
         self.config['SPARSE']['use_sparse'] = str(use_sparse).lower()
         if use_sparse:
             num_inducing = best_params.get('num_inducing', 20)
@@ -394,7 +375,6 @@ class GPAutoTuner:
             print(f"Preserved sections: {preserved_sections}")
     
     def load_optimized_parameters(self):
-        """Load optimized parameters from saved files"""
         config = ConfigParser()
         config.read(self.config_path)
         
@@ -407,7 +387,6 @@ class GPAutoTuner:
         return config, np.array(sigmas)
 
 def load_sigmas_from_file(file_path):
-    """Load optimized sigmas from file"""
     if os.path.exists(file_path):
         with open(file_path, 'rb') as f:
             return np.array(pickle.load(f))
