@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from typing import Optional
 from dataclasses import dataclass
 from configparser import ConfigParser
+from jax import tree_util
 
 def get_device_config(config: ConfigParser) -> dict:
     if 'DEVICE' not in config:
@@ -28,6 +29,7 @@ def setup_jax_device(config: ConfigParser):
     else:
         jax.config.update('jax_platform_name', 'cpu')
 
+@tree_util.register_pytree_node_class
 @dataclass
 class NormalDist:
     mean: jax.Array
@@ -36,6 +38,15 @@ class NormalDist:
     def __post_init__(self):
         if self.mean.shape != self.var.shape:
             raise ValueError(f"Mean shape {self.mean.shape} must match variance shape {self.var.shape}")
+    
+    def tree_flatten(self):
+        """Flatten the PyTree for JAX."""
+        return ((self.mean, self.var), None)
+    
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten the PyTree for JAX."""
+        return cls(*children)
     
     @classmethod
     def from_array(cls, mean: jax.Array, var: Optional[jax.Array] = None):
@@ -91,16 +102,17 @@ class NormalDist:
         key : jax.random.PRNGKey
             Random key for sampling
         shape : tuple, optional
-            Shape of samples to generate. If None, uses the shape of mean.
-            
+            Number of samples to generate. If None, uses the shape of mean.
+            If shape is provided, output shape will be shape + mean.shape
         Returns:
         --------
         jax.Array : Sampled values
         """
         if shape is None:
-            shape = self.mean.shape
-        
-        std_samples = jax.random.normal(key, shape)
+            sample_shape = self.mean.shape
+        else:
+            sample_shape = shape + self.mean.shape
+        std_samples = jax.random.normal(key, sample_shape)
         samples = self.mean + jnp.sqrt(self.var) * std_samples
         return samples
     
