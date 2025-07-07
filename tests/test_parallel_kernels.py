@@ -8,6 +8,10 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.multivar_gp.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
 
+@pytest.fixture
+def sample_kernel_data():
+    return create_test_data(500, 3)
+
 def create_test_data(n_samples, n_features):
     np.random.seed(42)
     X1 = np.random.randn(n_samples, n_features)
