@@ -42,6 +42,12 @@ class DenseGP:
         self : object
             Returns self.
         """
+        if len(X) == 0 or len(y) == 0:
+            raise ValueError("Training data cannot be empty")
+        
+        if len(X) != len(y):
+            raise ValueError(f"X and y must have the same length. Got X: {len(X)}, y: {len(y)}")
+        
         self.X_train = self._recast_2D(X)
         self.y_train = y
         
