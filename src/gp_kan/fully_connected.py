@@ -1,6 +1,7 @@
 import jax
 from typing import List, Dict, Any
 from configparser import ConfigParser
+import matplotlib.pyplot as plt
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 from src.gp_kan.dense_layer import DenseGPLayer
@@ -171,7 +172,6 @@ class GP_KAN:
         return total_ll
     
     def save_fig(self, path: str, max_neurons_per_layer: int = 3):
-        import matplotlib.pyplot as plt
         
         total_layers = len(self.layers)
         fig, axes = plt.subplots(total_layers, max_neurons_per_layer, 
