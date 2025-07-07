@@ -113,7 +113,7 @@ class GP_KAN:
                 self.normalizers.append(None)
 
         if self.device_config['use_gpu']:
-            self._compile_JIT()
+            self._loglikelihood_jit = jax.jit(self.loglikelihood)
     
     def forward(self, x: NormalDist) -> NormalDist:
         current = x
@@ -125,6 +125,33 @@ class GP_KAN:
                 current = normalizer(current)
         
         return current
+    
+    def _forward_jit(self, x_mean: jax.Array, x_var: jax.Array) -> tuple[jax.Array, jax.Array]:
+        
+        # JIT-able array-heavy part
+        def _forward_core(x_mean, x_var):
+            current_mean = x_mean
+            current_var = x_var
+            
+            for i, (layer, normalizer) in enumerate(zip(self.layers, self.normalizers)):
+                current_dist = NormalDist(current_mean, current_var)
+                
+                layer_output = layer.forward(current_dist)
+                current_mean = layer_output.mean
+                current_var = layer_output.var
+                
+                if normalizer is not None:
+                    normalizer_output = normalizer(layer_output)
+                    current_mean = normalizer_output.mean
+                    current_var = normalizer_output.var
+            
+            return current_mean, current_var
+        
+        # JIT once
+        if not hasattr(self, '_forward_core_jit'):
+            self._forward_core_jit = jax.jit(_forward_core)
+        
+        return self._forward_core_jit(x_mean, x_var)
     
     def get_params(self) -> Dict[str, Any]:
         params = {}
@@ -188,11 +215,3 @@ class GP_KAN:
         layer_info = [f"{layer.I}→{layer.O}" for layer in self.layers]
         device_info = f"GPU={self.device_config['use_gpu']}"
         return f"GP_KAN({' → '.join(layer_info)}, {device_info})"
-
-    def _compile_JIT(self):
-        self.forward = jax.jit(self.forward)
-        self.loglikelihood = jax.jit(self.loglikelihood)
-        
-        for layer in self.layers:
-            layer.forward = jax.jit(layer.forward)
-
