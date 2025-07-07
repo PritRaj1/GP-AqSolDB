@@ -25,7 +25,8 @@ class GPKANAutoTuner:
             n_jobs: int = 2,
             use_gpu: bool = False,
             max_hidden_layers: int = 3,
-            max_hidden_size: int = 10
+            max_hidden_size: int = 10,
+            num_epochs: int = 50
         ):
         """
         Initialize the GP-KAN Auto Tuner
@@ -50,6 +51,8 @@ class GPKANAutoTuner:
             Maximum number of hidden layers to try
         max_hidden_size : int
             Maximum hidden layer size to try
+        num_epochs : int
+            Number of training epochs for each trial
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -63,6 +66,7 @@ class GPKANAutoTuner:
         self.use_gpu = use_gpu
         self.max_hidden_layers = max_hidden_layers
         self.max_hidden_size = max_hidden_size
+        self.num_epochs = num_epochs
         
         if self.metric not in ['BIC', 'MSE']:
             raise ValueError("metric must be 'BIC' or 'MSE'")
@@ -198,6 +202,10 @@ class GPKANAutoTuner:
             
             min_var = trial.suggest_float('min_var', 0.1, 0.5)
             
+            learning_rate = trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True)
+            batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 128])
+            pretrain_iters = trial.suggest_int('pretrain_iters', 5, 20)
+            
             config = ConfigParser()
             config['NETWORK'] = {
                 'input_size': str(self.n_features),
@@ -228,7 +236,12 @@ class GPKANAutoTuner:
                 'precision': 'float32'
             }
             
-            cv_results = self._cross_validate_gpkan(config, hidden_sizes, n_splits=5)
+            config['TRAINING']['learning_rate'] = str(learning_rate)
+            config['TRAINING']['num_epochs'] = str(self.num_epochs)
+            config['TRAINING']['batch_size'] = str(batch_size)
+            config['TRAINING']['pretrain_iters'] = str(pretrain_iters)
+            
+            cv_results = self._cross_validate_gpkan(config, hidden_sizes, n_splits=3)  # Reduced for speed
             
             if self.metric == 'BIC':
                 return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
@@ -261,6 +274,11 @@ class GPKANAutoTuner:
         mse_scores = []
         bic_scores = []
         
+        learning_rate = float(config['TRAINING'].get('learning_rate', '0.001'))
+        num_epochs = int(config['TRAINING'].get('num_epochs', '30'))
+        batch_size = int(config['TRAINING'].get('batch_size', '32'))
+        pretrain_iters = int(config['TRAINING'].get('pretrain_iters', '10'))
+        
         for train_idx, val_idx in kf.split(self.X_train):
             X_train_fold = self.X_train[train_idx]
             y_train_fold = self.y_train[train_idx]
@@ -270,16 +288,26 @@ class GPKANAutoTuner:
             try:
                 network = GP_KAN(config, hidden_sizes=hidden_sizes)
                 
-                input_mean = X_train_fold.astype(np.float32)
-                input_var = np.ones_like(input_mean) * 0.01  
-                input_dist = NormalDist(jnp.array(input_mean), jnp.array(input_var))
+                network.train(
+                    X_train_fold, y_train_fold,
+                    X_val_fold, y_val_fold,
+                    learning_rate=learning_rate,
+                    num_epochs=num_epochs,
+                    batch_size=batch_size,
+                    patience=10,
+                    pretrain_iters=pretrain_iters
+                )
                 
-                output_dist = network.forward(input_dist)
-                y_pred = np.array(output_dist.mean)
-                mse = mean_squared_error(y_train_fold, y_pred)
+                X_val_mean = X_val_fold.astype(np.float32)
+                X_val_var = np.zeros_like(X_val_mean)
+                X_val_dist = NormalDist(jnp.array(X_val_mean), jnp.array(X_val_var))
                 
+                output_dist = network.forward(X_val_dist)
+                y_pred = np.array(output_dist.mean).flatten()
+                
+                mse = mean_squared_error(y_val_fold, y_pred)
                 n_params = self._count_network_parameters(hidden_sizes)
-                bic = self.calculate_bic(mse, n_params, len(y_train_fold))
+                bic = self.calculate_bic(mse, n_params, len(y_val_fold))
                 
                 mse_scores.append(mse)
                 bic_scores.append(bic)
