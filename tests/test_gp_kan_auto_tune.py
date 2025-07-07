@@ -38,7 +38,8 @@ def sample_tuner(sample_data, temp_config_dir):
         config_path=config_path,
         params_save_path=params_path,
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
 
 def test_init(sample_data, temp_config_dir):
@@ -53,7 +54,8 @@ def test_init(sample_data, temp_config_dir):
         params_save_path=params_path,
         metric='BIC',
         max_hidden_layers=2,
-        max_hidden_size=5
+        max_hidden_size=5,
+        num_epochs=5
     )
     
     assert tuner.n_features == 3, "Number of features should be 3"
@@ -61,6 +63,7 @@ def test_init(sample_data, temp_config_dir):
     assert tuner.metric == 'BIC', "Metric should be BIC"
     assert tuner.max_hidden_layers == 2, "Max hidden layers should be 2"
     assert tuner.max_hidden_size == 5, "Max hidden size should be 5"
+    assert tuner.num_epochs == 5, "Num epochs should be 5"
 
 def test_default_conf(sample_data, temp_config_dir):
     X, y = sample_data
@@ -71,7 +74,8 @@ def test_default_conf(sample_data, temp_config_dir):
         X_train=X,
         y_train=y,
         config_path=config_path,
-        params_save_path=params_path
+        params_save_path=params_path,
+        num_epochs=5
     )
     
     assert 'NETWORK' in tuner.config, "NETWORK section should exist"
@@ -92,7 +96,8 @@ def test_param_counting(sample_data, temp_config_dir):
         X_train=X,
         y_train=y,
         config_path=config_path,
-        params_save_path=params_path
+        params_save_path=params_path,
+        num_epochs=5
     )
     
     hidden_sizes = []
@@ -116,7 +121,8 @@ def test_bic(sample_data, temp_config_dir):
         X_train=X,
         y_train=y,
         config_path=config_path,
-        params_save_path=params_path
+        params_save_path=params_path,
+        num_epochs=5
     )
     
     mse = 0.1
@@ -138,7 +144,8 @@ def test_opt(sample_data, temp_config_dir):
         config_path=config_path,
         params_save_path=params_path,
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
     
     best_params = tuner.optimize(n_trials=2)
@@ -159,7 +166,8 @@ def test_saving_loading(sample_data, temp_config_dir):
         config_path=config_path,
         params_save_path=params_path,
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
     
     best_params = tuner.optimize(n_trials=3)
@@ -183,7 +191,8 @@ def test_opt_creation(sample_data, temp_config_dir):
         config_path=config_path,
         params_save_path=params_path,
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
     
     tuner.optimize(n_trials=3)
@@ -225,7 +234,8 @@ def test_mse(sample_data, temp_config_dir):
         params_save_path=params_path,
         metric='MSE',
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
     
     best_params = tuner.optimize(n_trials=3)
@@ -246,7 +256,8 @@ def test_gpu_tuning(sample_data, temp_config_dir):
         params_save_path=params_path,
         use_gpu=True,
         max_hidden_layers=1,
-        max_hidden_size=3
+        max_hidden_size=3,
+        num_epochs=5
     )
 
     best_params = tuner.optimize(n_trials=2)
