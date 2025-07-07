@@ -324,7 +324,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         
         ax.set_xlabel(x_name)
         ax.set_ylabel(y_name)
-        ax.set_title(f'Learning Step {step+1}/{n_steps}')
+        ax.set_title(f'Data Seen {step+1}/{n_steps}')
         ax.legend(loc='lower left')
         ax.grid(True, alpha=0.3)
         ax.set_xlim(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99))
@@ -339,7 +339,7 @@ def learning_evolution(X, y, feature_names, config, sigmas, full_X, n_init=1, n_
         
         ax2 = axes[1]
         ax2.plot(np.arange(1, step+2), mean_uncertainties, '-o', color='purple')
-        ax2.set_xlabel('Learning Step')
+        ax2.set_xlabel('Data Seen')
         ax2.set_ylabel('Mean Predictive Variance')
         ax2.set_title('Uncertainty Reduction')
         ax2.set_xlim(1, n_steps)
