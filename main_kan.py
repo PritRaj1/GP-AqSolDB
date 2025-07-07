@@ -22,8 +22,8 @@ sns.set_palette("husl")
 plt.rcParams['figure.figsize'] = (12, 8)
 plt.rcParams['font.size'] = 16
 
-CONFIG_PATH = "config/solubility_gp_kan.ini"
-PARAMS_PATH = "config/solubility_gp_kan_params.pkl"
+CONFIG_PATH = "config/gp_kan.ini"
+PARAMS_PATH = "config/gp_kan_params.pkl"
 FIGURE_DIR = "figures"
 
 def load_data():
@@ -316,7 +316,8 @@ def main():
             max_hidden_size=16,
             num_epochs=20
         )
-        tuner.optimize(n_trials=100)          config, params = tuner.load_optimized_parameters()
+        tuner.optimize(n_trials=100)          
+        config, params = tuner.load_optimized_parameters()
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")

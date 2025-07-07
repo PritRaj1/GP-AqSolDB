@@ -20,8 +20,8 @@ sns.set_palette("husl")
 plt.rcParams['figure.figsize'] = (12, 8)
 plt.rcParams['font.size'] = 16
 
-CONFIG_PATH = "config/solubility_gp.ini"
-SIGMA_PATH = "config/solubility_sigmas.pkl"
+CONFIG_PATH = "config/gp.ini"
+SIGMA_PATH = "config/gp_sigmas.pkl"
 FIGURE_DIR = "figures"
 
 def load_data():
