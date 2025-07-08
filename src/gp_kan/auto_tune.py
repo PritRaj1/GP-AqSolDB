@@ -411,6 +411,10 @@ class GPKANAutoTuner:
         self.config['NORMALIZATION']['min_var'] = str(best_params['min_var'])
         
         self.config['TRAINING']['seed'] = '42'
+        self.config['TRAINING']['learning_rate'] = str(best_params['learning_rate'])
+        self.config['TRAINING']['num_epochs'] = str(self.num_epochs)
+        self.config['TRAINING']['batch_size'] = str(best_params['batch_size'])
+        self.config['TRAINING']['pretrain_iters'] = str(best_params['pretrain_iters'])
         
         self.config['DEVICE']['use_gpu'] = str(self.use_gpu).lower()
         self.config['DEVICE']['device'] = 'gpu' if self.use_gpu else 'cpu'
@@ -436,6 +440,10 @@ class GPKANAutoTuner:
         print(f"Covariance scale: {best_params['global_covariance_scale']}")
         print(f"Jitter: {best_params['global_jitter']}")
         print(f"Min variance: {best_params['min_var']}")
+        print(f"Learning rate: {best_params['learning_rate']}")
+        print(f"Batch size: {best_params['batch_size']}")
+        print(f"Pretrain iterations: {best_params['pretrain_iters']}")
+        print(f"Num epochs: {self.num_epochs}")
     
     def load_optimized_parameters(self):
         config = ConfigParser()

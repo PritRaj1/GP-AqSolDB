@@ -323,6 +323,7 @@ class DenseGPLayer:
         def covar_func(x1, x2):
             return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
 
+        # Standard GP variance calculation
         K_hh = build_kernel_mat(z, z, covar_func)  # (P, P)
         K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P) # (P, P)
 

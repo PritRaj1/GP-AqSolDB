@@ -39,7 +39,11 @@ def load_kan_conf(config: ConfigParser) -> dict:
         'global_jitter': float(config['GP'].get('global_jitter', '0.001')),
         'baseline_jitter': float(config['GP'].get('baseline_jitter', '0.01')),
         'min_var': float(normalization_section.get('min_var', '0.2')),
-        'seed': int(training_section.get('seed', '42'))
+        'seed': int(training_section.get('seed', '42')),
+        'learning_rate': float(training_section.get('learning_rate', '0.001')),
+        'num_epochs': int(training_section.get('num_epochs', '30')),
+        'batch_size': int(training_section.get('batch_size', '32')),
+        'pretrain_iters': int(training_section.get('pretrain_iters', '10'))
     }
 
 def create_default_conf() -> ConfigParser:
@@ -65,7 +69,11 @@ def create_default_conf() -> ConfigParser:
         'min_var': '0.2'
     }
     config['TRAINING'] = {
-        'seed': '42'
+        'seed': '42',
+        'learning_rate': '0.001',
+        'num_epochs': '30',
+        'batch_size': '32',
+        'pretrain_iters': '10'
     }
     config['DEVICE'] = {
         'use_gpu': 'false',
@@ -159,8 +167,8 @@ class GP_KAN:
         
     def train(self, X_train: jax.Array, y_train: jax.Array, 
               X_val: jax.Array = None, y_val: jax.Array = None,
-              learning_rate: float = 0.001, num_epochs: int = 30, 
-              batch_size: int = 32, patience: int = 10, pretrain_iters: int = 10):
+              learning_rate: float = None, num_epochs: int = None, 
+              batch_size: int = None, patience: int = 10, pretrain_iters: int = None):
         """
         Train the GP-KAN network using gradient descent.
         
@@ -174,17 +182,26 @@ class GP_KAN:
             Validation features
         y_val : jax.Array, optional
             Validation targets
-        learning_rate : float
-            Learning rate for optimization
-        num_epochs : int
-            Number of training epochs
-        batch_size : int
-            Batch size for training
+        learning_rate : float, optional
+            Learning rate for optimization (reads from config if None)
+        num_epochs : int, optional
+            Number of training epochs (reads from config if None)
+        batch_size : int, optional
+            Batch size for training (reads from config if None)
         patience : int
             Early stopping patience
-        pretrain_iters : int
-            Number of pretraining iterations for GP hyperparameters
+        pretrain_iters : int, optional
+            Number of pretraining iterations for GP hyperparameters (reads from config if None)
         """
+        if learning_rate is None:
+            learning_rate = float(self.config['TRAINING'].get('learning_rate', '0.001'))
+        if num_epochs is None:
+            num_epochs = int(self.config['TRAINING'].get('num_epochs', '30'))
+        if batch_size is None:
+            batch_size = int(self.config['TRAINING'].get('batch_size', '32'))
+        if pretrain_iters is None:
+            pretrain_iters = int(self.config['TRAINING'].get('pretrain_iters', '10'))
+        
         X_train = jnp.array(X_train, dtype=jnp.float32)
         y_train = jnp.array(y_train, dtype=jnp.float32).reshape(-1, 1)
         
