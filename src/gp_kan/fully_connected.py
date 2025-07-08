@@ -242,11 +242,6 @@ class GP_KAN:
             X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
             
             output_dist = self.forward(X_batch_dist)
-            
-            if jnp.any(jnp.isnan(output_dist.var)) or jnp.any(jnp.isinf(output_dist.var)):
-                print(f"Warning: NaN or inf variance detected: {output_dist.var}")
-                return 1e6  
-            
             return -self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
         
         grad_fn = jit(grad(loss_fn))
