@@ -310,7 +310,7 @@ def main():
             max_hidden_size=16,
             num_epochs=20
         )
-        tuner.optimize(n_trials=100)          
+        tuner.optimize(n_trials=50)          
         config, params = tuner.load_optimized_parameters()
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
