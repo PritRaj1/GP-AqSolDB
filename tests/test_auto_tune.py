@@ -102,7 +102,7 @@ def test_objective_function():
                 def suggest_int(self, name, low, high):
                     return max(low, min(20, high))
             trial = MockTrial()
-            score = tuner.objective(trial)
+            score = tuner._objective(trial)
             assert isinstance(score, float)
             assert not np.isnan(score)
             assert not np.isinf(score)

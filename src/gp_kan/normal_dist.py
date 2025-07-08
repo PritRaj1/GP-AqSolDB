@@ -1,9 +1,8 @@
 import jax
 import jax.numpy as jnp
+import jax_dataclasses as jdc
 from typing import Optional
-from dataclasses import dataclass
 from configparser import ConfigParser
-from jax import tree_util
 
 def get_device_config(config: ConfigParser) -> dict:
     if 'DEVICE' not in config:
@@ -29,8 +28,7 @@ def setup_jax_device(config: ConfigParser):
     else:
         jax.config.update('jax_platform_name', 'cpu')
 
-@tree_util.register_pytree_node_class
-@dataclass
+@jdc.pytree_dataclass
 class NormalDist:
     mean: jax.Array
     var: jax.Array
@@ -38,13 +36,6 @@ class NormalDist:
     def __post_init__(self):
         if self.mean.shape != self.var.shape:
             raise ValueError(f"Mean shape {self.mean.shape} must match variance shape {self.var.shape}")
-    
-    def tree_flatten(self):
-        return ((self.mean, self.var), None)
-    
-    @classmethod
-    def tree_unflatten(cls, aux_data, children):
-        return cls(*children)
     
     @classmethod
     def from_array(cls, mean: jax.Array, var: Optional[jax.Array] = None):

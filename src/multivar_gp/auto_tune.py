@@ -130,7 +130,7 @@ class GPAutoTuner:
         """
         return n_samples * np.log(mse) + n_params * np.log(n_samples)
     
-    def objective(self, trial):
+    def _objective(self, trial):
         """
         Objective function for Optuna optimization
         
@@ -276,7 +276,7 @@ class GPAutoTuner:
             pruner=optuna.pruners.MedianPruner()
         )
         
-        study.optimize(self.objective, n_trials=n_trials, timeout=timeout)
+        study.optimize(self._objective, n_trials=n_trials, timeout=timeout)
         
         best_params = study.best_params
         best_value = study.best_value

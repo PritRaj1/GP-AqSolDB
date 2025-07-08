@@ -164,7 +164,7 @@ class GPKANAutoTuner:
         
         return total_params
     
-    def objective(self, trial):
+    def _objective(self, trial: optuna.Trial) -> float:
         """
         Objective function for Optuna optimization
         
@@ -292,7 +292,7 @@ class GPKANAutoTuner:
                     X_train_fold, y_train_fold,
                     X_val_fold, y_val_fold,
                     learning_rate=learning_rate,
-                    num_epochs=num_epochs,
+                    num_epochs=self.num_epochs,
                     batch_size=batch_size,
                     patience=10,
                     pretrain_iters=pretrain_iters
@@ -354,7 +354,7 @@ class GPKANAutoTuner:
             pruner=optuna.pruners.MedianPruner()
         )
         
-        study.optimize(self.objective, n_trials=n_trials, timeout=timeout)
+        study.optimize(self._objective, n_trials=n_trials, timeout=timeout)
         
         best_params = study.best_params
         best_value = study.best_value

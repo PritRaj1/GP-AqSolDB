@@ -15,6 +15,7 @@ requirements = [
     'pandas',
     'imageio',
     'optax',
+    'jax_dataclasses',
 
     # Replace with your CUDA version
     'cupy-cuda12x', 
@@ -25,14 +26,6 @@ jax_gpu_packages = [
     'jax[cuda12_pip]',
     'jaxlib[cuda12_pip]',
 ]
-
-for package in requirements:
-    try:
-        print(f"Installing {package}...")
-        install(package)
-        print(f"{package} installed successfully.")
-    except subprocess.CalledProcessError:
-        print(f"Failed to install {package}.")
 
 print("Installing JAX with GPU support...")
 try:
@@ -49,6 +42,14 @@ except subprocess.CalledProcessError:
         print("JAX CPU version installed as fallback.")
     except subprocess.CalledProcessError:
         print("Failed to install JAX.")
+
+for package in requirements:
+    try:
+        print(f"Installing {package}...")
+        install(package)
+        print(f"{package} installed successfully.")
+    except subprocess.CalledProcessError:
+        print(f"Failed to install {package}.")
 
 if __name__ == "__main__":
     for r in requirements:

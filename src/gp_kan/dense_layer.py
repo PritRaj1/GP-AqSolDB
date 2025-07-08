@@ -255,12 +255,18 @@ class DenseGPLayer:
 
         A = q_xh @ L_inv_T
         A_T = jnp.transpose(A, (0, 1, 2, 4, 3)) # (N, I, O, P, 1)
-        t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var)) # (N, I, O, 1)
-        t4 = SQRT_2PI * (s**2) * jnp.abs(l) # (1, I, O, 1)
         t5 = A @ A_T
         t6 = t5.reshape(N, I, O, 1) # (N, I, O, 1)
+        
+        t3 = (s**2) * (jnp.abs(l) / jnp.sqrt(l**2 + 2 * x_var)) # (N, I, O, 1)
+        t4 = SQRT_2PI * (s**2) * jnp.abs(l) # (1, I, O, 1)
         t7 = t3 - t4 * t6 + self.global_jitter
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
+        
+        # # Debug: Check variance components
+        # if jnp.any(out_var < 1e-6):
+        #     print(f"Warning: Small variance detected. t3={jnp.mean(t3):.6f}, t4={jnp.mean(t4):.6f}, t6={jnp.mean(t6):.6f}, t7={jnp.mean(t7):.6f}, out_var={jnp.mean(out_var):.6f}")
+        
         out_var = jnp.maximum(out_var, 1e-6) # Positive variance
 
         return NormalDist(out_mean, out_var)
@@ -307,35 +313,6 @@ class DenseGPLayer:
         h = self.h
         
         return self._loglikelihood_core_jit(s, l, jitter, z, h)
-
-    def __gp_dist(self, x: jax.Array, I_idx: int, O_idx: int) -> NormalDist:
-        z = self.get_z()[I_idx, O_idx, :]  # (P,)
-        h = self.h[I_idx, O_idx, :]  # (P,)
-        l = self.get_l()[I_idx, O_idx]  # scalar
-        s = self.get_s()[I_idx, O_idx]  # scalar
-        jitter = self.get_jitter()[I_idx, O_idx]  # scalar
-        
-        def covar_func(x1, x2):
-            return s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * l**2))
-
-        K_hh = build_kernel_mat(z, z, covar_func)  # (P, P)
-        K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P) # (P, P)
-
-        L = jax.scipy.linalg.cholesky(K_hh_noise)
-        L_inv = jax.scipy.linalg.inv(L)
-        L_inv_T = jnp.transpose(L_inv, (1, 0)) # (P, P)
-
-        h = h.reshape(1, self.P)
-        A = h @ L_inv_T
-        A_T = jnp.transpose(A, (1, 0)) # (P, 1)
-
-        t1 = jnp.log(jnp.linalg.det(L)) # scalar
-        t2 = A @ A_T # (1, 1)
-
-        loglik = -0.5 * t2 - t1 - self.P * jnp.log(SQRT_2PI)  # (1, 1)
-        loglik_sum = jnp.sum(loglik)  # scalar
-        
-        return loglik_sum
 
     def plot_neuron(self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100):
         """Plot a single neuron's function."""

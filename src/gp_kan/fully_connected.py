@@ -116,7 +116,6 @@ class GP_KAN:
             else:
                 self.normalizers.append(None)
 
-    
     def forward(self, x: NormalDist) -> NormalDist:
         current = x
         
@@ -127,33 +126,6 @@ class GP_KAN:
                 current = normalizer(current)
         
         return current
-    
-    def _forward_jit(self, x_mean: jax.Array, x_var: jax.Array) -> tuple[jax.Array, jax.Array]:
-        
-        # JIT-able array-heavy part
-        def _forward_core(x_mean, x_var):
-            current_mean = x_mean
-            current_var = x_var
-            
-            for i, (layer, normalizer) in enumerate(zip(self.layers, self.normalizers)):
-                current_dist = NormalDist(current_mean, current_var)
-                
-                layer_output = layer.forward(current_dist)
-                current_mean = layer_output.mean
-                current_var = layer_output.var
-                
-                if normalizer is not None:
-                    normalizer_output = normalizer(layer_output)
-                    current_mean = normalizer_output.mean
-                    current_var = normalizer_output.var
-            
-            return current_mean, current_var
-        
-        # JIT once
-        if not hasattr(self, '_forward_core_jit'):
-            self._forward_core_jit = jax.jit(_forward_core)
-        
-        return self._forward_core_jit(x_mean, x_var)
     
     def get_params(self) -> Dict[str, Any]:
         params = {}
@@ -167,7 +139,7 @@ class GP_KAN:
                 layer.set_params(params[f'layer_{i}'])
     
     
-    def internal_loglikelihood(self) -> jax.Array:
+    def loglikelihood(self) -> jax.Array:
         """Expected log-likelihood on the inducing points."""
         total_loglik = 0.0
         count = 0
@@ -176,7 +148,7 @@ class GP_KAN:
             count += 1
         return total_loglik / count if count > 0 else 0.0
     
-    def _log_likelihood(self, pred_mean: jax.Array, pred_var: jax.Array, true_val: jax.Array) -> jax.Array:
+    def _condlikelihood(self, pred_mean: jax.Array, pred_var: jax.Array, true_val: jax.Array) -> jax.Array:
         """Return expected conditional log-likelihood of true_val given pred_mean and pred_var"""
         pred_var = jnp.maximum(pred_var, 1e-6) # Positive var
         
@@ -242,9 +214,10 @@ class GP_KAN:
             X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
             
             output_dist = self.forward(X_batch_dist)
-            return -self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
+            return -self._condlikelihood(output_dist.mean, output_dist.var, y_batch)
         
         grad_fn = jit(grad(loss_fn))
+        loss_fn_jit = jit(loss_fn)
         
         best_val_loss = float('inf')
         patience_counter = 0
@@ -262,18 +235,18 @@ class GP_KAN:
                 X_batch = X_train_shuffled[i:i+batch_size]
                 y_batch = y_train_shuffled[i:i+batch_size]
                 
-                grads = grad_fn(params, X_batch, y_batch)                
+                grads = grad_fn(params, X_batch, y_batch)
                 updates, opt_state = optimizer.update(grads, opt_state)
                 params = optax.apply_updates(params, updates)
                 
-                loss = loss_fn(params, X_batch, y_batch)
+                loss = loss_fn_jit(params, X_batch, y_batch)
                 total_loss += loss
                 num_batches += 1
             
             avg_loss = total_loss / num_batches
             
             if X_val is not None:
-                val_loss = loss_fn(params, X_val, y_val)
+                val_loss = loss_fn_jit(params, X_val, y_val)
                 
                 if epoch % 5 == 0:
                     print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}, Val Loss = {val_loss:.4f}")
@@ -300,7 +273,9 @@ class GP_KAN:
         
         def pretrain_loss_fn(params):
             self.set_params(params)
-            return -self.internal_loglikelihood()
+            return -self.loglikelihood()
+
+        grad_fn = jit(grad(pretrain_loss_fn))
         
         optimizer = optax.chain(
             optax.clip_by_global_norm(1.0), # GPs are always unstable, so clip
@@ -311,7 +286,7 @@ class GP_KAN:
         opt_state = optimizer.init(params)
         
         for i in range(num_iters):
-            grads = grad(pretrain_loss_fn)(params)
+            grads = grad_fn(params)
             updates, opt_state = optimizer.update(grads, opt_state)
             params = optax.apply_updates(params, updates)
             
