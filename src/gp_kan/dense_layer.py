@@ -261,6 +261,7 @@ class DenseGPLayer:
         t6 = t5.reshape(N, I, O, 1) # (N, I, O, 1)
         t7 = t3 - t4 * t6 + self.global_jitter
         out_var = jnp.sum(t7, axis=1).reshape(N, O)
+        out_var = jnp.maximum(out_var, 1e-6) # Positive variance
 
         return NormalDist(out_mean, out_var)
 

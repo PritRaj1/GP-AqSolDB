@@ -178,6 +178,8 @@ class GP_KAN:
     
     def _log_likelihood(self, pred_mean: jax.Array, pred_var: jax.Array, true_val: jax.Array) -> jax.Array:
         """Return expected conditional log-likelihood of true_val given pred_mean and pred_var"""
+        pred_var = jnp.maximum(pred_var, 1e-6) # Positive var
+        
         return jnp.mean(
             -0.5 * jnp.log(2 * jnp.pi * pred_var)
             - 0.5 * ((pred_mean - true_val) ** 2) / pred_var
@@ -222,7 +224,11 @@ class GP_KAN:
         print("Pretraining GP hyperparameters...")
         self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
         
-        optimizer = optax.adam(learning_rate)        
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(1.0), # GPs are always unstable, so clip
+            optax.adam(learning_rate)
+        )     
+
         params = self.get_params()
         opt_state = optimizer.init(params)
         
@@ -236,6 +242,11 @@ class GP_KAN:
             X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
             
             output_dist = self.forward(X_batch_dist)
+            
+            if jnp.any(jnp.isnan(output_dist.var)) or jnp.any(jnp.isinf(output_dist.var)):
+                print(f"Warning: NaN or inf variance detected: {output_dist.var}")
+                return 1e6  
+            
             return -self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
         
         grad_fn = jit(grad(loss_fn))
@@ -296,7 +307,11 @@ class GP_KAN:
             self.set_params(params)
             return -self.internal_loglikelihood()
         
-        optimizer = optax.adam(0.001)
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(1.0), # GPs are always unstable, so clip
+            optax.adam(0.001)
+        )
+        
         params = self.get_params()
         opt_state = optimizer.init(params)
         
