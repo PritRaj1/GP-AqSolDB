@@ -168,12 +168,23 @@ class GP_KAN:
             if f'layer_{i}' in params:
                 layer.set_params(params[f'layer_{i}'])
     
-    def loglikelihood(self) -> jax.Array:
-        total_ll = 0.0
-        for layer in self.layers:
-            total_ll += layer.loglikelihood()
-        return total_ll
     
+    def internal_loglikelihood(self) -> jax.Array:
+        """Expected log-likelihood on the inducing points."""
+        total_loglik = 0.0
+        count = 0
+        for layer in self.layers:
+            total_loglik += layer.loglikelihood()
+            count += 1
+        return total_loglik / count if count > 0 else 0.0
+    
+    def _log_likelihood(self, pred_mean: jax.Array, pred_var: jax.Array, true_val: jax.Array) -> jax.Array:
+        """Return expected conditional log-likelihood of true_val given pred_mean and pred_var"""
+        return jnp.mean(
+            -0.5 * jnp.log(2 * jnp.pi * pred_var)
+            - 0.5 * ((pred_mean - true_val) ** 2) / pred_var
+        )
+        
     def train(self, X_train: jax.Array, y_train: jax.Array, 
               X_val: jax.Array = None, y_val: jax.Array = None,
               learning_rate: float = 0.001, num_epochs: int = 30, 
@@ -227,11 +238,7 @@ class GP_KAN:
             X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
             
             output_dist = self.forward(X_batch_dist)
-            
-            loglik = self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
-            negloglik = -jnp.mean(loglik)
-            
-            return negloglik
+            return -self._log_likelihood(output_dist.mean, output_dist.var, y_batch)
         
         grad_fn = jit(grad(loss_fn))
         
@@ -289,7 +296,7 @@ class GP_KAN:
         
         def pretrain_loss_fn(params):
             self.set_params(params)
-            return -self.loglikelihood()
+            return -self.internal_loglikelihood()
         
         optimizer = optax.adam(0.001)
         params = self.get_params()
@@ -302,12 +309,10 @@ class GP_KAN:
             
             if i % 2 == 0:
                 loss = pretrain_loss_fn(params)
-                print(f"  Pretrain {i}: internal loglik {-loss:.4f}")
+                print(f"  Pretrain {i}: Inducing point loglik {-loss:.4f}")
         
         self.set_params(params)
-    
-    def _log_likelihood(self, mean: jax.Array, var: jax.Array, targets: jax.Array) -> jax.Array:
-        return -0.5 * jnp.log(2 * jnp.pi * var) - 0.5 * (targets - mean) ** 2 / var
+
     
     def save_fig(self, path: str, max_neurons_per_layer: int = 3):
         
