@@ -6,15 +6,10 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from configparser import ConfigParser
-import imageio
-import glob
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import cdist
-import jax
-import jax.numpy as jnp
 
-from src.gp_kan.auto_tune import GPKANAutoTuner
-from src.gp_kan.fully_connected import GP_KAN, create_default_conf
+from src.gp_kan.auto_tune import GPKANAutoTuner, load_gpkan_params_from_file, create_optimized_network
 from src.gp_kan.normal_dist import NormalDist
 
 plt.style.use('seaborn-v0_8')
@@ -297,7 +292,6 @@ def main():
     
     if os.path.exists(CONFIG_PATH) and os.path.exists(PARAMS_PATH):
         print("Loading previously optimized hyperparameters...")
-        from src.gp_kan.auto_tune import load_gpkan_params_from_file, create_optimized_network
         config = ConfigParser()
         config.read(CONFIG_PATH)
         params = load_gpkan_params_from_file(PARAMS_PATH)
