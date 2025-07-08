@@ -116,8 +116,6 @@ class GP_KAN:
             else:
                 self.normalizers.append(None)
 
-        if self.device_config['use_gpu']:
-            self._loglikelihood_jit = jax.jit(self.loglikelihood)
     
     def forward(self, x: NormalDist) -> NormalDist:
         current = x
