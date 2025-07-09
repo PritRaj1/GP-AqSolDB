@@ -16,50 +16,22 @@
 
 Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer and run: 
 
-```bash
-bash <conda-installer-name>-latest-Linux-x86_64.sh
-```
+Then can use the Makefile:
 
 Run:
 ```bash
-bash setup/auto.sh
-```
+# See all available commands
+make help
 
-NOTE: This will create a conda environment for the Python dependencies called 'GP_sol'. The terminal multiplexer 'tmux' will also be installed in GP_sol, which is my personally preferred method of running long programs.
-
-## Scripts
-
-```bash
-conda activate GP_sol
-```
-
-To test:
-
-```bash 
-pytest tests
-```
-
-To run:
-
-```bash
-# In terminal
-python main.py 
-```
-
-```bash
-# In pseudo terminal (preferred)
-bash run.sh
+# Quick start
+make install    # Install everything
+make test       # Run tests
+make run-gp    # Run the standard GP
 ```
 
 ## Data
 
 The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.
-
-
-## TODO
-
-- Parallelize auto tune cross-validation
-- Parallelize hp opt
 
 ## References
 
