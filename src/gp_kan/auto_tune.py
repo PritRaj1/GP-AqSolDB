@@ -189,17 +189,17 @@ class GPKANAutoTuner:
                 hidden_size = trial.suggest_int(f'hidden_size_{i}', 2, self.max_hidden_size)
                 hidden_sizes.append(hidden_size)
             
-            num_inducing_points = trial.suggest_int('num_inducing_points', 5, 100)
+            num_inducing_points = trial.suggest_int('num_inducing_points', 5, 30)
             z_init_low = trial.suggest_float('z_init_low', -3.0, -0.0)
             z_init_high = trial.suggest_float('z_init_high', 0.0, 3.0)
             h_init_low = trial.suggest_float('h_init_low', -3.0, 0.0)
             h_init_high = trial.suggest_float('h_init_high', 0.0, 3.0)
             
-            global_length_scale = trial.suggest_float('global_length_scale', 0.001, 10.0)
-            min_length_scale = trial.suggest_float('min_length_scale', 0.001, 10.0)
+            global_length_scale = trial.suggest_float('global_length_scale', 0.01, 10.0)
+            min_length_scale = trial.suggest_float('min_length_scale', 0.01, 10.0)
             
-            global_covariance_scale = trial.suggest_float('global_covariance_scale', 0.001, 10.0)
-            min_covariance_scale = trial.suggest_float('min_covariance_scale', 0.001, 10.0)
+            global_covariance_scale = trial.suggest_float('global_covariance_scale', 0.01, 10.0)
+            min_covariance_scale = trial.suggest_float('min_covariance_scale', 0.01, 10.0)
             
             global_jitter = trial.suggest_float('global_jitter', 1e-4, 1e-2, log=True)
             baseline_jitter = trial.suggest_float('baseline_jitter', 1e-3, 1e-1, log=True)
