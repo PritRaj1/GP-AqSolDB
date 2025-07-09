@@ -294,7 +294,6 @@ def main():
         print("Loading previously optimized hyperparameters...")
         config = ConfigParser()
         config.read(CONFIG_PATH)
-        params = load_gpkan_params_from_file(PARAMS_PATH)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
@@ -312,16 +311,15 @@ def main():
             pretrain_iters=30
         )
         tuner.optimize(n_trials=200)          
-        config, params = tuner.load_optimized_parameters()
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        num_epochs=1000,  
-        patience=300,
-        pretrain_iters=300
+        num_epochs=200,  
+        patience=600,
+        pretrain_iters=30
     )
 
     X_test_mean = X_test

@@ -14,11 +14,10 @@
 
 ## Setup
 
-Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer and run: 
+Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer. 
 
 Then can use the Makefile:
 
-Run:
 ```bash
 # See all available commands
 make help

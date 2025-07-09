@@ -315,26 +315,11 @@ class GP_KAN:
 
     
     def save_fig(self, path: str, max_neurons_per_layer: int = 3):
-        
-        total_layers = len(self.layers)
-        fig, axes = plt.subplots(total_layers, max_neurons_per_layer, 
-                                figsize=(5*max_neurons_per_layer, 4*total_layers))
-        
-        if total_layers == 1:
-            axes = axes.reshape(1, -1)
+        """Save figures for each layer separately."""
         
         for layer_idx, layer in enumerate(self.layers):
-            for neuron_idx in range(min(max_neurons_per_layer, layer.num_neurons)):
-                i_idx = neuron_idx // layer.O
-                o_idx = neuron_idx % layer.O
-                
-                if i_idx < layer.I:
-                    layer.plot_neuron(axes[layer_idx, neuron_idx], i_idx, o_idx)
-                    axes[layer_idx, neuron_idx].set_title(f'Layer {layer_idx}, Neuron ({i_idx},{o_idx})')
-        
-        plt.tight_layout()
-        plt.savefig(path)
-        plt.close()
+            layer_path = path.replace('.png', f'_layer_{layer_idx}.png')
+            layer.save_fig(layer_path, max_neurons_shown=max_neurons_per_layer)
     
     def to_device(self, device: str):
         """Move the entire network to a specific device."""

@@ -354,24 +354,32 @@ class DenseGPLayer:
 
     def save_fig(self, path: str, max_neurons_shown: int = 5):
         """Save a figure showing neuron functions."""
-        import matplotlib.pyplot as plt
         
-        num_neurons = min(max_neurons_shown, self.num_neurons)
-        fig, axes = plt.subplots(1, num_neurons, figsize=(5*num_neurons, 4))
         
-        if num_neurons == 1:
-            axes = [axes]
+        plot_num = min(max_neurons_shown, self.num_neurons)
         
-        for neuron_idx in range(num_neurons):
-            i_idx = neuron_idx // self.O
-            o_idx = neuron_idx % self.O
-            
-            if i_idx < self.I:
-                self.plot_neuron(axes[neuron_idx], i_idx, o_idx)
-                axes[neuron_idx].set_title(f'Neuron ({i_idx},{o_idx})')
+        num_cols = min(plot_num, 5) 
+        num_rows = (plot_num + num_cols - 1) // num_cols
         
-        plt.tight_layout()
-        plt.savefig(path)
+        fig, axes = plt.subplots(num_rows, num_cols, squeeze=False)
+        
+        axes_idx = 0
+        for i_idx in range(self.I):
+            for o_idx in range(self.O):
+                if axes_idx < plot_num:
+                    row_idx = axes_idx // num_cols
+                    col_idx = axes_idx % num_cols
+                    self.plot_neuron(axes[row_idx, col_idx], i_idx, o_idx)
+                    axes_idx += 1
+        
+        for i in range(plot_num, num_rows * num_cols):
+            row_idx = i // num_cols
+            col_idx = i % num_cols
+            axes[row_idx, col_idx].set_visible(False)
+        
+        fig.set_figwidth(20)
+        fig.set_figheight(5)
+        fig.savefig(path)
         plt.close()
 
     def __repr__(self) -> str:
