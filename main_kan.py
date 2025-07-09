@@ -306,8 +306,8 @@ def main():
             n_jobs=4, 
             use_gpu=True, 
             max_hidden_layers=4,
-            max_hidden_size=50,
-            num_epochs=50,
+            max_hidden_size=100,
+            num_epochs=100,
             pretrain_iters=30
         )
         tuner.optimize(n_trials=200)          
@@ -318,7 +318,7 @@ def main():
         X_train, y_train,
         X_test, y_test,
         num_epochs=200,  
-        patience=600,
+        patience=100,
         pretrain_iters=30
     )
 

@@ -189,25 +189,25 @@ class GPKANAutoTuner:
                 hidden_size = trial.suggest_int(f'hidden_size_{i}', 2, self.max_hidden_size)
                 hidden_sizes.append(hidden_size)
             
-            num_inducing_points = trial.suggest_int('num_inducing_points', 5, 20)
-            z_init_low = trial.suggest_float('z_init_low', -3.0, -1.0)
-            z_init_high = trial.suggest_float('z_init_high', 1.0, 3.0)
-            h_init_low = trial.suggest_float('h_init_low', -2.0, 0.0)
-            h_init_high = trial.suggest_float('h_init_high', 0.0, 2.0)
+            num_inducing_points = trial.suggest_int('num_inducing_points', 5, 100)
+            z_init_low = trial.suggest_float('z_init_low', -3.0, -0.0)
+            z_init_high = trial.suggest_float('z_init_high', 0.0, 3.0)
+            h_init_low = trial.suggest_float('h_init_low', -3.0, 0.0)
+            h_init_high = trial.suggest_float('h_init_high', 0.0, 3.0)
             
-            global_length_scale = trial.suggest_float('global_length_scale', 0.1, 1.0)
-            min_length_scale = trial.suggest_float('min_length_scale', 0.05, 0.5)
+            global_length_scale = trial.suggest_float('global_length_scale', 0.001, 10.0)
+            min_length_scale = trial.suggest_float('min_length_scale', 0.001, 10.0)
             
-            global_covariance_scale = trial.suggest_float('global_covariance_scale', 0.5, 2.0)
-            min_covariance_scale = trial.suggest_float('min_covariance_scale', 0.05, 0.5)
+            global_covariance_scale = trial.suggest_float('global_covariance_scale', 0.001, 10.0)
+            min_covariance_scale = trial.suggest_float('min_covariance_scale', 0.001, 10.0)
             
             global_jitter = trial.suggest_float('global_jitter', 1e-4, 1e-2, log=True)
             baseline_jitter = trial.suggest_float('baseline_jitter', 1e-3, 1e-1, log=True)
             
-            min_var = trial.suggest_float('min_var', 0.1, 0.5)
+            min_var = trial.suggest_float('min_var', 0.001, 0.5)
             
-            learning_rate = trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True)
-            batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 128])
+            learning_rate = trial.suggest_float('learning_rate', 1e-4, 1, log=True)
+            batch_size = trial.suggest_int('batch_size', 16, 128)
             
             config = ConfigParser()
             config['NETWORK'] = {
