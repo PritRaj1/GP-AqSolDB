@@ -4,7 +4,7 @@ import os
 from configparser import ConfigParser
 import pickle
 from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 import warnings
 import jax
 import jax.numpy as jnp
@@ -68,8 +68,8 @@ class GPKANAutoTuner:
         self.max_hidden_size = max_hidden_size
         self.num_epochs = num_epochs
         
-        if self.metric not in ['BIC', 'MSE']:
-            raise ValueError("metric must be 'BIC' or 'MSE'")
+        if self.metric not in ['BIC', 'MSE', 'R2']:
+            raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
         
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -245,6 +245,8 @@ class GPKANAutoTuner:
             
             if self.metric == 'BIC':
                 return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
+            elif self.metric == 'R2':
+                return -np.mean(cv_results['r2'])  # Negative because Optuna minimizes
             else:  
                 return np.mean(cv_results['mse'])  # Direct minimization
                 
@@ -273,6 +275,7 @@ class GPKANAutoTuner:
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         mse_scores = []
         bic_scores = []
+        r2_scores = []
         
         learning_rate = float(config['TRAINING'].get('learning_rate', '0.001'))
         num_epochs = int(config['TRAINING'].get('num_epochs', '30'))
@@ -306,20 +309,24 @@ class GPKANAutoTuner:
                 y_pred = np.array(output_dist.mean).flatten()
                 
                 mse = mean_squared_error(y_val_fold, y_pred)
+                r2 = r2_score(y_val_fold, y_pred)
                 n_params = self._count_network_parameters(hidden_sizes)
                 bic = self.calculate_bic(mse, n_params, len(y_val_fold))
                 
                 mse_scores.append(mse)
                 bic_scores.append(bic)
+                r2_scores.append(r2)
                 
             except Exception as e:
                 print(f"CV fold failed: {e}")
                 mse_scores.append(1e6)
                 bic_scores.append(1e6)
+                r2_scores.append(-1e6)
         
         return {
             'mse': mse_scores,
-            'bic': bic_scores
+            'bic': bic_scores,
+            'r2': r2_scores
         }
     
     def optimize(self, n_trials: int = 100, timeout: Optional[int] = None):
@@ -345,6 +352,8 @@ class GPKANAutoTuner:
         print(f"Metric: {self.metric}")
         if self.metric == 'BIC':
             print("  BIC balances accuracy and model complexity")
+        elif self.metric == 'R2':
+            print("  R² optimizes for prediction accuracy (higher is better)")
         else:
             print("  MSE optimizes for pure prediction accuracy")
         
@@ -362,6 +371,8 @@ class GPKANAutoTuner:
         print(f"\nOptimization completed!")
         if self.metric == 'BIC':
             print(f"Best CV BIC: {-best_value:.2f}")
+        elif self.metric == 'R2':
+            print(f"Best CV R²: {-best_value:.4f}")
         else:
             print(f"Best CV MSE: {best_value:.4f}")
         

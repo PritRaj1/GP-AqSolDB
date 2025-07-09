@@ -4,7 +4,7 @@ import os
 from configparser import ConfigParser
 import pickle
 from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -65,8 +65,8 @@ class GPAutoTuner:
         self.chunk_size = chunk_size
         self.min_size_for_parallel = min_size_for_parallel
         
-        if self.metric not in ['BIC', 'MSE']:
-            raise ValueError("metric must be 'BIC' or 'MSE'")
+        if self.metric not in ['BIC', 'MSE', 'R2']:
+            raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
         
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -192,6 +192,8 @@ class GPAutoTuner:
 
             if self.metric == 'BIC':
                 return -np.mean(cv_results['bic'])  # Negative because Optuna minimizes
+            elif self.metric == 'R2':
+                return -np.mean(cv_results['r2'])  # Negative because Optuna minimizes 
             else:  
                 return np.mean(cv_results['mse'])  # Direct minimization
                 
@@ -220,6 +222,7 @@ class GPAutoTuner:
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         mse_scores = []
         bic_scores = []
+        r2_scores = []
         
         for train_idx, val_idx in kf.split(self.X_train):
             X_train_fold = self.X_train[train_idx]
@@ -234,14 +237,17 @@ class GPAutoTuner:
             
             y_pred = gp.predict(X_val_fold)
             mse = mean_squared_error(y_val_fold, y_pred)
+            r2 = r2_score(y_val_fold, y_pred)
             bic = self.calculate_bic(mse, n_params, len(y_val_fold))
             
             mse_scores.append(mse)
             bic_scores.append(bic)
+            r2_scores.append(r2)
         
         return {
             'mse': mse_scores,
-            'bic': bic_scores
+            'bic': bic_scores,
+            'r2': r2_scores
         }
     
     def optimize(self, n_trials=100, timeout=None):
@@ -267,6 +273,8 @@ class GPAutoTuner:
         print(f"Metric: {self.metric}")
         if self.metric == 'BIC':
             print("  BIC balances accuracy and model complexity")
+        elif self.metric == 'R2':
+            print("  R² optimizes for prediction accuracy (higher is better)")
         else:
             print("  MSE optimizes for pure prediction accuracy")
         
@@ -284,6 +292,8 @@ class GPAutoTuner:
         print(f"\nOptimization completed!")
         if self.metric == 'BIC':
             print(f"Best CV BIC: {-best_value:.2f}")
+        elif self.metric == 'R2':
+            print(f"Best CV R²: {-best_value:.4f}")
         else:
             print(f"Best CV MSE: {best_value:.4f}")
             
