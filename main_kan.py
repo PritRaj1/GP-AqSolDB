@@ -307,8 +307,9 @@ def main():
             n_jobs=4, 
             use_gpu=True, 
             max_hidden_layers=4,
-            max_hidden_size=16,
-            num_epochs=20
+            max_hidden_size=50,
+            num_epochs=50,
+            pretrain_iters=30
         )
         tuner.optimize(n_trials=50)          
         config, params = tuner.load_optimized_parameters()
@@ -318,11 +319,9 @@ def main():
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        learning_rate=0.001,
         num_epochs=200,  
-        batch_size=32,
-        patience=20,
-        pretrain_iters=10
+        patience=60,
+        pretrain_iters=50
     )
 
     X_test_mean = X_test

@@ -26,7 +26,8 @@ class GPKANAutoTuner:
             use_gpu: bool = False,
             max_hidden_layers: int = 3,
             max_hidden_size: int = 10,
-            num_epochs: int = 50
+            num_epochs: int = 50,
+            pretrain_iters: int = 10,
         ):
         """
         Initialize the GP-KAN Auto Tuner
@@ -53,6 +54,8 @@ class GPKANAutoTuner:
             Maximum hidden layer size to try
         num_epochs : int
             Number of training epochs for each trial
+        pretrain_iters : int
+            Number of pretraining iterations for each trial
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -67,6 +70,7 @@ class GPKANAutoTuner:
         self.max_hidden_layers = max_hidden_layers
         self.max_hidden_size = max_hidden_size
         self.num_epochs = num_epochs
+        self.pretrain_iters = pretrain_iters
         
         if self.metric not in ['BIC', 'MSE', 'R2']:
             raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
@@ -204,7 +208,6 @@ class GPKANAutoTuner:
             
             learning_rate = trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True)
             batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 128])
-            pretrain_iters = trial.suggest_int('pretrain_iters', 5, 20)
             
             config = ConfigParser()
             config['NETWORK'] = {
@@ -239,7 +242,7 @@ class GPKANAutoTuner:
             config['TRAINING']['learning_rate'] = str(learning_rate)
             config['TRAINING']['num_epochs'] = str(self.num_epochs)
             config['TRAINING']['batch_size'] = str(batch_size)
-            config['TRAINING']['pretrain_iters'] = str(pretrain_iters)
+            config['TRAINING']['pretrain_iters'] = str(self.pretrain_iters)
             
             cv_results = self._cross_validate_gpkan(config, hidden_sizes, n_splits=3)  # Reduced for speed
             
@@ -278,7 +281,6 @@ class GPKANAutoTuner:
         r2_scores = []
         
         learning_rate = float(config['TRAINING'].get('learning_rate', '0.001'))
-        num_epochs = int(config['TRAINING'].get('num_epochs', '30'))
         batch_size = int(config['TRAINING'].get('batch_size', '32'))
         pretrain_iters = int(config['TRAINING'].get('pretrain_iters', '10'))
         
@@ -425,7 +427,7 @@ class GPKANAutoTuner:
         self.config['TRAINING']['learning_rate'] = str(best_params['learning_rate'])
         self.config['TRAINING']['num_epochs'] = str(self.num_epochs)
         self.config['TRAINING']['batch_size'] = str(best_params['batch_size'])
-        self.config['TRAINING']['pretrain_iters'] = str(best_params['pretrain_iters'])
+        self.config['TRAINING']['pretrain_iters'] = str(self.pretrain_iters)
         
         self.config['DEVICE']['use_gpu'] = str(self.use_gpu).lower()
         self.config['DEVICE']['device'] = 'gpu' if self.use_gpu else 'cpu'
@@ -453,7 +455,7 @@ class GPKANAutoTuner:
         print(f"Min variance: {best_params['min_var']}")
         print(f"Learning rate: {best_params['learning_rate']}")
         print(f"Batch size: {best_params['batch_size']}")
-        print(f"Pretrain iterations: {best_params['pretrain_iters']}")
+        print(f"Pretrain iterations: {self.pretrain_iters}")
         print(f"Num epochs: {self.num_epochs}")
     
     def load_optimized_parameters(self):
