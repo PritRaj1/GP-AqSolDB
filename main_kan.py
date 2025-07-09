@@ -319,9 +319,9 @@ def main():
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        num_epochs=200,  
-        patience=60,
-        pretrain_iters=50
+        num_epochs=1000,  
+        patience=300,
+        pretrain_iters=300
     )
 
     X_test_mean = X_test

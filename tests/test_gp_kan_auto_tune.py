@@ -215,7 +215,7 @@ def test_invalid_metric():
     X = np.random.randn(10, 2)
     y = np.random.randn(10)
     
-    with pytest.raises(ValueError, match="metric must be 'BIC' or 'MSE'"):
+    with pytest.raises(ValueError, match="metric must be 'BIC', 'MSE', or 'R2'"):
         GPKANAutoTuner(
             X_train=X,
             y_train=y,
