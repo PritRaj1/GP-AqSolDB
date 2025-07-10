@@ -53,16 +53,22 @@ dev:
 	@echo "Dev session ready: tmux attach-session -t gp_kan_dev"
 
 run-gp:
+	@mkdir -p logs
 	@tmux kill-session -t gp_sol_gp 2>/dev/null || true
 	@tmux new-session -d -s gp_sol_gp -n gp
-	@tmux send-keys -t gp_sol_gp:gp "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME) && python main.py; else conda activate $(ENV_NAME) && python main.py; fi" Enter
+	@tmux send-keys -t gp_sol_gp:gp "conda activate $(ENV_NAME) && python main.py" Enter
+	@tmux pipe-pane -t gp_sol_gp:gp "cat > logs/gp.log"
 	@echo "GP model session ready: tmux attach-session -t gp_sol_gp"
+	@echo "Log file: logs/gp.log"
 
 run-kan:
+	@mkdir -p logs
 	@tmux kill-session -t gp_sol_kan 2>/dev/null || true
 	@tmux new-session -d -s gp_sol_kan -n kan
-	@tmux send-keys -t gp_sol_kan:kan "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME) && python main_kan.py; else conda activate $(ENV_NAME) && python main_kan.py; fi" Enter
+	@tmux send-keys -t gp_sol_kan:kan "conda activate $(ENV_NAME) && python main_kan.py" Enter
+	@tmux pipe-pane -t gp_sol_kan:kan "cat > logs/kan.log"
 	@echo "KAN model session ready: tmux attach-session -t gp_sol_kan"
+	@echo "Log file: logs/kan.log"
 
 format:
 	$(call conda_run,black src/ tests/ --line-length 88)
