@@ -1,12 +1,12 @@
 import numpy as np
 import time
-import sys
+
 import os
 import pytest
 from configparser import ConfigParser
 from sklearn.metrics import mean_squared_error
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.multivar_gp.dense_gp import DenseGP
 from src.multivar_gp.sparse_gp import SparseGP
 

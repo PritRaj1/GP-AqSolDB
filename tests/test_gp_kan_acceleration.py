@@ -2,11 +2,11 @@ import jax
 import jax.numpy as jnp
 import pytest
 import time
-import sys
+
 import os
 from configparser import ConfigParser
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 

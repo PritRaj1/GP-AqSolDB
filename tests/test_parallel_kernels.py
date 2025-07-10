@@ -2,10 +2,10 @@ import numpy as np
 import time
 import pytest
 from configparser import ConfigParser
-import sys
+
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.multivar_gp.kernels import RBF, RQ, configure_parallel_settings, get_parallel_info, load_parallel_conf
 
 @pytest.fixture

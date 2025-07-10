@@ -6,9 +6,7 @@ import os
 import tempfile
 import shutil
 from configparser import ConfigParser
-import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.gp_kan.auto_tune import GPKANAutoTuner, load_gpkan_params_from_file, create_optimized_network
 from src.gp_kan.fully_connected import GP_KAN
 from src.gp_kan.normal_dist import NormalDist
@@ -296,4 +294,4 @@ if __name__ == "__main__":
         shutil.rmtree(temp_dir)
 
     
-    
+ 

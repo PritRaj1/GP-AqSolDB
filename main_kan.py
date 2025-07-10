@@ -310,7 +310,7 @@ def main():
             num_epochs=100,
             pretrain_iters=30
         )
-        tuner.optimize(n_trials=200)          
+        tuner.optimize(n_trials=1000)          
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")

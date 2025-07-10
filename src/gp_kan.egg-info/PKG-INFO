@@ -1,0 +1,67 @@
+Metadata-Version: 2.4
+Name: gp-kan
+Version: 0.1.0
+Author-email: Prithvi Raj <prithvi@zettalaboratories.com>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: jax[cuda12_pip]
+Requires-Dist: jaxlib[cuda12_pip]
+Requires-Dist: optax
+Requires-Dist: jax_dataclasses
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: scikit-learn
+Requires-Dist: optuna
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: pandas
+Requires-Dist: imageio
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: pytest-mock; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+
+# Gaussian Processes - AqSolDB
+
+<p align="center">
+  <img src="figures/learning_evolution.gif" alt="Active Learning">
+  <br>
+  <em>Active Learning of Gaussian Process</em>
+</p>
+
+<p align="center">
+  <img src="figures/kernel_uncertainty_heatmap.png" alt="Uncertainty Distributions">
+  <br>
+  <em>Uncertainty distribution in most important features</em>
+</p>
+
+## Setup
+
+Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer. 
+
+Then can use the Makefile:
+
+```bash
+# See all available commands
+make help
+
+# Quick start
+make install    # Install everything
+make test       # Run tests
+make run-gp    # Run the standard GP
+```
+
+## Data
+
+The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.
+
+## References
+
+- [GPs](https://direct.mit.edu/books/oa-monograph/2320/Gaussian-Processes-for-Machine-Learning)
+- [Sparse FITC GPs](https://arxiv.org/abs/1606.04820)
+- [GP-Kolmogorov-Arnold Networks](https://arxiv.org/abs/2407.18397)
+- [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1)

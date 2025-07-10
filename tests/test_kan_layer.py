@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
 import pytest
-import sys
+
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
 from src.gp_kan.normal_dist import NormalDist
 

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pytest
 from configparser import ConfigParser
-import sys
+
 import os
 
 sns.set_theme(style="whitegrid", palette="husl")
@@ -16,7 +16,7 @@ plt.rcParams.update({
     "text.latex.preamble": r"\usepackage{amsmath} \usepackage{amssymb}"
 })
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.multivar_gp.dense_gp import DenseGP
 from tests.fcn import get_data
 

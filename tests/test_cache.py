@@ -1,11 +1,11 @@
 import numpy as np
 import time
-import sys
+
 import os
 import pytest
 from configparser import ConfigParser
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.multivar_gp.dense_gp import DenseGP
 from src.multivar_gp.kernels import get_cache_stats, clear_kernel_cache
 

@@ -17,7 +17,7 @@ plt.rcParams.update({
     "text.latex.preamble": r"\usepackage{amsmath} \usepackage{amssymb}"
 })
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.multivar_gp.dense_gp import DenseGP
 from src.multivar_gp.auto_tune import GPAutoTuner, load_sigmas_from_file
 
