@@ -309,7 +309,7 @@ class GP_KAN:
             
             if i % 2 == 0:
                 loss = pretrain_loss_fn(params)
-                print(f"  Pretrain {i}: Inducing point loglik {-loss:.4f}")
+                print(f"  Pretrain {i}: Inducing point log-likelihood {-loss:.4f}")
         
         self.set_params(params)
 
