@@ -436,15 +436,33 @@ class GPKANAutoTuner:
         with open(self.config_path, 'w') as f:
             self.config.write(f)
         
+        print("Training final network with best hyperparameters...")
+        final_network = GP_KAN(self.config, hidden_sizes=hidden_sizes)
+        
+        learning_rate = float(best_params['learning_rate'])
+        batch_size = int(best_params['batch_size'])
+        pretrain_iters = int(self.pretrain_iters)
+        
+        final_network.train(
+            self.X_train, self.y_train,
+            learning_rate=learning_rate,
+            num_epochs=self.num_epochs,
+            batch_size=batch_size,
+            pretrain_iters=pretrain_iters
+        )
+        
+        network_params = final_network.get_params()
+        
         params_to_save = {
             'hidden_sizes': hidden_sizes,
-            'best_params': best_params
+            'best_params': best_params,
+            'network_params': network_params
         }
         
         with open(self.params_save_path, 'wb') as f:
             pickle.dump(params_to_save, f)
         
-        print(f"\nSaved hyperparameters:")
+        print(f"\nSaved hyperparameters and trained network:")
         print(f"Config file: {self.config_path}")
         print(f"Params file: {self.params_save_path}")
         print(f"Architecture: {[self.n_features] + hidden_sizes + [1]}")
@@ -484,4 +502,12 @@ def create_optimized_network(config_path: str, params_path: str) -> GP_KAN:
     params_data = load_gpkan_params_from_file(params_path)
     hidden_sizes = params_data['hidden_sizes']
     
-    return GP_KAN(config, hidden_sizes=hidden_sizes) 
+    network = GP_KAN(config, hidden_sizes=hidden_sizes)
+    
+    if 'network_params' in params_data:
+        print("Loading saved network parameters...")
+        network.set_params(params_data['network_params'])
+    else:
+        print("No saved network parameters found. Using initialized parameters.")
+    
+    return network 
