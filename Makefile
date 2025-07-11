@@ -1,4 +1,4 @@
-.PHONY: install clean test dev train format lint help
+.PHONY: install clean test dev train format lint help logs
 
 ENV_NAME = GP_sol
 CONDA_BASE := $(shell conda info --base 2>/dev/null || echo "")
@@ -14,6 +14,7 @@ help:
 	@echo "  run-kan  - Run KAN model in tmux"
 	@echo "  format   - Format code"
 	@echo "  lint     - Run linting"
+	@echo "  logs     - Display log files"
 	@echo "  help     - Show this help"
 
 install:
@@ -112,6 +113,32 @@ clean-config:
 
 clean-all: clean-figures clean-config
 	@echo "All generated files cleaned!"
+
+logs:
+	@echo "Displaying log files from logs/ directory:"
+	@if [ -d "logs" ] && [ "$(shell ls logs/*.log 2>/dev/null | wc -l)" -gt 0 ]; then \
+		echo "Found log files:"; \
+		ls -la logs/*.log; \
+		echo ""; \
+		echo "=== GP Model Log ==="; \
+		if [ -f "logs/gp.log" ]; then \
+			echo "Last 20 lines of gp.log:"; \
+			tail -20 logs/gp.log; \
+		else \
+			echo "gp.log not found"; \
+		fi; \
+		echo ""; \
+		echo "=== KAN Model Log ==="; \
+		if [ -f "logs/kan.log" ]; then \
+			echo "Last 20 lines of kan.log:"; \
+			tail -20 logs/kan.log; \
+		else \
+			echo "kan.log not found"; \
+		fi; \
+	else \
+		echo "No log files found in logs/ directory"; \
+		echo "Run 'make run-gp' or 'make run-kan' to generate logs"; \
+	fi
 
 info:
 	@echo "Environment Information:"
