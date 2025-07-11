@@ -4,6 +4,7 @@ from typing import Callable, Dict, Optional
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
@@ -347,25 +348,21 @@ class DenseGPLayer:
     def plot_neuron(
         self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100
     ) -> None:
-        """Plot a single neuron's function."""
         z = self.get_z()[I_idx, O_idx, :]
+        h = self.h[I_idx, O_idx, :]
+        s_val = self.get_s()[I_idx, O_idx]
+        length_scale_val = self.get_length_scale()[I_idx, O_idx]
         jitter = self.get_jitter()[I_idx, O_idx]
 
-        x_plot = jnp.linspace(
-            jnp.min(z) - 2 * self.length_scale,
-            jnp.max(z) + 2 * self.length_scale,
-            num_pts,
-        )
+        x_min = float(jnp.min(z) - 2 * length_scale_val)
+        x_max = float(jnp.max(z) + 2 * length_scale_val)
+        x_plot = jnp.linspace(x_min, x_max, num_pts)
 
         def covar_func(x1: jax.Array, x2: jax.Array) -> jax.Array:
-            s_val = self.get_s()[I_idx, O_idx]
-            length_scale_val = self.get_length_scale()[I_idx, O_idx]
             return s_val**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * length_scale_val**2))
 
-        # Standard GP variance calculation
         K_hh = build_kernel_mat(z, z, covar_func)
         K_hh_noise = K_hh + (jitter**2) * jnp.eye(self.P)
-
         L = jax.scipy.linalg.cholesky(K_hh_noise)
         L_inv = jax.scipy.linalg.inv(L)
         L_inv_T = jnp.transpose(L_inv, (1, 0))
@@ -373,29 +370,23 @@ class DenseGPLayer:
         k_xh = build_kernel_mat(x_plot, z, covar_func)
         A = k_xh @ L_inv_T
 
-        # Mean
-        h = self.h[I_idx, O_idx, :].reshape(1, self.P)
-        mean = A @ h.T
+        mean = (A @ h.reshape(-1, 1)).flatten()
+        k_xx_diag = jnp.array([covar_func(x, x) for x in x_plot])
+        var = k_xx_diag - jnp.sum(A * A, axis=1)
+        std_dev = jnp.sqrt(var)
 
-        # Variance
-        k_xx = build_kernel_mat(x_plot, x_plot, covar_func)
-        var = jnp.diag(k_xx) - jnp.sum(A * A, axis=1)
-
-        axes.plot(x_plot, mean.flatten(), "b-", label="Mean")
+        axes.plot(np.array(x_plot), np.array(mean), color="black")
         axes.fill_between(
-            x_plot,
-            mean.flatten() - 2 * jnp.sqrt(var),
-            mean.flatten() + 2 * jnp.sqrt(var),
+            np.array(x_plot),
+            np.array(mean) + 2 * np.array(std_dev),
+            np.array(mean) - 2 * np.array(std_dev),
+            color="gray",
             alpha=0.3,
-            label=r"$\pm 2\sigma$",
         )
-        axes.scatter(z, h, c="red", s=50, label="Inducing points")
-        axes.legend()
+        axes.scatter(np.array(z), np.array(h), color="red")
         axes.grid(True, alpha=0.3)
 
     def save_fig(self, path: str, max_neurons_shown: int = 5) -> None:
-        """Save a figure showing neuron functions."""
-
         plot_num = min(max_neurons_shown, self.num_neurons)
 
         num_cols = min(plot_num, 5)
