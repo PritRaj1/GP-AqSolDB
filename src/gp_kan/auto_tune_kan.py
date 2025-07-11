@@ -192,28 +192,28 @@ class GPKANAutoTuner:
                 )
                 hidden_sizes.append(hidden_size)
 
-            num_inducing_points = trial.suggest_int("num_inducing_points", 5, 30)
-            z_init_low = trial.suggest_float("z_init_low", -3.0, -0.0)
-            z_init_high = trial.suggest_float("z_init_high", 0.0, 3.0)
-            h_init_low = trial.suggest_float("h_init_low", -3.0, 0.0)
-            h_init_high = trial.suggest_float("h_init_high", 0.0, 3.0)
+            num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
+            z_init_low = trial.suggest_float("z_init_low", -3.0, -0.5)
+            z_init_high = trial.suggest_float("z_init_high", 0.5, 3.0)
+            h_init_low = trial.suggest_float("h_init_low", -3.0, -0.5)
+            h_init_high = trial.suggest_float("h_init_high", 0.5, 3.0)
 
-            global_length_scale = trial.suggest_float("global_length_scale", 0.01, 10.0)
-            min_length_scale = trial.suggest_float("min_length_scale", 0.01, 10.0)
+            global_length_scale = trial.suggest_float("global_length_scale", 0.01, 5.0)
+            min_length_scale = trial.suggest_float("min_length_scale", 0.01, 5.0)
 
             global_covariance_scale = trial.suggest_float(
-                "global_covariance_scale", 0.01, 10.0
+                "global_covariance_scale", 0.01, 5.0
             )
             min_covariance_scale = trial.suggest_float(
-                "min_covariance_scale", 0.01, 10.0
+                "min_covariance_scale", 0.01, 5.0
             )
 
-            global_jitter = trial.suggest_float("global_jitter", 1e-4, 1e-2, log=True)
+            global_jitter = trial.suggest_float("global_jitter", 1e-3, 1e-1, log=True)
             baseline_jitter = trial.suggest_float(
                 "baseline_jitter", 1e-3, 1e-1, log=True
             )
 
-            min_var = trial.suggest_float("min_var", 0.001, 0.5)
+            min_var = trial.suggest_float("min_var", 0.01, 0.5)
 
             learning_rate = trial.suggest_float("learning_rate", 1e-4, 1, log=True)
             batch_size = trial.suggest_int("batch_size", 16, 128)
