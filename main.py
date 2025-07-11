@@ -580,7 +580,7 @@ def main():
             min_size_for_parallel=500,
             sampler='bayesian',
             )
-        tuner.optimize(n_trials=200)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)

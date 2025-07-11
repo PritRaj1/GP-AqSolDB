@@ -292,7 +292,12 @@ class DenseGPLayer:
     ) -> tuple[jax.Array, jax.Array, jax.Array]:
         cholesky_factor = jax.scipy.linalg.cholesky(kernel_matrix)
         cholesky_inverse = jax.scipy.linalg.inv(cholesky_factor)
-        cholesky_inverse_transpose = jnp.transpose(cholesky_inverse, (0, 1, 2, 4, 3))
+        if kernel_matrix.ndim == 4:
+            cholesky_inverse_transpose = jnp.transpose(cholesky_inverse, (0, 1, 3, 2))
+        else:
+            cholesky_inverse_transpose = jnp.transpose(
+                cholesky_inverse, (0, 1, 2, 4, 3)
+            )
         return cholesky_factor, cholesky_inverse, cholesky_inverse_transpose
 
     def _predictive_mean(
@@ -430,14 +435,10 @@ class DenseGPLayer:
             I, O, P = z.shape
 
             def rbf_kernel(x1: jax.Array, x2: jax.Array) -> jax.Array:
-                signal_variance_broadcast = jnp.broadcast_to(
-                    s.reshape(I, O, 1, 1), (I, O, P, P)
-                )
-                length_scale_broadcast = jnp.broadcast_to(
-                    length_scale.reshape(I, O, 1, 1), (I, O, P, P)
-                )
-                return signal_variance_broadcast**2 * jnp.exp(
-                    -((x1 - x2) ** 2) / (2 * length_scale_broadcast**2)
+                signal_variance = s.reshape(I, O, 1, 1)
+                length_scale_sq = length_scale.reshape(I, O, 1, 1) ** 2
+                return signal_variance**2 * jnp.exp(
+                    -((x1 - x2) ** 2) / (2 * length_scale_sq)
                 )
 
             inducing_kernel_matrix = build_kernel_mat(z, z, rbf_kernel)
