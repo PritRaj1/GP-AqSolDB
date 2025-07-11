@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from src.gp_kan.normal_dist import NormalDist, get_device_config
 
 
-def load_normalization_config(config: ConfigParser) -> dict:
+def load_normalization_config(config: ConfigParser) -> Dict[str, float]:
     if "NORMALIZATION" not in config:
         raise ValueError("NORMALIZATION section not found in config")
 
@@ -26,7 +26,9 @@ def create_default_conf() -> ConfigParser:
 class NormaliseGaussian:
     """Normalize - tanh for mean and sigmoid for variance."""
 
-    def __init__(self, min_var: float = 0.2, config: Optional[ConfigParser] = None):
+    def __init__(
+        self, min_var: float = 0.2, config: Optional[ConfigParser] = None
+    ) -> None:
         if config is not None:
             norm_params = load_normalization_config(config)
             self.min_var = norm_params["min_var"]
@@ -39,7 +41,7 @@ class NormaliseGaussian:
         self.sigmoid_offset = self.inverse_sigmoid(self.min_var)
 
     @staticmethod
-    def inverse_sigmoid(x: float):
+    def inverse_sigmoid(x: float) -> float:
         t1 = (1 / x) - 1
         t2 = -jnp.log(t1)
         return t2
@@ -47,7 +49,9 @@ class NormaliseGaussian:
     def __call__(self, x: NormalDist) -> NormalDist:
 
         # JIT once
-        def _normalize_core(x_mean, x_var, sigmoid_offset, min_var):
+        def _normalize_core(
+            x_mean: jax.Array, x_var: jax.Array, sigmoid_offset: float, min_var: float
+        ) -> Tuple[jax.Array, jax.Array]:
             out_mean = jnp.tanh(x_mean)
             out_var = jax.nn.sigmoid(x_var - x_mean**2 + sigmoid_offset)
             out_var = jnp.maximum(out_var, min_var)
@@ -68,7 +72,9 @@ class NormaliseGaussian:
 
 
 class ReshapeGaussian:
-    def __init__(self, new_shape: List[int], config: Optional[ConfigParser] = None):
+    def __init__(
+        self, new_shape: List[int], config: Optional[ConfigParser] = None
+    ) -> None:
         self.new_shape = new_shape
         if config is not None:
             self.device_config = get_device_config(config)

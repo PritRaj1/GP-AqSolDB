@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
 import jax
 import jax.numpy as jnp
@@ -10,7 +10,7 @@ from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_devi
 SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
 
 
-def load_gp_config(config: ConfigParser) -> dict:
+def load_gp_config(config: ConfigParser) -> Dict[str, float]:
     if "GP" not in config:
         raise ValueError("GP section not found in config")
 
@@ -158,7 +158,7 @@ class DenseGPLayer:
 
         self.reset_gp_hyp()
 
-    def _move_to_gpu(self):
+    def _move_to_gpu(self) -> None:
         """Move all parameters to GPU."""
         gpu_device = jax.devices("gpu")[0]
         self.z = jax.device_put(self.z, gpu_device)
@@ -180,7 +180,7 @@ class DenseGPLayer:
     def get_z(self) -> jax.Array:
         return jnp.tanh(self.z)
 
-    def reset_gp_hyp(self):
+    def reset_gp_hyp(self) -> None:
         z_tanh = self.get_z()
         max_z = jnp.max(z_tanh, axis=-1)
         min_z = jnp.min(z_tanh, axis=-1)
@@ -194,21 +194,26 @@ class DenseGPLayer:
             jnp.ones((self.input_dim, self.output_dim)) * self.global_jitter
         )
 
-    def get_params(self) -> dict:
+    def get_params(self) -> Dict[str, jax.Array]:
         return {
             "z": self.z,
             "h": self.h,
-            "length_scale": self.length_scale,
+            "l": self.length_scale,  # Alias for backward compatibility
             "s": self.s,
             "jitter": self.jitter,
         }
 
-    def set_params(self, params: dict):
+    def set_params(self, params: Dict[str, jax.Array]) -> None:
         self.z = params["z"]
         self.h = params["h"]
-        self.length_scale = params["length_scale"]
         self.s = params["s"]
         self.jitter = params["jitter"]
+
+        # Handle both "length_scale" and "l"
+        if "length_scale" in params:
+            self.length_scale = params["length_scale"]
+        elif "l" in params:
+            self.length_scale = params["l"]
 
     def forward(self, x: NormalDist) -> NormalDist:
         assert x.mean.ndim == 2
@@ -227,7 +232,7 @@ class DenseGPLayer:
         jitter = self.get_jitter().reshape(1, input_dim, output_dim, 1, 1)
         z = self.get_z().reshape(1, input_dim, output_dim, P)
 
-        def kernel_func1(x1, x2):
+        def kernel_func1(x1: jax.Array, x2: jax.Array) -> jax.Array:
             N = x_var.shape[0]
             x_var_reshaped = x_var.reshape(N, input_dim, 1, 1, 1)
             var = jnp.broadcast_to(x_var_reshaped, x1.shape)
@@ -236,7 +241,7 @@ class DenseGPLayer:
             )
             return normal_pdf(x1, x2, var + length_scale_b**2)
 
-        def kernel_func2(x1, x2):
+        def kernel_func2(x1: jax.Array, x2: jax.Array) -> jax.Array:
             length_scale_reshaped = length_scale.reshape(1, input_dim, output_dim, 1, 1)
             length_scale_b = jnp.broadcast_to(length_scale_reshaped, x1.shape)
             return normal_pdf(x1, x2, length_scale_b**2)
@@ -287,10 +292,16 @@ class DenseGPLayer:
     def loglikelihood(self) -> jax.Array:
 
         # Top level JIT
-        def _loglikelihood_core(s, length_scale, jitter, z, h):
+        def _loglikelihood_core(
+            s: jax.Array,
+            length_scale: jax.Array,
+            jitter: jax.Array,
+            z: jax.Array,
+            h: jax.Array,
+        ) -> jax.Array:
             I, O, P = z.shape
 
-            def covar_func(x1, x2):
+            def covar_func(x1: jax.Array, x2: jax.Array) -> jax.Array:
                 length_scale_b = jnp.broadcast_to(
                     length_scale.reshape(I, O, 1, 1), (I, O, P, P)
                 )
@@ -332,7 +343,9 @@ class DenseGPLayer:
 
         return self._loglikelihood_core_jit(s, length_scale, jitter, z, h)
 
-    def plot_neuron(self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100):
+    def plot_neuron(
+        self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100
+    ) -> None:
         """Plot a single neuron's function."""
         z = self.get_z()[I_idx, O_idx, :]
         jitter = self.get_jitter()[I_idx, O_idx]
@@ -343,8 +356,10 @@ class DenseGPLayer:
             num_pts,
         )
 
-        def covar_func(x1, x2):
-            return self.s**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * self.length_scale**2))
+        def covar_func(x1: jax.Array, x2: jax.Array) -> jax.Array:
+            s_val = self.get_s()[I_idx, O_idx]
+            length_scale_val = self.get_length_scale()[I_idx, O_idx]
+            return s_val**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * length_scale_val**2))
 
         # Standard GP variance calculation
         K_hh = build_kernel_mat(z, z, covar_func)
@@ -358,7 +373,7 @@ class DenseGPLayer:
         A = k_xh @ L_inv_T
 
         # Mean
-        h = self.h.reshape(1, self.P)
+        h = self.h[I_idx, O_idx, :].reshape(1, self.P)
         mean = A @ h.T
 
         # Variance
@@ -377,7 +392,7 @@ class DenseGPLayer:
         axes.legend()
         axes.grid(True, alpha=0.3)
 
-    def save_fig(self, path: str, max_neurons_shown: int = 5):
+    def save_fig(self, path: str, max_neurons_shown: int = 5) -> None:
         """Save a figure showing neuron functions."""
 
         plot_num = min(max_neurons_shown, self.num_neurons)

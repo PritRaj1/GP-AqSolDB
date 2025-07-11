@@ -1,12 +1,12 @@
 from configparser import ConfigParser
-from typing import Optional
+from typing import Dict, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import jax_dataclasses as jdc
 
 
-def get_device_config(config: ConfigParser) -> dict:
+def get_device_config(config: ConfigParser) -> Dict[str, Union[bool, str]]:
     if "DEVICE" not in config:
         return {"use_gpu": False, "device": "cpu"}
 
@@ -18,7 +18,7 @@ def get_device_config(config: ConfigParser) -> dict:
     }
 
 
-def setup_jax_device(config: ConfigParser):
+def setup_jax_device(config: ConfigParser) -> None:
     device_config = get_device_config(config)
 
     if device_config["use_gpu"]:
@@ -37,7 +37,7 @@ class NormalDist:
     mean: jax.Array
     var: jax.Array
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.mean.shape != self.var.shape:
             raise ValueError(
                 f"Mean shape {self.mean.shape} must match "
@@ -45,7 +45,9 @@ class NormalDist:
             )
 
     @classmethod
-    def from_array(cls, mean: jax.Array, var: Optional[jax.Array] = None):
+    def from_array(
+        cls, mean: jax.Array, var: Optional[jax.Array] = None
+    ) -> "NormalDist":
         """
         Make NormalDist from mean array.
 
@@ -90,7 +92,7 @@ class NormalDist:
         return f"NormalDist(mean: {self.mean}, var: {self.var})"
 
     def sample(
-        self, key: jax.random.PRNGKey, shape: Optional[tuple] = None
+        self, key: jax.random.PRNGKey, shape: Optional[Tuple[int, ...]] = None
     ) -> jax.Array:
         """
         Sample from NormalDist.
@@ -134,10 +136,10 @@ class NormalDist:
     def std(self) -> jax.Array:
         return jnp.sqrt(self.var)
 
-    def to_numpy(self):
+    def to_numpy(self) -> "NormalDist":
         return NormalDist(jnp.array(self.mean), jnp.array(self.var))
 
-    def to_device(self, device: str):
+    def to_device(self, device: str) -> "NormalDist":
         if device == "gpu":
             mean_gpu = jax.device_put(self.mean, jax.devices("gpu")[0])
             var_gpu = jax.device_put(self.var, jax.devices("gpu")[0])

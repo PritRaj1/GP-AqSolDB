@@ -41,8 +41,8 @@ def sample_input_dist():
 def test_layer_initialization(sample_gp_config):
     layer = DenseGPLayer(input_size=2, output_size=3, config=sample_gp_config)
 
-    assert layer.I == 2, "Input size should be 2"
-    assert layer.O == 3, "Output size should be 3"
+    assert layer.input_dim == 2, "Input size should be 2"
+    assert layer.output_dim == 3, "Output size should be 3"
     assert layer.P == 5, "Number of inducing points should match config"
     assert (
         layer.num_neurons == 6
@@ -59,7 +59,7 @@ def test_layer_initialization(sample_gp_config):
 def test_layer_parameter_transformations(sample_layer):
     jitter = sample_layer.get_jitter()
     s = sample_layer.get_s()
-    length_scale = sample_layer.get_l()
+    length_scale = sample_layer.get_length_scale()
     z = sample_layer.get_z()
 
     assert jitter.shape == (3, 2), "jitter should have shape (I, O)"
@@ -119,7 +119,7 @@ def test_forward_pass_uncertainty_propagation(sample_layer):
     sample_layer.jitter = jnp.log(jnp.ones_like(sample_layer.jitter))
 
     print("After setting parameters:")
-    print("length_scale:", sample_layer.get_l())
+    print("length_scale:", sample_layer.get_length_scale())
     print("s:", sample_layer.get_s())
     print("jitter:", sample_layer.get_jitter())
 

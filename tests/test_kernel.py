@@ -192,13 +192,13 @@ def test_visual():
 
         if kernel_type == "RBF":
             label = (
-                r"$k_{\text{RBF}}(x, x_0) = " +
-                r"\exp\left(-\frac{(x-x_0)^2}{2\sigma^2}\right)$"
+                r"$k_{\text{RBF}}(x, x_0) = "
+                + r"\exp\left(-\frac{(x-x_0)^2}{2\sigma^2}\right)$"
             )
         else:
             label = (
-                r"$k_{\text{RQ}}(x, x_0) = " +
-                r"\left(1 + \frac{(x-x_0)^2}{2\alpha\sigma^2}\right)^{-\alpha}$"
+                r"$k_{\text{RQ}}(x, x_0) = "
+                + r"\left(1 + \frac{(x-x_0)^2}{2\alpha\sigma^2}\right)^{-\alpha}$"
             )
 
         sns.lineplot(

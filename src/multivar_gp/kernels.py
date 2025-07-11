@@ -2,6 +2,7 @@ import hashlib
 import multiprocessing as mp
 import warnings
 from concurrent.futures import ProcessPoolExecutor
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from scipy.special import kv
@@ -23,7 +24,7 @@ PARALLEL_SETTINGS = {
 }
 
 
-def load_parallel_conf(config):
+def load_parallel_conf(config: Any) -> Dict[str, Any]:
     if "PARALLEL" in config:
         parallel_config = config["PARALLEL"]
 
@@ -76,13 +77,20 @@ def load_parallel_conf(config):
 class KernelCache:
     """Simple cache for repeated kernel computation"""
 
-    def __init__(self, max_size=100):
-        self.cache = {}
+    def __init__(self, max_size: int = 100) -> None:
+        self.cache: Dict[str, np.ndarray] = {}
         self.max_size = max_size
         self.hit_count = 0
         self.miss_count = 0
 
-    def _hash_inputs(self, X1, X2, sigma, alpha=None, kernel_type="RBF"):
+    def _hash_inputs(
+        self,
+        X1: np.ndarray,
+        X2: np.ndarray,
+        sigma: np.ndarray,
+        alpha: Optional[float] = None,
+        kernel_type: str = "RBF",
+    ) -> str:
         """Create a hash of the inputs for caching"""
         # Convert to bytes for hashing
         X1_bytes = X1.tobytes()
@@ -98,7 +106,9 @@ class KernelCache:
         )
         return hashlib.md5(hash_input).hexdigest()
 
-    def _hash_intermediate(self, X1, X2, sigma):
+    def _hash_intermediate(
+        self, X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray
+    ) -> str:
         """Create a hash for intermediate computations (normalized data)"""
         X1_bytes = X1.tobytes()
         X2_bytes = X2.tobytes()
@@ -107,7 +117,14 @@ class KernelCache:
         hash_input = X1_bytes + X2_bytes + sigma_bytes
         return hashlib.md5(hash_input).hexdigest()
 
-    def get(self, X1, X2, sigma, alpha=None, kernel_type="RBF"):
+    def get(
+        self,
+        X1: np.ndarray,
+        X2: np.ndarray,
+        sigma: np.ndarray,
+        alpha: Optional[float] = None,
+        kernel_type: str = "RBF",
+    ) -> Optional[np.ndarray]:
         """Get cached result if available"""
         key = self._hash_inputs(X1, X2, sigma, alpha, kernel_type)
         if key in self.cache:
@@ -117,14 +134,24 @@ class KernelCache:
             self.miss_count += 1
             return None
 
-    def get_intermediate(self, X1, X2, sigma):
+    def get_intermediate(
+        self, X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray
+    ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """Get cached intermediate computations"""
         key = self._hash_intermediate(X1, X2, sigma)
         if key in self.cache:
             return self.cache[key]
         return None
 
-    def set(self, X1, X2, sigma, alpha, kernel_type, result):
+    def set(
+        self,
+        X1: np.ndarray,
+        X2: np.ndarray,
+        sigma: np.ndarray,
+        alpha: float,
+        kernel_type: str,
+        result: np.ndarray,
+    ) -> None:
         """Store in cache"""
         key = self._hash_inputs(X1, X2, sigma, alpha, kernel_type)
 
@@ -135,7 +162,13 @@ class KernelCache:
 
         self.cache[key] = result
 
-    def set_intermediate(self, X1, X2, sigma, result):
+    def set_intermediate(
+        self,
+        X1: np.ndarray,
+        X2: np.ndarray,
+        sigma: np.ndarray,
+        result: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    ) -> None:
         """Store intermediate computations in cache"""
         key = self._hash_intermediate(X1, X2, sigma)
 
@@ -145,7 +178,7 @@ class KernelCache:
 
         self.cache[key] = result
 
-    def get_stats(self):
+    def get_stats(self) -> Dict[str, Union[int, float]]:
         total = self.hit_count + self.miss_count
         hit_rate = self.hit_count / total if total > 0 else 0
         return {
@@ -155,7 +188,7 @@ class KernelCache:
             "cache_size": len(self.cache),
         }
 
-    def clear(self):
+    def clear(self) -> None:
         self.cache.clear()
         self.hit_count = 0
         self.miss_count = 0
@@ -165,14 +198,14 @@ class KernelCache:
 _kernel_cache = KernelCache()
 
 
-def _get_n_jobs():
+def _get_n_jobs() -> int:
     """Number of jobs for parallel processing"""
     if PARALLEL_SETTINGS["n_jobs"] is not None:
         return PARALLEL_SETTINGS["n_jobs"]
     return min(mp.cpu_count(), 8)  # Capped at 8 to avoid overhead
 
 
-def _should_use_parallel(n1, n2):
+def _should_use_parallel(n1: int, n2: int) -> bool:
     """Based on matrix size"""
     if not PARALLEL_SETTINGS["use_parallel"]:
         return False
@@ -180,13 +213,14 @@ def _should_use_parallel(n1, n2):
     return n1 * n2 >= min_size * min_size
 
 
-def _chunk_indices(n, chunk_size):
+def _chunk_indices(n: int, chunk_size: int) -> List[Tuple[int, int]]:
     """List of chunk indices"""
-    for i in range(0, n, chunk_size):
-        yield i, min(i + chunk_size, n)
+    return [(i, min(i + chunk_size, n)) for i in range(0, n, chunk_size)]
 
 
-def _compute_kernel_chunk(args):
+def _compute_kernel_chunk(
+    args: Tuple[np.ndarray, np.ndarray, np.ndarray, str, Optional[float]],
+) -> np.ndarray:
     """Single chunk kernel matrix"""
     X1_chunk, X2, sigma, kernel_type, alpha = args
 
@@ -200,7 +234,9 @@ def _compute_kernel_chunk(args):
         raise ValueError(f"Unknown kernel type: {kernel_type}")
 
 
-def _compute_rbf_chunk(X1_chunk, X2, sigma):
+def _compute_rbf_chunk(
+    X1_chunk: np.ndarray, X2: np.ndarray, sigma: np.ndarray
+) -> np.ndarray:
     """RBF kernel for a chunk of X1"""
     X1_norm = X1_chunk / sigma
     X2_norm = X2 / sigma
@@ -214,7 +250,9 @@ def _compute_rbf_chunk(X1_chunk, X2, sigma):
     return np.exp(-0.5 * sq_dist)
 
 
-def _compute_rq_chunk(X1_chunk, X2, sigma, alpha):
+def _compute_rq_chunk(
+    X1_chunk: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: Optional[float]
+) -> np.ndarray:
     """RQ kernel for a chunk of X1"""
     X1_norm = X1_chunk / sigma
     X2_norm = X2 / sigma
@@ -228,7 +266,9 @@ def _compute_rq_chunk(X1_chunk, X2, sigma, alpha):
     return (1 + 0.5 * sq_dist / alpha) ** (-alpha)
 
 
-def _compute_matern_chunk(X1_chunk, X2, sigma, alpha):
+def _compute_matern_chunk(
+    X1_chunk: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: Optional[float]
+) -> np.ndarray:
     """Matérn kernel for a chunk of X1"""
     X1_norm = X1_chunk / sigma
     X2_norm = X2 / sigma
@@ -266,8 +306,13 @@ def _compute_matern_chunk(X1_chunk, X2, sigma, alpha):
 
 
 def _parallel_kernel_computation(
-    X1, X2, sigma, kernel_type, alpha=None, use_cache=True
-):
+    X1: np.ndarray,
+    X2: np.ndarray,
+    sigma: np.ndarray,
+    kernel_type: str,
+    alpha: Optional[float] = None,
+    use_cache: bool = True,
+) -> np.ndarray:
     """Parallelized kernel computation with improved error handling"""
     n1 = X1.shape[0]  # Only use n1, ignore n2
     chunk_size = PARALLEL_SETTINGS["chunk_size"]
@@ -339,7 +384,13 @@ def _parallel_kernel_computation(
     return result
 
 
-def _cupy_kernel(X1, X2, sigma, kernel_type, alpha=None):
+def _cupy_kernel(
+    X1: np.ndarray,
+    X2: np.ndarray,
+    sigma: np.ndarray,
+    kernel_type: str,
+    alpha: Optional[float] = None,
+) -> np.ndarray:
     """CuPy kernel computation with improved error handling"""
     if not CUPY_AVAILABLE:
         raise RuntimeError("GPU acceleration not available. Install cupy.")
@@ -392,26 +443,29 @@ def _cupy_kernel(X1, X2, sigma, kernel_type, alpha=None):
         raise RuntimeError(f"GPU computation failed: {e}")
 
 
-def RBF(X1, X2, sigma, use_cache=True):
+def RBF(
+    X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray, use_cache: bool = True
+) -> np.ndarray:
     """
     Radial Basis Function kernel with optional parallel processing
 
     Parameters:
     -----------
-    X1 : np.ndarray, shape (n1, d)
-        First set of points
-    X2 : np.ndarray, shape (n2, d)
-        Second set of points
-    sigma : np.ndarray, shape (d,)
-        Length scales for each dimension
+    X1 : np.ndarray
+        First set of points (n1, d)
+    X2 : np.ndarray
+        Second set of points (n2, d)
+    sigma : np.ndarray
+        Length scales for each dimension (d,)
     use_cache : bool
         Whether to use caching
 
     Returns:
     --------
-    K : np.ndarray, shape (n1, n2)
-        Kernel matrix
+    K : np.ndarray
+        Kernel matrix (n1, n2)
     """
+    # Ensure sigma is a numpy array
     sigma = np.asarray(sigma)
     n1, n2 = X1.shape[0], X2.shape[0]
 
@@ -466,18 +520,24 @@ def RBF(X1, X2, sigma, use_cache=True):
     return result
 
 
-def RQ(X1, X2, sigma, alpha, use_cache=True):
+def RQ(
+    X1: np.ndarray,
+    X2: np.ndarray,
+    sigma: np.ndarray,
+    alpha: float,
+    use_cache: bool = True,
+) -> np.ndarray:
     """
     Rational Quadratic kernel with optional parallel processing
 
     Parameters:
     -----------
-    X1 : np.ndarray, shape (n1, d)
-        First set of points
-    X2 : np.ndarray, shape (n2, d)
-        Second set of points
-    sigma : np.ndarray, shape (d,)
-        Length scales for each dimension
+    X1 : np.ndarray
+        First set of points (n1, d)
+    X2 : np.ndarray
+        Second set of points (n2, d)
+    sigma : np.ndarray
+        Length scales for each dimension (d,)
     alpha : float
         Shape parameter
     use_cache : bool
@@ -485,8 +545,8 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
 
     Returns:
     --------
-    K : np.ndarray, shape (n1, n2)
-        Kernel matrix
+    K : np.ndarray
+        Kernel matrix (n1, n2)
     """
     # Ensure sigma is a numpy array
     sigma = np.asarray(sigma)
@@ -494,13 +554,13 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
 
     if PARALLEL_SETTINGS["use_gpu"]:
         try:
-            return _cupy_kernel(X1, X2, sigma, "RQ", alpha)
+            return _cupy_kernel(X1, X2, sigma, "RQ", alpha=alpha)
         except Exception as e:
             warnings.warn(f"GPU computation failed, falling back to CPU: {e}")
 
     if _should_use_parallel(n1, n2):
         return _parallel_kernel_computation(
-            X1, X2, sigma, "RQ", alpha, use_cache=use_cache
+            X1, X2, sigma, "RQ", alpha=alpha, use_cache=use_cache
         )
 
     # Sequential implementation
@@ -545,27 +605,33 @@ def RQ(X1, X2, sigma, alpha, use_cache=True):
     return result
 
 
-def MATERN(X1, X2, sigma, alpha, use_cache=True):
+def MATERN(
+    X1: np.ndarray,
+    X2: np.ndarray,
+    sigma: np.ndarray,
+    alpha: float,
+    use_cache: bool = True,
+) -> np.ndarray:
     """
     Matérn kernel with optional parallel processing
 
     Parameters:
     -----------
-    X1 : np.ndarray, shape (n1, d)
-        First set of points
-    X2 : np.ndarray, shape (n2, d)
-        Second set of points
-    sigma : np.ndarray, shape (d,)
-        Length scales for each dimension
+    X1 : np.ndarray
+        First set of points (n1, d)
+    X2 : np.ndarray
+        Second set of points (n2, d)
+    sigma : np.ndarray
+        Length scales for each dimension (d,)
     alpha : float
-        Smoothness parameter (0.5, 1.5, 2.5 are most common)
+        Smoothness parameter
     use_cache : bool
         Whether to use caching
 
     Returns:
     --------
-    K : np.ndarray, shape (n1, n2)
-        Kernel matrix
+    K : np.ndarray
+        Kernel matrix (n1, n2)
     """
     # Ensure sigma is a numpy array
     sigma = np.asarray(sigma)
@@ -652,12 +718,12 @@ def MATERN(X1, X2, sigma, alpha, use_cache=True):
 
 
 def configure_parallel_settings(
-    use_parallel=False,
-    n_jobs=None,
-    chunk_size=1000,
-    use_gpu=False,
-    min_size_for_parallel=500,
-):
+    use_parallel: bool = False,
+    n_jobs: Optional[int] = None,
+    chunk_size: int = 1000,
+    use_gpu: bool = False,
+    min_size_for_parallel: int = 500,
+) -> None:
     """
     Configure config for kernel computations
 
@@ -699,7 +765,7 @@ def configure_parallel_settings(
             PARALLEL_SETTINGS["use_gpu"] = False
 
 
-def get_parallel_info():
+def get_parallel_info() -> Dict[str, Any]:
     """Get parallel processing capabilities"""
     info = {
         "parallel_available": PARALLEL_SETTINGS["use_parallel"],
@@ -718,7 +784,9 @@ def get_parallel_info():
     return info
 
 
-def get_kernel(config, sigma, use_cache=True, cache_size=100):
+def get_kernel(
+    config: Any, sigma: np.ndarray, use_cache: bool = True, cache_size: int = 100
+) -> Any:
     """
     Get kernel function based on config with optional caching and parallel processing
 
@@ -760,9 +828,9 @@ def get_kernel(config, sigma, use_cache=True, cache_size=100):
     return kernel_functions[kernel_type]
 
 
-def get_cache_stats():
+def get_cache_stats() -> Dict[str, Union[int, float]]:
     return _kernel_cache.get_stats()
 
 
-def clear_kernel_cache():
+def clear_kernel_cache() -> None:
     _kernel_cache.clear()

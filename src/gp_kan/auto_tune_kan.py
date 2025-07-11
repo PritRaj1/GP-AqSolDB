@@ -2,7 +2,7 @@ import os
 import pickle
 import warnings
 from configparser import ConfigParser
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -31,7 +31,7 @@ class GPKANAutoTuner:
         max_hidden_size: int = 10,
         num_epochs: int = 50,
         pretrain_iters: int = 10,
-    ):
+    ) -> None:
         """
         Initialize the GP-KAN Auto Tuner
 
@@ -86,7 +86,7 @@ class GPKANAutoTuner:
 
         self._load_device_settings()
 
-    def _load_device_settings(self):
+    def _load_device_settings(self) -> None:
         try:
             if "DEVICE" in self.config:
                 device_section = self.config["DEVICE"]
@@ -110,7 +110,7 @@ class GPKANAutoTuner:
         except Exception as e:
             print(f"Warning: Could not load device settings: {e}")
 
-    def _create_default_config(self):
+    def _create_default_config(self) -> None:
         self.config["NETWORK"] = {
             "input_size": str(self.n_features),
             "output_size": "1",
@@ -263,7 +263,7 @@ class GPKANAutoTuner:
 
     def _cross_validate_gpkan(
         self, config: ConfigParser, hidden_sizes: List[int], n_splits: int = 5
-    ):
+    ) -> Dict[str, List[float]]:
         """
         Perform cross-validation for GP-KAN with given hyperparameters
 
@@ -335,7 +335,9 @@ class GPKANAutoTuner:
 
         return {"mse": mse_scores, "bic": bic_scores, "r2": r2_scores}
 
-    def optimize(self, n_trials: int = 100, timeout: Optional[int] = None):
+    def optimize(
+        self, n_trials: int = 100, timeout: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Run hyperparameter optimization
 
@@ -392,7 +394,7 @@ class GPKANAutoTuner:
         self._save_best_parameters(best_params)
         return best_params
 
-    def _save_best_parameters(self, best_params: dict):
+    def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
 
         hidden_sizes = []
         for i in range(best_params.get("num_hidden_layers", 0)):
@@ -489,7 +491,7 @@ class GPKANAutoTuner:
         print(f"Pretrain iterations: {self.pretrain_iters}")
         print(f"Num epochs: {self.num_epochs}")
 
-    def load_optimized_parameters(self):
+    def load_optimized_parameters(self) -> Tuple[ConfigParser, List[int]]:
         config = ConfigParser()
         config.read(self.config_path)
 
@@ -502,7 +504,7 @@ class GPKANAutoTuner:
         return config, params_data["hidden_sizes"]
 
 
-def load_gpkan_params_from_file(file_path: str) -> dict:
+def load_gpkan_params_from_file(file_path: str) -> Dict[str, Any]:
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
             return pickle.load(f)

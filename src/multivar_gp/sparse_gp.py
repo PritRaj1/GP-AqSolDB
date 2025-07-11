@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional, Tuple, Union
+
 import numpy as np
 from scipy import linalg
 
@@ -13,7 +15,7 @@ class SparseGP:
     to O(NM²) where M << N.
     """
 
-    def __init__(self, config, sigma):
+    def __init__(self, config: Any, sigma: np.ndarray) -> None:
         self.config = config
         self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)
         cache_size = config.getint("KERNEL", "cache_size", fallback=100)
@@ -24,29 +26,33 @@ class SparseGP:
         )
         self.noise_var = config.getfloat("KERNEL", "lmbda")
 
-        self.X_train = None
-        self.y_train = None
+        self.X_train: Optional[np.ndarray] = None
+        self.y_train: Optional[np.ndarray] = None
 
         # Sparse GP variables
-        self.Z = None  # Inducing points
-        self.LA = None  # Cholesky factor for sparse GP
-        self.v = None  # Solution vector for sparse GP
-        self.Lambda = None  # Diagonal correction term
-        self.Kmm = None  # Kernel matrix between inducing points
-        self.Kmm_inv = None  # Inverse of Kmm
-        self.Knm = None  # Kernel matrix between training and inducing points
-        self.Kmn = None  # Transpose of Knm
+        self.Z: Optional[np.ndarray] = None  # Inducing points
+        self.LA: Optional[np.ndarray] = None  # Cholesky factor for sparse GP
+        self.v: Optional[np.ndarray] = None  # Solution vector for sparse GP
+        self.Lambda: Optional[np.ndarray] = None  # Diagonal correction term
+        self.Kmm: Optional[np.ndarray] = None  # Kernel matrix between inducing points
+        self.Kmm_inv: Optional[np.ndarray] = None  # Inverse of Kmm
+        self.Knm: Optional[np.ndarray] = (
+            None  # Kernel matrix between training and inducing points
+        )
+        self.Kmn: Optional[np.ndarray] = None  # Transpose of Knm
 
         self.is_fitted = False
 
-    def _recast_2D(self, X):
+    def _recast_2D(self, X: np.ndarray) -> np.ndarray:
         """Ensure X is 2D array for vectorized kernels"""
         X = np.asarray(X)
         if X.ndim == 1:
             X = X.reshape(-1, 1)
         return X
 
-    def _select_inducing_points(self, X, method="random"):
+    def _select_inducing_points(
+        self, X: np.ndarray, method: str = "random"
+    ) -> np.ndarray:
         """
         Select inducing points from training data.
 
@@ -79,7 +85,9 @@ class SparseGP:
         else:
             raise ValueError(f"Unknown inducing point selection method: {method}")
 
-    def fit(self, X, y, inducing_method="random"):
+    def fit(
+        self, X: np.ndarray, y: np.ndarray, inducing_method: str = "random"
+    ) -> "SparseGP":
         """
         Fit using FITC approximation.
 
@@ -132,7 +140,9 @@ class SparseGP:
         self.is_fitted = True
         return self
 
-    def predict(self, X_test, return_std=False):
+    def predict(
+        self, X_test: np.ndarray, return_std: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         Predict using the fitted sparse GP model.
 
@@ -172,7 +182,7 @@ class SparseGP:
 
         return mean_pred
 
-    def get_sparse_info(self):
+    def get_sparse_info(self) -> Optional[Dict[str, Any]]:
         if self.is_fitted:
             return {
                 "num_inducing": self.Z.shape[0],
@@ -183,12 +193,12 @@ class SparseGP:
         else:
             return None
 
-    def get_cache_stats(self):
+    def get_cache_stats(self) -> Optional[Dict[str, Union[int, float]]]:
         if self.use_cache:
             return get_cache_stats()
         else:
             return None
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         if self.use_cache:
             clear_kernel_cache()

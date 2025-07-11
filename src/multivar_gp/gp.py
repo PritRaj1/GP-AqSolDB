@@ -1,9 +1,14 @@
+from typing import Any, Dict, Optional, Tuple, Union
+
 import numpy as np
+
+from src.multivar_gp.dense_gp import DenseGP
+from src.multivar_gp.sparse_gp import SparseGP
 
 
 class GP:
 
-    def __init__(self, config, sigma):
+    def __init__(self, config: Any, sigma: np.ndarray) -> None:
 
         self.config = config
         self.sigma = np.asarray(sigma)
@@ -12,24 +17,20 @@ class GP:
 
         # Only import when needed
         if self.use_sparse:
-            from src.multivar_gp.sparse_gp import SparseGP
-
             self.gp_impl = SparseGP(config, sigma)
             self.model_type = "sparse"
         else:
-            from src.multivar_gp.dense_gp import DenseGP
-
             self.gp_impl = DenseGP(config, sigma)
             self.model_type = "dense"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"GP(sparse: {self.use_sparse}), "
             f"kernel: {self.config.get('KERNEL', 'type')}, "
             f"gpu: {self.config.get('PARALLEL', 'use_gpu')}"
         )
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "GP":
         if self.use_sparse:
             inducing_method = self.config.get(
                 "SPARSE", "inducing_method", fallback="random"
@@ -40,19 +41,23 @@ class GP:
 
         return self
 
-    def predict(self, X_test, return_std=False):
+    def predict(
+        self, X_test: np.ndarray, return_std: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         return self.gp_impl.predict(X_test, return_std=return_std)
 
-    def eval_fit(self, y_pred, y_true):
+    def eval_fit(
+        self, y_pred: np.ndarray, y_true: np.ndarray
+    ) -> Tuple[float, float, float]:
         return self.gp_impl.eval_fit(y_pred, y_true)
 
-    def get_cache_stats(self):
+    def get_cache_stats(self) -> Optional[Dict[str, Union[int, float]]]:
         return self.gp_impl.get_cache_stats()
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         return self.gp_impl.clear_cache()
 
-    def get_model_info(self):
+    def get_model_info(self) -> Dict[str, Any]:
         info = {"model_type": self.model_type, "use_sparse": self.use_sparse}
 
         if self.use_sparse:
@@ -65,7 +70,7 @@ class GP:
 
         return info
 
-    def get_model_complexity(self):
+    def get_model_complexity(self) -> int:
         if self.use_sparse:
             num_inducing = self.config.getint("SPARSE", "num_inducing", fallback=20)
             n_params = len(self.sigma) + 1  # sigmas + lambda

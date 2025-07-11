@@ -2,6 +2,7 @@ import os
 import pickle
 import warnings
 from configparser import ConfigParser
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import optuna
@@ -17,17 +18,17 @@ warnings.filterwarnings("ignore")
 class GPAutoTuner:
     def __init__(
         self,
-        X_train,
-        y_train,
-        config_path="../config/GP.ini",
-        sigma_save_path="../config/optimized_sigmas.pkl",
-        force_dense=False,
-        metric="BIC",
-        n_jobs=2,
-        use_gpu=False,
-        chunk_size=500,
-        min_size_for_parallel=1000,
-    ):
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        config_path: str = "../config/GP.ini",
+        sigma_save_path: str = "../config/optimized_sigmas.pkl",
+        force_dense: bool = False,
+        metric: str = "BIC",
+        n_jobs: int = 2,
+        use_gpu: bool = False,
+        chunk_size: int = 500,
+        min_size_for_parallel: int = 1000,
+    ) -> None:
         """
         Initialize the GP Auto Tuner
 
@@ -79,7 +80,7 @@ class GPAutoTuner:
 
         self._load_parallel_settings()
 
-    def _load_parallel_settings(self):
+    def _load_parallel_settings(self) -> None:
         try:
             load_parallel_conf(self.config)
             parallel_info = get_parallel_info()
@@ -101,7 +102,7 @@ class GPAutoTuner:
         except Exception as e:
             print(f"Warning: Could not load parallel settings: {e}")
 
-    def _create_default_config(self):
+    def _create_default_config(self) -> None:
         self.config["KERNEL"] = {
             "type": "RBF",
             "lmbda": "0.1",
@@ -122,7 +123,7 @@ class GPAutoTuner:
             "min_size_for_parallel": str(self.min_size_for_parallel),
         }
 
-    def calculate_bic(self, mse, n_params, n_samples):
+    def calculate_bic(self, mse: float, n_params: int, n_samples: int) -> float:
         """
         Calculate Bayesian Information Criterion (BIC)
 
@@ -133,7 +134,7 @@ class GPAutoTuner:
         """
         return n_samples * np.log(mse) + n_params * np.log(n_samples)
 
-    def _objective(self, trial):
+    def _objective(self, trial: optuna.Trial) -> float:
         """
         Objective function for Optuna optimization
 
@@ -214,7 +215,9 @@ class GPAutoTuner:
             print(f"Trial failed: {e}")
             return float("inf")  # Return large value for failed trials
 
-    def _cross_validate_gp(self, config, sigmas, n_splits=5):
+    def _cross_validate_gp(
+        self, config: ConfigParser, sigmas: List[float], n_splits: int = 5
+    ) -> Dict[str, List[float]]:
         """
         Perform cross-validation for GP with given hyperparameters
 
@@ -259,7 +262,9 @@ class GPAutoTuner:
 
         return {"mse": mse_scores, "bic": bic_scores, "r2": r2_scores}
 
-    def optimize(self, n_trials=100, timeout=None):
+    def optimize(
+        self, n_trials: int = 100, timeout: Optional[int] = None
+    ) -> Dict[str, Any]:
         print(f"Starting GP hyperparameter optimization with {n_trials} trials...")
         print(f"Features: {self.n_features}")
         print(f"Samples: {self.n_samples}")
@@ -317,7 +322,7 @@ class GPAutoTuner:
         self._save_best_parameters(best_params)
         return best_params
 
-    def _save_best_parameters(self, best_params):
+    def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
 
         if self.force_dense:
             use_sparse = "false"
@@ -381,7 +386,7 @@ class GPAutoTuner:
         if preserved_sections:
             print(f"Preserved sections: {preserved_sections}")
 
-    def load_optimized_parameters(self):
+    def load_optimized_parameters(self) -> Tuple[ConfigParser, np.ndarray]:
         config = ConfigParser()
         config.read(self.config_path)
 
@@ -394,7 +399,7 @@ class GPAutoTuner:
         return config, np.array(sigmas)
 
 
-def load_sigmas_from_file(file_path):
+def load_sigmas_from_file(file_path: str) -> np.ndarray:
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
             return np.array(pickle.load(f))

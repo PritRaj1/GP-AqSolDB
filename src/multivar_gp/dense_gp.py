@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional, Tuple, Union
+
 import numpy as np
 from scipy import linalg, stats
 
@@ -5,7 +7,7 @@ from src.multivar_gp.kernels import clear_kernel_cache, get_cache_stats, get_ker
 
 
 class DenseGP:
-    def __init__(self, config, sigma):
+    def __init__(self, config: Any, sigma: np.ndarray) -> None:
         self.config = config
         self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)
         cache_size = config.getint("KERNEL", "cache_size", fallback=100)
@@ -13,20 +15,20 @@ class DenseGP:
         self.kernel = get_kernel(
             config, sigma, use_cache=self.use_cache, cache_size=cache_size
         )
-        self.L = None  # Cholesky factor
-        self.alpha = None  # Solution vector
-        self.X_train = None
-        self.y_train = None
+        self.L: Optional[np.ndarray] = None  # Cholesky factor
+        self.alpha: Optional[np.ndarray] = None  # Solution vector
+        self.X_train: Optional[np.ndarray] = None
+        self.y_train: Optional[np.ndarray] = None
         self.noise_var = config.getfloat("KERNEL", "lmbda")
 
-    def _recast_2D(self, X):
+    def _recast_2D(self, X: np.ndarray) -> np.ndarray:
         """Ensure X is 2D array for vectorized kernels"""
         X = np.asarray(X)
         if X.ndim == 1:
             X = X.reshape(-1, 1)
         return X
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "DenseGP":
         """
         Fit the GP model to the training data
 
@@ -69,8 +71,11 @@ class DenseGP:
 
         # Forward substitution to solve L @ alpha = y
         self.alpha = linalg.solve_triangular(self.L, self.y_train, lower=True)
+        return self
 
-    def predict(self, X_test, return_std=False):
+    def predict(
+        self, X_test: np.ndarray, return_std: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         Predict using the fitted GP model
 
@@ -104,16 +109,18 @@ class DenseGP:
 
         return mean_pred
 
-    def eval_fit(self, y_pred, y_true):
+    def eval_fit(
+        self, y_pred: np.ndarray, y_true: np.ndarray
+    ) -> Tuple[float, float, float]:
         slope, intercept, r_value, p_value, std_err = stats.linregress(y_true, y_pred)
         return r_value, p_value, std_err
 
-    def get_cache_stats(self):
+    def get_cache_stats(self) -> Optional[Dict[str, Union[int, float]]]:
         if self.use_cache:
             return get_cache_stats()
         else:
             return None
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         if self.use_cache:
             clear_kernel_cache()

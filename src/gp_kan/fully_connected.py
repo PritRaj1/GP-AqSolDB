@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -11,7 +11,7 @@ from src.gp_kan.invariant_acts import NormaliseGaussian
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
 
-def load_kan_conf(config: ConfigParser) -> dict:
+def load_kan_conf(config: ConfigParser) -> Dict[str, Union[int, float]]:
     if "NETWORK" not in config:
         raise ValueError("NETWORK section not found in config")
     if "GP" not in config:
@@ -81,10 +81,12 @@ def create_default_conf() -> ConfigParser:
 class GP_KAN:
     """Gaussian Process Kolmogorov-Arnold Network."""
 
-    def __init__(self, config: ConfigParser, hidden_sizes: List[int] = None):
+    def __init__(
+        self, config: ConfigParser, hidden_sizes: Optional[List[int]] = None
+    ) -> None:
         self.config = config
-        self.layers = []
-        self.normalizers = []
+        self.layers: List[DenseGPLayer] = []
+        self.normalizers: List[Optional[NormaliseGaussian]] = []
 
         self.device_config = get_device_config(config)
         setup_jax_device(config)
@@ -97,7 +99,7 @@ class GP_KAN:
 
         self._build_network()
 
-    def _build_network(self):
+    def _build_network(self) -> None:
         layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
 
         for i in range(len(layer_sizes) - 1):
@@ -136,7 +138,7 @@ class GP_KAN:
             params[f"layer_{i}"] = layer.get_params()
         return params
 
-    def set_params(self, params: Dict[str, Any]):
+    def set_params(self, params: Dict[str, Any]) -> None:
         for i, layer in enumerate(self.layers):
             if f"layer_{i}" in params:
                 layer.set_params(params[f"layer_{i}"])
@@ -164,14 +166,14 @@ class GP_KAN:
         self,
         X_train: jax.Array,
         y_train: jax.Array,
-        X_val: jax.Array = None,
-        y_val: jax.Array = None,
-        learning_rate: float = None,
-        num_epochs: int = None,
-        batch_size: int = None,
+        X_val: Optional[jax.Array] = None,
+        y_val: Optional[jax.Array] = None,
+        learning_rate: Optional[float] = None,
+        num_epochs: Optional[int] = None,
+        batch_size: Optional[int] = None,
         patience: int = 10,
-        pretrain_iters: int = None,
-    ):
+        pretrain_iters: Optional[int] = None,
+    ) -> None:
         """
         Train the GP-KAN network using gradient descent.
 
@@ -227,7 +229,9 @@ class GP_KAN:
 
         key = jax.random.PRNGKey(self.seed)
 
-        def loss_fn(params, X_batch, y_batch):
+        def loss_fn(
+            params: Dict[str, Any], X_batch: jax.Array, y_batch: jax.Array
+        ) -> jax.Array:
             self.set_params(params)
 
             X_batch_mean = X_batch
@@ -294,10 +298,10 @@ class GP_KAN:
 
     def _pretrain_gp_hyperparameters(
         self, X_train: jax.Array, y_train: jax.Array, num_iters: int
-    ):
+    ) -> None:
         """Pretrain GP hyperparameters by maximizing ll of inducing points."""
 
-        def pretrain_loss_fn(params):
+        def pretrain_loss_fn(params: Dict[str, Any]) -> jax.Array:
             self.set_params(params)
             return -self.loglikelihood()
 
@@ -322,14 +326,14 @@ class GP_KAN:
 
         self.set_params(params)
 
-    def save_fig(self, path: str, max_neurons_per_layer: int = 3):
+    def save_fig(self, path: str, max_neurons_per_layer: int = 3) -> None:
         """Save figures for each layer separately."""
 
         for layer_idx, layer in enumerate(self.layers):
             layer_path = path.replace(".png", f"_layer_{layer_idx}.png")
             layer.save_fig(layer_path, max_neurons_shown=max_neurons_per_layer)
 
-    def to_device(self, device: str):
+    def to_device(self, device: str) -> None:
         """Move the entire network to a specific device."""
         if device == "gpu":
             for layer in self.layers:
