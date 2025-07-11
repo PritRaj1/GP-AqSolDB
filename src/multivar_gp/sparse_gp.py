@@ -88,26 +88,8 @@ class SparseGP:
     def fit(
         self, X: np.ndarray, y: np.ndarray, inducing_method: str = "random"
     ) -> "SparseGP":
-        """
-        Fit using FITC approximation.
-
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_features)
-            Training data
-        y : array-like, shape (n_samples,)
-            Training targets
-        inducing_method : str, optional
-            Method for selecting inducing points: 'random' or 'uniform'
-
-        Returns
-        -------
-        self : object
-            Returns self.
-        """
         self.X_train = self._recast_2D(X)
         self.y_train = y
-        # N = self.X_train.shape[0]  # Unused variable
 
         self.Z = self._select_inducing_points(self.X_train, method=inducing_method)
         M = self.Z.shape[0]
@@ -118,52 +100,40 @@ class SparseGP:
 
         diag_Knn = np.diag(self.kernel(self.X_train, self.X_train))
 
-        # Qnn_diag = diag(Knm @ Kmm^{-1} @ Kmn)
         self.Kmm_inv = np.linalg.inv(self.Kmm)
-        Qnn_diag = np.einsum("ij,jk,ki->i", self.Knm, self.Kmm_inv, self.Kmn)
-        self.Lambda = diag_Knn - Qnn_diag + self.noise_var
+        if self.Knm is not None and self.Kmm_inv is not None and self.Kmn is not None:
+            Qnn_diag = np.einsum("ij,jk,ki->i", self.Knm, self.Kmm_inv, self.Kmn)
+            self.Lambda = diag_Knn - Qnn_diag + self.noise_var
 
-        # Compute A = Kmm + Kmn @ diag(1/Lambda) @ Knm
-        A = self.Kmm + self.Kmn @ (self.Knm / self.Lambda[:, None])
+            # Compute A = Kmm + Kmn @ diag(1/Lambda) @ Knm
+            A = self.Kmm + self.Kmn @ (self.Knm / self.Lambda[:, None])
 
-        try:
-            self.LA = linalg.cholesky(A, lower=True)
-        except linalg.LinAlgError:
-            A += 1e-8 * np.eye(M)
-            self.LA = linalg.cholesky(A, lower=True)
+            try:
+                self.LA = linalg.cholesky(A, lower=True)
+            except linalg.LinAlgError:
+                A += 1e-8 * np.eye(M)
+                self.LA = linalg.cholesky(A, lower=True)
 
-        # b = Kmn @ (y / Lambda)
-        b = self.Kmn @ (self.y_train / self.Lambda)
+            # b = Kmn @ (y / Lambda)
+            if self.y_train is not None:
+                b = self.Kmn @ (self.y_train / self.Lambda)
 
-        # Solve LA @ v = b
-        self.v = linalg.solve_triangular(self.LA, b, lower=True)
+                # Solve LA @ v = b
+                if self.LA is not None:
+                    self.v = linalg.solve_triangular(self.LA, b, lower=True)
         self.is_fitted = True
         return self
 
     def predict(
         self, X_test: np.ndarray, return_std: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """
-        Predict using the fitted sparse GP model.
-
-        Parameters
-        ----------
-        X_test : array-like, shape (n_test_samples, n_features)
-            Test points
-        return_std : bool, optional
-            If True, return standard deviation along with mean
-
-        Returns
-        -------
-        mean_pred : array-like, shape (n_test_samples,)
-            Predicted mean
-        std_pred : array-like, shape (n_test_samples,), optional
-            Predicted standard deviation (if return_std=True)
-        """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before making predictions")
 
         X_test = self._recast_2D(X_test)
+
+        if self.Z is None or self.LA is None or self.v is None or self.Kmm_inv is None:
+            raise ValueError("Model not properly fitted")
 
         Kms = self.kernel(self.Z, X_test)
         Ksm = Kms.T
@@ -172,18 +142,16 @@ class SparseGP:
         tmp = linalg.solve_triangular(self.LA, Kms, lower=True)
         mean_pred = Ksm @ linalg.solve_triangular(self.LA.T, self.v, lower=False)
 
-        # Predictive variance: Kss - Qss + sum(tmp^2, axis=0) + noise_var
         if return_std:
             Qss_diag = np.einsum("ij,jk,ki->i", Ksm, self.Kmm_inv, Kms)
             var_pred = Kss_diag - Qss_diag + np.sum(tmp**2, axis=0) + self.noise_var
             std_pred = np.sqrt(np.maximum(var_pred, 0))
-
             return mean_pred, std_pred
 
         return mean_pred
 
     def get_sparse_info(self) -> Optional[Dict[str, Any]]:
-        if self.is_fitted:
+        if self.is_fitted and self.Z is not None and self.X_train is not None:
             return {
                 "num_inducing": self.Z.shape[0],
                 "num_training": self.X_train.shape[0],

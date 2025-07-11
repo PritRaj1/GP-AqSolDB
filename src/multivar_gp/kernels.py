@@ -1,4 +1,5 @@
 import hashlib
+import math
 import multiprocessing as mp
 import warnings
 from concurrent.futures import ProcessPoolExecutor
@@ -139,8 +140,13 @@ class KernelCache:
     ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """Get cached intermediate computations"""
         key = self._hash_intermediate(X1, X2, sigma)
-        if key in self.cache:
-            return self.cache[key]
+        value = self.cache.get(key, None)
+        if (
+            isinstance(value, tuple)
+            and len(value) == 5
+            and all(isinstance(v, np.ndarray) for v in value)
+        ):
+            return value  # type: ignore
         return None
 
     def set(
@@ -148,7 +154,7 @@ class KernelCache:
         X1: np.ndarray,
         X2: np.ndarray,
         sigma: np.ndarray,
-        alpha: float,
+        alpha: Optional[float],
         kernel_type: str,
         result: np.ndarray,
     ) -> None:
@@ -176,7 +182,12 @@ class KernelCache:
             oldest_key = next(iter(self.cache))
             del self.cache[oldest_key]
 
-        self.cache[key] = result
+        if (
+            isinstance(result, tuple)
+            and len(result) == 5
+            and all(isinstance(v, np.ndarray) for v in result)
+        ):
+            self.cache[key] = result
 
     def get_stats(self) -> Dict[str, Union[int, float]]:
         total = self.hit_count + self.miss_count
@@ -200,8 +211,9 @@ _kernel_cache = KernelCache()
 
 def _get_n_jobs() -> int:
     """Number of jobs for parallel processing"""
-    if PARALLEL_SETTINGS["n_jobs"] is not None:
-        return PARALLEL_SETTINGS["n_jobs"]
+    n_jobs = PARALLEL_SETTINGS["n_jobs"]
+    if n_jobs is not None:
+        return int(n_jobs)
     return min(mp.cpu_count(), 8)  # Capped at 8 to avoid overhead
 
 
@@ -210,12 +222,14 @@ def _should_use_parallel(n1: int, n2: int) -> bool:
     if not PARALLEL_SETTINGS["use_parallel"]:
         return False
     min_size = PARALLEL_SETTINGS["min_size_for_parallel"]
-    return n1 * n2 >= min_size * min_size
+    if min_size is None:
+        min_size = 500
+    return n1 * n2 >= int(min_size) * int(min_size)
 
 
 def _chunk_indices(n: int, chunk_size: int) -> List[Tuple[int, int]]:
     """List of chunk indices"""
-    return [(i, min(i + chunk_size, n)) for i in range(0, n, chunk_size)]
+    return [(i, min(i + int(chunk_size), n)) for i in range(0, n, int(chunk_size))]
 
 
 def _compute_kernel_chunk(
@@ -254,6 +268,8 @@ def _compute_rq_chunk(
     X1_chunk: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: Optional[float]
 ) -> np.ndarray:
     """RQ kernel for a chunk of X1"""
+    if alpha is None:
+        raise ValueError("Alpha parameter must not be None for RQ kernel.")
     X1_norm = X1_chunk / sigma
     X2_norm = X2 / sigma
 
@@ -270,6 +286,8 @@ def _compute_matern_chunk(
     X1_chunk: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: Optional[float]
 ) -> np.ndarray:
     """Matérn kernel for a chunk of X1"""
+    if alpha is None:
+        raise ValueError("Alpha parameter must not be None for MATERN kernel.")
     X1_norm = X1_chunk / sigma
     X2_norm = X2 / sigma
 
@@ -295,11 +313,11 @@ def _compute_matern_chunk(
         sqrt5_dist = np.sqrt(5) * dist
         return (1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist)
 
-    # Genealize with scipy's modified Bessel function
+    # Generalize with scipy's modified Bessel function
     else:
         dist_safe = np.where(dist < 1e-10, 1e-10, dist)  # Avoid division by zero
         return (
-            (2 ** (1 - alpha) / np.math.gamma(alpha))
+            (2 ** (1 - alpha) / math.gamma(alpha))
             * (np.sqrt(2 * alpha) * dist_safe) ** alpha
             * kv(alpha, np.sqrt(2 * alpha) * dist_safe)
         )
@@ -315,7 +333,7 @@ def _parallel_kernel_computation(
 ) -> np.ndarray:
     """Parallelized kernel computation with improved error handling"""
     n1 = X1.shape[0]  # Only use n1, ignore n2
-    chunk_size = PARALLEL_SETTINGS["chunk_size"]
+    chunk_size = int(PARALLEL_SETTINGS["chunk_size"])
 
     # Check cache first
     if use_cache:
@@ -352,7 +370,7 @@ def _parallel_kernel_computation(
     else:
         try:
             # Use a more conservative approach for multiprocessing
-            with ProcessPoolExecutor(max_workers=min(n_jobs, 4)) as executor:
+            with ProcessPoolExecutor(max_workers=min(int(n_jobs), 4)) as executor:
                 # Add timeout to prevent hanging
                 result_chunks = list(
                     executor.map(_compute_kernel_chunk, chunks, timeout=300)
@@ -704,7 +722,7 @@ def MATERN(
     else:
         dist_safe = np.where(dist < 1e-10, 1e-10, dist)  # Avoid division by zero
         result = (
-            (2 ** (1 - alpha) / np.math.gamma(alpha))
+            (2 ** (1 - alpha) / math.gamma(alpha))
             * (np.sqrt(2 * alpha) * dist_safe) ** alpha
             * kv(alpha, np.sqrt(2 * alpha) * dist_safe)
         )
