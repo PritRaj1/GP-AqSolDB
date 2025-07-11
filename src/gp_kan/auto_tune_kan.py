@@ -317,9 +317,7 @@ class GPKANAutoTuner:
 
                 X_val_mean = X_val_fold.astype(np.float32)
                 X_val_var = np.zeros_like(X_val_mean)
-                X_val_dist = NormalDist(
-                    jnp.array(X_val_mean), jnp.array(X_val_var)
-                )  # type: ignore[call-arg]
+                X_val_dist = NormalDist(jnp.array(X_val_mean), jnp.array(X_val_var))
 
                 output_dist = network.forward(X_val_dist)
                 y_pred = np.array(output_dist.mean).flatten()

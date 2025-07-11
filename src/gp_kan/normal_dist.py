@@ -64,7 +64,7 @@ class NormalDist:
         """
         if var is None:
             var = 1e-6 * jnp.ones_like(mean)
-        return cls(mean, var)  # type: ignore[call-arg]
+        return cls(mean, var)
 
     def __add__(self, other: "NormalDist") -> "NormalDist":
         """
@@ -86,7 +86,7 @@ class NormalDist:
 
         mean = self.mean + other.mean
         var = self.var + other.var
-        return NormalDist(mean, var)  # type: ignore[call-arg]
+        return NormalDist(mean, var)
 
     def __repr__(self) -> str:
         return f"NormalDist(mean: {self.mean}, var: {self.var})"
@@ -137,16 +137,14 @@ class NormalDist:
         return jnp.sqrt(self.var)
 
     def to_numpy(self) -> "NormalDist":
-        return NormalDist(
-            jnp.array(self.mean), jnp.array(self.var)
-        )  # type: ignore[call-arg]
+        return NormalDist(jnp.array(self.mean), jnp.array(self.var))
 
     def to_device(self, device: str) -> "NormalDist":
         if device == "gpu":
             mean_gpu = jax.device_put(self.mean, jax.devices("gpu")[0])
             var_gpu = jax.device_put(self.var, jax.devices("gpu")[0])
-            return NormalDist(mean_gpu, var_gpu)  # type: ignore[call-arg]
+            return NormalDist(mean_gpu, var_gpu)
         else:
             mean_cpu = jax.device_put(self.mean, jax.devices("cpu")[0])
             var_cpu = jax.device_put(self.var, jax.devices("cpu")[0])
-            return NormalDist(mean_cpu, var_cpu)  # type: ignore[call-arg]
+            return NormalDist(mean_cpu, var_cpu)

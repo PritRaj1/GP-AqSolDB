@@ -287,7 +287,7 @@ class DenseGPLayer:
 
         out_var = jnp.maximum(out_var, 1e-6)  # Positive variance
 
-        return NormalDist(out_mean, out_var)  # type: ignore[call-arg]
+        return NormalDist(out_mean, out_var)
 
     def loglikelihood(self) -> jax.Array:
 
