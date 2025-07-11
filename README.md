@@ -35,7 +35,7 @@ make run-gp    # Run the standard GP
 
 ```bash
 make dev                    # Start development session
-tmux attach-session -t svebm_dev  # Attach to session
+tmux attach-session -t gp_dev  # Attach to session
 ```
 
 **Note**: [jax_dataclass](https://github.com/brentyi/jax_dataclasses) package is not type-safe.

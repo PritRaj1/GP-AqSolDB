@@ -55,12 +55,12 @@ test-file:
 	$(call conda_run,python -m pytest $(FILE) -v)
 
 dev:
-	@tmux kill-session -t gp_kan_dev 2>/dev/null || true
-	@tmux new-session -d -s gp_kan_dev -n main
-	@tmux send-keys -t gp_kan_dev:main "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME); else conda activate $(ENV_NAME); fi" Enter
-	@tmux new-window -t gp_kan_dev -n logs
-	@tmux send-keys -t gp_kan_dev:logs "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME) && tail -f logs/*.log; else conda activate $(ENV_NAME) && tail -f logs/*.log; fi" Enter
-	@echo "Dev session ready: tmux attach-session -t gp_kan_dev"
+	@tmux kill-session -t gp_dev 2>/dev/null || true
+	@tmux new-session -d -s gp_dev -n main
+	@tmux send-keys -t gp_dev:main "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME); else conda activate $(ENV_NAME); fi" Enter
+	@tmux new-window -t gp_dev -n logs
+	@tmux send-keys -t gp_dev:logs "if [ -f '$(CONDA_ACTIVATE)' ]; then . '$(CONDA_ACTIVATE)' && conda activate $(ENV_NAME) && tail -f logs/*.log; else conda activate $(ENV_NAME) && tail -f logs/*.log; fi" Enter
+	@echo "Dev session ready: tmux attach-session -t gp_dev"
 
 run-gp:
 	@mkdir -p logs
@@ -94,7 +94,7 @@ sessions:
 
 kill-sessions:
 	@echo "Killing tmux sessions..."
-	@tmux kill-session -t gp_kan_dev 2>/dev/null || echo "No dev session to kill"
+	@tmux kill-session -t gp_dev 2>/dev/null || echo "No dev session to kill"
 	@tmux kill-session -t gp_sol_gp 2>/dev/null || echo "No GP session to kill"
 	@tmux kill-session -t gp_sol_kan 2>/dev/null || echo "No KAN session to kill"
 	@echo "Sessions killed!"
