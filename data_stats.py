@@ -1,7 +1,5 @@
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
 
 df = pd.read_csv('data/solubility-dataset.csv')
 
@@ -41,14 +39,16 @@ print("\nFeature correlations (absolute > 0.8):")
 for i in range(len(feature_names)):
     for j in range(i+1, len(feature_names)):
         if abs(corr_matrix[i, j]) > 0.8:
-            print(f"  {feature_names[i]} <-> {feature_names[j]}: {corr_matrix[i, j]:.3f}")
+            print(f"  {feature_names[i]} <-> {feature_names[j]}: "
+                  f"{corr_matrix[i, j]:.3f}")
 
 print("\n=== OUTLIERS ===")
 for i, name in enumerate(feature_names):
     Q1 = np.percentile(X[:, i], 25)
     Q3 = np.percentile(X[:, i], 75)
     IQR = Q3 - Q1
-    outliers = np.sum((X[:, i] < Q1 - 1.5*IQR) | (X[:, i] > Q3 + 1.5*IQR))
+    outliers = np.sum((X[:, i] < Q1 - 1.5*IQR) |
+                      (X[:, i] > Q3 + 1.5*IQR))
     print(f"{name}: {outliers} outliers ({outliers/len(X)*100:.1f}%)")
 
 print("\n=== DATA QUALITY ===")
@@ -57,4 +57,4 @@ print(f"Missing values in target: {np.sum(np.isnan(y))}")
 print(f"Infinite values in features: {np.sum(np.isinf(X))}")
 print(f"Infinite values in target: {np.sum(np.isinf(y))}")
 
-#print(f"\nDuplicate feature vectors: {len(X) - len(np.unique(X, axis=0))}") 
+# print(f"\nDuplicate feature vectors: {len(X) - len(np.unique(X, axis=0))}")

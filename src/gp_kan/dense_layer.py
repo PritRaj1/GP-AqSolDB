@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
-SQRT_2PI: float = jnp.sqrt(2 * jnp.pi)
+SQRT_2PI = jnp.sqrt(2 * jnp.pi)
 
 
 def load_gp_config(config: ConfigParser) -> Dict[str, float]:
@@ -100,7 +100,7 @@ class DenseGPLayer:
         input_size: int,
         output_size: int,
         config: Optional[ConfigParser] = None,
-        key: Optional[jax.random.PRNGKey] = None,
+        key: Optional[jax.Array] = None,
     ) -> None:
         self.input_dim = input_size
         self.output_dim = output_size
@@ -134,7 +134,7 @@ class DenseGPLayer:
         h_key = jax.random.split(key, 1)[0]
 
         # Inducing points
-        _z_single_neuron = jnp.linspace(self.z_init_low, self.z_init_high, self.P)
+        _z_single_neuron = jnp.linspace(self.z_init_low, self.z_init_high, int(self.P))
         _z = (
             jnp.zeros((self.input_dim, self.output_dim, self.P))
             + _z_single_neuron[jnp.newaxis, jnp.newaxis, :]
@@ -144,7 +144,7 @@ class DenseGPLayer:
         # Fcn values @ inducing points
         self.h = jax.random.uniform(
             h_key,
-            (self.input_dim, self.output_dim, self.P),
+            (self.input_dim, self.output_dim, int(self.P)),
             minval=self.h_init_low,
             maxval=self.h_init_high,
         )
@@ -302,10 +302,10 @@ class DenseGPLayer:
             I, O, P = z.shape
 
             def covar_func(x1: jax.Array, x2: jax.Array) -> jax.Array:
+                s_b = jnp.broadcast_to(s.reshape(I, O, 1, 1), (I, O, P, P))
                 length_scale_b = jnp.broadcast_to(
                     length_scale.reshape(I, O, 1, 1), (I, O, P, P)
                 )
-                s_b = jnp.broadcast_to(s.reshape(I, O, 1, 1), (I, O, P, P))
                 return s_b**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * length_scale_b**2))
 
             K_hh = build_kernel_mat(z, z, covar_func)
@@ -341,7 +341,8 @@ class DenseGPLayer:
         z = self.get_z()
         h = self.h
 
-        return self._loglikelihood_core_jit(s, length_scale, jitter, z, h)
+        result = self._loglikelihood_core_jit(s, length_scale, jitter, z, h)
+        return jnp.asarray(result)
 
     def plot_neuron(
         self, axes: plt.Axes, I_idx: int, O_idx: int, num_pts: int = 100

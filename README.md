@@ -28,6 +28,18 @@ make test       # Run tests
 make run-gp    # Run the standard GP
 ```
 
+
+## Developing
+
+**Recommended**: Use the dev environment and tmux for the best experience:
+
+```bash
+make dev                    # Start development session
+tmux attach-session -t svebm_dev  # Attach to session
+```
+
+**Note**: [jax_dataclass](https://github.com/brentyi/jax_dataclasses) package is not type-safe.
+
 ## Data
 
 The [AqSolDB](https://doi.org/10.1038/s41597-019-0151-1) dataset in this repository comprises curated experimental solubility values, made openly accessible by the Autonomous Energy Materials Discovery research group.

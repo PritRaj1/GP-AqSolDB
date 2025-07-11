@@ -125,7 +125,7 @@ class KernelCache:
         sigma: np.ndarray,
         alpha: Optional[float] = None,
         kernel_type: str = "RBF",
-    ) -> Optional[np.ndarray]:
+    ) -> Optional[Union[np.ndarray, Tuple[np.ndarray, ...]]]:
         """Get cached result if available"""
         key = self._hash_inputs(X1, X2, sigma, alpha, kernel_type)
         if key in self.cache:
@@ -214,7 +214,8 @@ _kernel_cache = KernelCache()
 def _get_n_jobs() -> int:
     """Number of jobs for parallel processing"""
     n_jobs = PARALLEL_SETTINGS["n_jobs"]
-    if n_jobs is not None:
+    # Only cast to int if n_jobs is not None and not a bool
+    if n_jobs is not None and not isinstance(n_jobs, bool):
         return int(n_jobs)
     return min(mp.cpu_count(), 8)  # Capped at 8 to avoid overhead
 
@@ -335,7 +336,12 @@ def _parallel_kernel_computation(
 ) -> np.ndarray:
     """Parallelized kernel computation with improved error handling"""
     n1 = X1.shape[0]  # Only use n1, ignore n2
-    chunk_size = int(PARALLEL_SETTINGS["chunk_size"])
+    chunk_size_raw = PARALLEL_SETTINGS["chunk_size"]
+    chunk_size = (
+        int(chunk_size_raw)
+        if chunk_size_raw is not None and not isinstance(chunk_size_raw, bool)
+        else 1000
+    )
 
     # Check cache first
     if use_cache:
@@ -355,7 +361,9 @@ def _parallel_kernel_computation(
             cached_result = None
 
         if cached_result is not None:
-            return cached_result
+            if isinstance(cached_result, tuple):
+                return np.asarray(cached_result[0])
+            return np.asarray(cached_result)
 
     # Prepare and process chunk
     chunks = []
@@ -364,6 +372,9 @@ def _parallel_kernel_computation(
         chunks.append((X1_chunk, X2, sigma, kernel_type, alpha))
 
     n_jobs = _get_n_jobs()
+    n_jobs_int = (
+        int(n_jobs) if n_jobs is not None and not isinstance(n_jobs, bool) else 1
+    )
     result_chunks = []
 
     # If single chunk, no need for parallel processing
@@ -372,7 +383,6 @@ def _parallel_kernel_computation(
     else:
         try:
             # Use a more conservative approach for multiprocessing
-            n_jobs_int = int(n_jobs) if n_jobs is not None else 1
             with ProcessPoolExecutor(max_workers=min(n_jobs_int, 4)) as executor:
                 # Add timeout to prevent hanging
                 result_chunks = list(
@@ -457,7 +467,7 @@ def _cupy_kernel(
             raise ValueError(f"Unknown kernel type: {kernel_type}")
 
         # Back to CPU
-        return cp.asnumpy(result)
+        return np.asarray(cp.asnumpy(result))
 
     except Exception as e:
         # Clean up GPU memory if possible
@@ -507,7 +517,9 @@ def RBF(
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=None, kernel_type="RBF")
         if cached_result is not None:
-            return cached_result
+            if isinstance(cached_result, tuple):
+                return np.asarray(cached_result[0])
+            return np.asarray(cached_result)
 
     # Check for cached intermediate computations
     if use_cache:
@@ -592,7 +604,9 @@ def RQ(
     if use_cache:
         cached_result = _kernel_cache.get(X1, X2, sigma, alpha=alpha, kernel_type="RQ")
         if cached_result is not None:
-            return cached_result
+            if isinstance(cached_result, tuple):
+                return np.asarray(cached_result[0])
+            return np.asarray(cached_result)
 
     # Check for cached intermediate computations
     if use_cache:
@@ -679,7 +693,9 @@ def MATERN(
             X1, X2, sigma, alpha=alpha, kernel_type="MATERN"
         )
         if cached_result is not None:
-            return cached_result
+            if isinstance(cached_result, tuple):
+                return np.asarray(cached_result[0])
+            return np.asarray(cached_result)
 
     # Check for cached intermediate computations
     if use_cache:

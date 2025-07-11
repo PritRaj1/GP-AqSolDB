@@ -132,7 +132,7 @@ class GPAutoTuner:
 
         Lower BIC is better (penalizes complexity)
         """
-        return n_samples * np.log(mse) + n_params * np.log(n_samples)
+        return float(n_samples * np.log(mse) + n_params * np.log(n_samples))
 
     def _objective(self, trial: optuna.Trial) -> float:
         """
@@ -205,11 +205,11 @@ class GPAutoTuner:
             cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
 
             if self.metric == "BIC":
-                return -np.mean(cv_results["bic"])  # Negative because Optuna minimizes
+                return float(-np.mean(cv_results["bic"]))  # Negative for minimization
             elif self.metric == "R2":
-                return -np.mean(cv_results["r2"])  # Negative because Optuna minimizes
+                return float(-np.mean(cv_results["r2"]))  # Negative for minimization
             else:
-                return np.mean(cv_results["mse"])  # Direct minimization
+                return float(np.mean(cv_results["mse"]))  # Direct minimization
 
         except Exception as e:
             print(f"Trial failed: {e}")

@@ -77,11 +77,11 @@ class SparseGP:
         # Selection method
         if method == "random":
             idx = np.random.choice(N, self.num_inducing, replace=False)
-            return X[idx]
+            return np.asarray(X[idx])
         elif method == "uniform":
             step = N // self.num_inducing
             idx = np.arange(0, N, step)[: self.num_inducing]
-            return X[idx]
+            return np.asarray(X[idx])
         else:
             raise ValueError(f"Unknown inducing point selection method: {method}")
 
@@ -96,16 +96,30 @@ class SparseGP:
 
         self.Kmm = self.kernel(self.Z, self.Z) + 1e-6 * np.eye(M)
         self.Knm = self.kernel(self.X_train, self.Z)
-        self.Kmn = self.Knm.T
+        if self.Knm is not None:
+            self.Kmn = self.Knm.T
+        else:
+            raise ValueError("Knm is None after kernel computation")
 
         diag_Knn = np.diag(self.kernel(self.X_train, self.X_train))
 
-        self.Kmm_inv = np.linalg.inv(self.Kmm)
+        if self.Kmm is not None:
+            self.Kmm_inv = np.linalg.inv(self.Kmm)
+        else:
+            raise ValueError("Kmm is None after kernel computation")
+
         if self.Knm is not None and self.Kmm_inv is not None and self.Kmn is not None:
             Qnn_diag = np.einsum("ij,jk,ki->i", self.Knm, self.Kmm_inv, self.Kmn)
             self.Lambda = diag_Knn - Qnn_diag + self.noise_var
 
             # Compute A = Kmm + Kmn @ diag(1/Lambda) @ Knm
+            if (
+                self.Kmm is None
+                or self.Kmn is None
+                or self.Knm is None
+                or self.Lambda is None
+            ):
+                raise ValueError("Kmm, Kmn, Knm, or Lambda is None before computing A")
             A = self.Kmm + self.Kmn @ (self.Knm / self.Lambda[:, None])
 
             try:
@@ -115,7 +129,11 @@ class SparseGP:
                 self.LA = linalg.cholesky(A, lower=True)
 
             # b = Kmn @ (y / Lambda)
-            if self.y_train is not None:
+            if (
+                self.y_train is not None
+                and self.Kmn is not None
+                and self.Lambda is not None
+            ):
                 b = self.Kmn @ (self.y_train / self.Lambda)
 
                 # Solve LA @ v = b
@@ -146,9 +164,9 @@ class SparseGP:
             Qss_diag = np.einsum("ij,jk,ki->i", Ksm, self.Kmm_inv, Kms)
             var_pred = Kss_diag - Qss_diag + np.sum(tmp**2, axis=0) + self.noise_var
             std_pred = np.sqrt(np.maximum(var_pred, 0))
-            return mean_pred, std_pred
+            return np.asarray(mean_pred), np.asarray(std_pred)
 
-        return mean_pred
+        return np.asarray(mean_pred)
 
     def get_sparse_info(self) -> Optional[Dict[str, Any]]:
         if self.is_fitted and self.Z is not None and self.X_train is not None:

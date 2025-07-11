@@ -11,6 +11,15 @@ from src.gp_kan.invariant_acts import NormaliseGaussian
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
 
+def ensure_int(val: Any, name: str = "value") -> int:
+    if val is None:
+        raise ValueError(f"{name} cannot be None")
+    try:
+        return int(val)
+    except Exception:
+        raise ValueError(f"{name} must be convertible to int, got {val!r}")
+
+
 def load_kan_conf(config: ConfigParser) -> Dict[str, Union[int, float]]:
     if "NETWORK" not in config:
         raise ValueError("NETWORK section not found in config")
@@ -26,8 +35,8 @@ def load_kan_conf(config: ConfigParser) -> Dict[str, Union[int, float]]:
     training_section = config["TRAINING"]
 
     return {
-        "input_size": int(network_section.get("input_size")),
-        "output_size": int(network_section.get("output_size")),
+        "input_size": ensure_int(network_section.get("input_size")),
+        "output_size": ensure_int(network_section.get("output_size")),
         "num_inducing_points": int(config["GP"].get("num_inducing_points", "10")),
         "z_init_low": float(config["GP"].get("z_init_low", "-2.0")),
         "z_init_high": float(config["GP"].get("z_init_high", "2.0")),
@@ -106,9 +115,12 @@ class GP_KAN:
             input_size = layer_sizes[i]
             output_size = layer_sizes[i + 1]
 
+            input_size_int = ensure_int(input_size, "input_size")
+            output_size_int = ensure_int(output_size, "output_size")
+
             layer = DenseGPLayer(
-                input_size=input_size,
-                output_size=output_size,
+                input_size=input_size_int,
+                output_size=output_size_int,
                 config=self.config,
                 key=jax.random.PRNGKey(self.seed + i),
             )
@@ -145,12 +157,15 @@ class GP_KAN:
 
     def loglikelihood(self) -> jax.Array:
         """Expected log-likelihood on the inducing points."""
-        total_loglik = 0.0
+        total_loglik = jnp.array(0.0)
         count = 0
         for layer in self.layers:
             total_loglik += layer.loglikelihood()
             count += 1
-        return total_loglik / count if count > 0 else 0.0
+        if count > 0:
+            return total_loglik / count
+        else:
+            return jnp.array(0.0)
 
     def _condlikelihood(
         self, pred_mean: jax.Array, pred_var: jax.Array, true_val: jax.Array

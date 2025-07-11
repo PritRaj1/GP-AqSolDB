@@ -93,6 +93,9 @@ class DenseGP:
         std_pred : array-like, shape (n_test_samples,), optional
             Predicted standard deviation (if return_std=True)
         """
+        if self.L is None or self.alpha is None:
+            raise ValueError("Model must be fitted before making predictions")
+
         X_test = self._recast_2D(X_test)
         K_star = self.kernel(X_test, self.X_train)
 
@@ -105,9 +108,9 @@ class DenseGP:
             v = linalg.solve_triangular(self.L, K_star.T, lower=True)
             var_pred = np.diag(K_star_star) - np.sum(v**2, axis=0)
             std_pred = np.sqrt(np.maximum(var_pred, 0)) + self.noise_var
-            return mean_pred, std_pred
+            return np.asarray(mean_pred), np.asarray(std_pred)
 
-        return mean_pred
+        return np.asarray(mean_pred)
 
     def eval_fit(
         self, y_pred: np.ndarray, y_true: np.ndarray

@@ -92,7 +92,7 @@ class NormalDist:
         return f"NormalDist(mean: {self.mean}, var: {self.var})"
 
     def sample(
-        self, key: jax.random.PRNGKey, shape: Optional[Tuple[int, ...]] = None
+        self, key: jax.Array, shape: Optional[Tuple[int, ...]] = None
     ) -> jax.Array:
         """
         Sample from NormalDist.

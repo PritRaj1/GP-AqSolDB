@@ -41,7 +41,7 @@ class NormaliseGaussian:
         self.sigmoid_offset = self.inverse_sigmoid(self.min_var)
 
     @staticmethod
-    def inverse_sigmoid(x: float) -> float:
+    def inverse_sigmoid(x: float) -> jax.Array:
         t1 = (1 / x) - 1
         t2 = -jnp.log(t1)
         return t2

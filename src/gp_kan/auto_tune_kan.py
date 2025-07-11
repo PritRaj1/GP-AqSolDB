@@ -145,7 +145,7 @@ class GPKANAutoTuner:
 
         Lower BIC is better (penalizes complexity)
         """
-        return n_samples * np.log(mse) + n_params * np.log(n_samples)
+        return float(n_samples * np.log(mse) + n_params * np.log(n_samples))
 
     def _count_network_parameters(self, hidden_sizes: List[int]) -> int:
         """Count total number of parameters in the network"""
@@ -251,11 +251,15 @@ class GPKANAutoTuner:
             )  # Reduced for speed
 
             if self.metric == "BIC":
-                return -np.mean(cv_results["bic"])  # Negative because Optuna minimizes
+                return float(
+                    -np.mean(cv_results["bic"])
+                )  # Negative because Optuna minimizes
             elif self.metric == "R2":
-                return -np.mean(cv_results["r2"])  # Negative because Optuna minimizes
+                return float(
+                    -np.mean(cv_results["r2"])
+                )  # Negative because Optuna minimizes
             else:
-                return np.mean(cv_results["mse"])  # Direct minimization
+                return float(np.mean(cv_results["mse"]))  # Direct minimization
 
         except Exception as e:
             print(f"Trial failed: {e}")
@@ -300,10 +304,10 @@ class GPKANAutoTuner:
                 network = GP_KAN(config, hidden_sizes=hidden_sizes)
 
                 network.train(
-                    X_train_fold,
-                    y_train_fold,
-                    X_val_fold,
-                    y_val_fold,
+                    jnp.array(X_train_fold),
+                    jnp.array(y_train_fold),
+                    jnp.array(X_val_fold),
+                    jnp.array(y_val_fold),
                     learning_rate=learning_rate,
                     num_epochs=self.num_epochs,
                     batch_size=batch_size,
@@ -392,7 +396,11 @@ class GPKANAutoTuner:
         print(f"Best parameters: {best_params}")
 
         self._save_best_parameters(best_params)
-        return best_params
+        return {
+            "best_params": best_params,
+            "best_value": best_value,
+            "hidden_sizes": hidden_sizes,
+        }
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
 
@@ -458,8 +466,8 @@ class GPKANAutoTuner:
         pretrain_iters = int(self.pretrain_iters)
 
         final_network.train(
-            self.X_train,
-            self.y_train,
+            jnp.array(self.X_train),
+            jnp.array(self.y_train),
             learning_rate=learning_rate,
             num_epochs=self.num_epochs,
             batch_size=batch_size,
@@ -507,7 +515,8 @@ class GPKANAutoTuner:
 def load_gpkan_params_from_file(file_path: str) -> Dict[str, Any]:
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
-            return pickle.load(f)
+            data = pickle.load(f)
+            return data if isinstance(data, dict) else {"data": data}
     else:
         raise FileNotFoundError(f"Params file not found: {file_path}")
 
