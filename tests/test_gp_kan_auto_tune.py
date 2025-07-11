@@ -159,9 +159,14 @@ def test_opt(sample_data, temp_config_dir):
         num_epochs=5,
     )
 
-    best_params = tuner.optimize(n_trials=2)
+    result = tuner.optimize(n_trials=2)
 
-    assert isinstance(best_params, dict), "Best parameters should be a dictionary"
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "best_params" in result, "Should have best_params"
+    assert "best_value" in result, "Should have best_value"
+    assert "hidden_sizes" in result, "Should have hidden_sizes"
+
+    best_params = result["best_params"]
     assert "num_inducing_points" in best_params, "Should have num_inducing_points"
     assert "global_length_scale" in best_params, "Should have global_length_scale"
     assert (
@@ -253,9 +258,11 @@ def test_mse(sample_data, temp_config_dir):
         num_epochs=5,
     )
 
-    best_params = tuner.optimize(n_trials=3)
+    result = tuner.optimize(n_trials=3)
     assert tuner.metric == "MSE", "Metric should be MSE"
-    assert isinstance(best_params, dict), "Best parameters should be a dictionary"
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "best_params" in result, "Should have best_params"
+    best_params = result["best_params"]
 
 
 def test_gpu_tuning(sample_data, temp_config_dir):
@@ -277,11 +284,13 @@ def test_gpu_tuning(sample_data, temp_config_dir):
         num_epochs=5,
     )
 
-    best_params = tuner.optimize(n_trials=2)
+    result = tuner.optimize(n_trials=2)
 
     assert tuner.config["DEVICE"]["use_gpu"] == "true"
     assert tuner.config["DEVICE"]["device"] == "gpu"
-    assert isinstance(best_params, dict)
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "best_params" in result, "Should have best_params"
+    best_params = result["best_params"]
 
 
 if __name__ == "__main__":
