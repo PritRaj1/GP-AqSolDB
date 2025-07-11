@@ -22,7 +22,15 @@ install:
 
 clean:
 	@echo "Removing conda environment..."
-	@conda env remove -n $(ENV_NAME) -y 2>/dev/null || echo "Environment not found"
+	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
+		echo "ERROR: Your shell is the $(ENV_NAME) environment. Please run 'conda deactivate' and then run 'make clean' again."; \
+		exit 1; \
+	elif conda env list | grep -q "$(ENV_NAME)"; then \
+		conda env remove -n $(ENV_NAME) -y; \
+		echo "Environment $(ENV_NAME) removed successfully"; \
+	else \
+		echo "Environment $(ENV_NAME) not found"; \
+	fi
 
 define conda_run
 	@if [ -n "$(CONDA_ACTIVATE)" ]; then \

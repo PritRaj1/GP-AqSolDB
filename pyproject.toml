@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "jax[cuda12_pip]",
-    "jaxlib[cuda12_pip]",
     "optax",
     "jax_dataclasses",
     "numpy",
@@ -21,6 +20,7 @@ dependencies = [
     "seaborn",
     "pandas",
     "imageio",
+    "cupy-cuda12x",
 ]
 
 [project.optional-dependencies]

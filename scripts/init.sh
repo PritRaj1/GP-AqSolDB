@@ -76,26 +76,26 @@ if [ $? -eq 0 ]; then
     
     echo -e "${GREEN}Testing installation...${NC}"
     python -c "
-        import jax
-        import jax.numpy as jnp
-        import optax
-        import numpy as np
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        import pandas as pd
-        from src.gp_kan.fully_connected import GP_KAN
-        from src.gp_kan.dense_layer import DenseGPLayer
-        from src.gp_kan.normal_dist import NormalDist
-        from configparser import ConfigParser
+import jax
+import jax.numpy as jnp
+import optax
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+from src.gp_kan.fully_connected import GP_KAN
+from src.gp_kan.dense_layer import DenseGPLayer
+from src.gp_kan.normal_dist import NormalDist
+from configparser import ConfigParser
 
-        print('✓ All imports successful!')
-        print(f'✓ JAX version: {jax.__version__}')
-        print(f'✓ NumPy version: {np.__version__}')
+print('✓ All imports successful!')
+print(f'✓ JAX version: {jax.__version__}')
+print(f'✓ NumPy version: {np.__version__}')
 
-        if jax.devices('gpu'):
-            print(f'✓ GPU available: {jax.devices(\"gpu\")}')
-        else:
-            print('✓ Using CPU (GPU not available)')
+if jax.devices('gpu'):
+    print(f'✓ GPU available: {jax.devices(\"gpu\")}')
+else:
+    print('✓ Using CPU (GPU not available)')
 "
     
     echo -e "${GREEN}✓ Setup completed successfully!${NC}"

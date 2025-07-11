@@ -307,10 +307,10 @@ def main():
             use_gpu=True, 
             max_hidden_layers=4,
             max_hidden_size=100,
-            num_epochs=100,
-            pretrain_iters=30
+            num_epochs=30,
+            pretrain_iters=10
         )
-        tuner.optimize(n_trials=1000)          
+        tuner.optimize(n_trials=300)          
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
