@@ -307,19 +307,19 @@ def main():
             use_gpu=True, 
             max_hidden_layers=4,
             max_hidden_size=100,
-            num_epochs=30,
-            pretrain_iters=10
+            num_epochs=50,
+            pretrain_iters=20
         )
-        tuner.optimize(n_trials=300)          
+        tuner.optimize(n_trials=100)          
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        num_epochs=200,  
+        num_epochs=50,  
         patience=100,
-        pretrain_iters=30
+        pretrain_iters=20
     )
 
     X_test_mean = X_test

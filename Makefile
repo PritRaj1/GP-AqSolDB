@@ -1,4 +1,4 @@
-.PHONY: install clean test dev train format lint help logs
+.PHONY: install clean test dev train format lint help logs clean-logs
 
 ENV_NAME = GP_sol
 CONDA_BASE := $(shell conda info --base 2>/dev/null || echo "")
@@ -15,6 +15,7 @@ help:
 	@echo "  format   - Format code"
 	@echo "  lint     - Run linting"
 	@echo "  logs     - Display log files"
+	@echo "  clean-logs - Delete log files"
 	@echo "  help     - Show this help"
 
 install:
@@ -138,6 +139,15 @@ logs:
 	else \
 		echo "No log files found in logs/ directory"; \
 		echo "Run 'make run-gp' or 'make run-kan' to generate logs"; \
+	fi
+
+clean-logs:
+	@echo "Cleaning log files..."
+	@if [ -d "logs" ]; then \
+		rm -f logs/*.log; \
+		echo "Log files deleted from logs/ directory"; \
+	else \
+		echo "logs/ directory not found"; \
 	fi
 
 info:
