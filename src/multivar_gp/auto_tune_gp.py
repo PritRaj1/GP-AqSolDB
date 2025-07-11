@@ -20,14 +20,15 @@ class GPAutoTuner:
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        config_path: str = "../config/GP.ini",
-        sigma_save_path: str = "../config/optimized_sigmas.pkl",
+        config_path: str = "../config/gp.ini",
+        sigma_save_path: str = "../config/gp_sigmas.pkl",
         force_dense: bool = False,
         metric: str = "BIC",
         n_jobs: int = 2,
         use_gpu: bool = False,
         chunk_size: int = 500,
         min_size_for_parallel: int = 1000,
+        sampler: str = "bayesian",  # "bayesian", "tpe", "random", "cmaes"
     ) -> None:
         """
         Initialize the GP Auto Tuner
@@ -54,6 +55,9 @@ class GPAutoTuner:
             Size of chunks for parallel processing
         min_size_for_parallel : int
             Minimum matrix size to trigger parallel processing
+        sampler : str
+            Optimization sampler: "bayesian" (GPSampler), "tpe" (TPESampler),
+            "random" (RandomSampler), or "cmaes" (CmaEsSampler)
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -68,9 +72,13 @@ class GPAutoTuner:
         self.use_gpu = use_gpu
         self.chunk_size = chunk_size
         self.min_size_for_parallel = min_size_for_parallel
+        self.sampler = sampler.lower()
 
         if self.metric not in ["BIC", "MSE", "R2"]:
             raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
+
+        if self.sampler not in ["bayesian", "tpe", "random", "cmaes"]:
+            raise ValueError("sampler must be 'bayesian', 'tpe', 'random', or 'cmaes'")
 
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -134,6 +142,18 @@ class GPAutoTuner:
         """
         return float(n_samples * np.log(mse) + n_params * np.log(n_samples))
 
+    def _get_sampler(self) -> optuna.samplers.BaseSampler:
+        if self.sampler == "bayesian":
+            return optuna.samplers.GPSampler(seed=42)
+        elif self.sampler == "tpe":
+            return optuna.samplers.TPESampler(seed=42)
+        elif self.sampler == "random":
+            return optuna.samplers.RandomSampler(seed=42)
+        elif self.sampler == "cmaes":
+            return optuna.samplers.CmaEsSampler(seed=42)
+        else:
+            raise ValueError(f"Unknown sampler: {self.sampler}")
+
     def _objective(self, trial: optuna.Trial) -> float:
         """
         Objective function for Optuna optimization
@@ -156,17 +176,17 @@ class GPAutoTuner:
             kernel_type = trial.suggest_categorical(
                 "kernel_type", ["RBF", "RQ", "MATERN"]
             )
-            lmbda = trial.suggest_float("lmbda", 1e-4, 1.0, log=True)
+            lmbda = trial.suggest_float("lmbda", 1e-3, 0.1, log=True)
 
             if kernel_type == "RQ":
-                alpha = trial.suggest_float("rq_alpha", 0.1, 10.0)
+                alpha = trial.suggest_float("rq_alpha", 0.5, 5.0)
             elif kernel_type == "MATERN":
                 alpha = trial.suggest_categorical("matern_nu", [0.5, 1.5, 2.5])
             else:  # RBF
                 alpha = 1.0
 
             sigmas = [
-                trial.suggest_float(f"sigma_{i}", 0.1, 3.0)
+                trial.suggest_float(f"sigma_{i}", 0.2, 2.0)
                 for i in range(self.n_features)
             ]
 
@@ -269,6 +289,7 @@ class GPAutoTuner:
         print(f"Features: {self.n_features}")
         print(f"Samples: {self.n_samples}")
         print(f"Metric: {self.metric}")
+        print(f"Sampler: {self.sampler}")
         if self.metric == "BIC":
             print("  BIC balances accuracy and model complexity")
         elif self.metric == "R2":
@@ -278,7 +299,7 @@ class GPAutoTuner:
 
         study = optuna.create_study(
             direction="minimize",
-            sampler=optuna.samplers.TPESampler(seed=42),
+            sampler=self._get_sampler(),
             pruner=optuna.pruners.MedianPruner(),
         )
 

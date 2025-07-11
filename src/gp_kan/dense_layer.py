@@ -196,7 +196,7 @@ class DenseGPLayer:
         return {
             "z": self.z,
             "h": self.h,
-            "l": self.length_scale, # Alias
+            "l": self.length_scale,  # Alias
             "s": self.s,
             "jitter": self.jitter,
         }
@@ -400,7 +400,7 @@ class DenseGPLayer:
             output_dim,
             int(P),
         )
-        
+
         out_mean = jnp.sum(weighted_function_values, axis=1).reshape(N, output_dim)
         predictive_variance_per_neuron = self._predictive_variance(
             query_inducing_kernel_matrix,

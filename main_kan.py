@@ -367,8 +367,9 @@ def main():
             max_hidden_size=100,
             num_epochs=50,
             pretrain_iters=20,
+            sampler='bayesian',
         )
-        tuner.optimize(n_trials=100)
+        tuner.optimize(n_trials=200)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")

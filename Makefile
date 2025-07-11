@@ -1,4 +1,4 @@
-.PHONY: install clean test dev train format lint help logs clean-logs
+.PHONY: install clean test dev train format lint help logs clean-logs clean-tuned-gp clean-tuned-kan
 
 ENV_NAME = GP_sol
 CONDA_BASE := $(shell conda info --base 2>/dev/null || echo "")
@@ -16,6 +16,8 @@ help:
 	@echo "  lint     - Run linting"
 	@echo "  logs     - Display log files"
 	@echo "  clean-logs - Delete log files"
+	@echo "  clean-tuned-gp - Delete GP tuned files (.ini and .pkl)"
+	@echo "  clean-tuned-kan - Delete KAN tuned files (.ini and .pkl)"
 	@echo "  help     - Show this help"
 
 install:
@@ -112,7 +114,7 @@ clean-config:
 	@echo "Config files cleaned!"
 	@echo "Note: test.ini was preserved"
 
-clean-all: clean-figures clean-config
+clean-all: clean-figures clean-config clean-tuned-gp clean-tuned-kan
 	@echo "All generated files cleaned!"
 
 logs:
@@ -149,6 +151,16 @@ clean-logs:
 	else \
 		echo "logs/ directory not found"; \
 	fi
+
+clean-tuned-gp:
+	@echo "Cleaning GP tuned files..."
+	@rm -f config/gp.ini config/gp_sigmas.pkl
+	@echo "GP tuned files deleted!"
+
+clean-tuned-kan:
+	@echo "Cleaning KAN tuned files..."
+	@rm -f config/gp_kan.ini config/gp_kan_params.pkl
+	@echo "KAN tuned files deleted!"
 
 info:
 	@echo "Environment Information:"

@@ -27,10 +27,11 @@ class GPKANAutoTuner:
         metric: str = "BIC",
         n_jobs: int = 2,
         use_gpu: bool = False,
-        max_hidden_layers: int = 3,
-        max_hidden_size: int = 10,
+        max_hidden_layers: int = 2,
+        max_hidden_size: int = 8,
         num_epochs: int = 50,
         pretrain_iters: int = 10,
+        sampler: str = "bayesian",
     ) -> None:
         """
         Initialize the GP-KAN Auto Tuner
@@ -59,6 +60,9 @@ class GPKANAutoTuner:
             Number of training epochs for each trial
         pretrain_iters : int
             Number of pretraining iterations for each trial
+        sampler : str
+            Optimization sampler: "bayesian" (GPSampler), "tpe" (TPESampler),
+            "random" (RandomSampler), or "cmaes" (CmaEsSampler)
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -74,9 +78,13 @@ class GPKANAutoTuner:
         self.max_hidden_size = max_hidden_size
         self.num_epochs = num_epochs
         self.pretrain_iters = pretrain_iters
+        self.sampler = sampler.lower()
 
         if self.metric not in ["BIC", "MSE", "R2"]:
             raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
+
+        if self.sampler not in ["bayesian", "tpe", "random", "cmaes"]:
+            raise ValueError("sampler must be 'bayesian', 'tpe', 'random', or 'cmaes'")
 
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -167,6 +175,18 @@ class GPKANAutoTuner:
 
         return total_params
 
+    def _get_sampler(self) -> optuna.samplers.BaseSampler:
+        if self.sampler == "bayesian":
+            return optuna.samplers.GPSampler(seed=42)
+        elif self.sampler == "tpe":
+            return optuna.samplers.TPESampler(seed=42)
+        elif self.sampler == "random":
+            return optuna.samplers.RandomSampler(seed=42)
+        elif self.sampler == "cmaes":
+            return optuna.samplers.CmaEsSampler(seed=42)
+        else:
+            raise ValueError(f"Unknown sampler: {self.sampler}")
+
     def _objective(self, trial: optuna.Trial) -> float:
         """
         Objective function for Optuna optimization
@@ -192,31 +212,31 @@ class GPKANAutoTuner:
                 )
                 hidden_sizes.append(hidden_size)
 
-            num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
-            z_init_low = trial.suggest_float("z_init_low", -3.0, -0.5)
-            z_init_high = trial.suggest_float("z_init_high", 0.5, 3.0)
-            h_init_low = trial.suggest_float("h_init_low", -3.0, -0.5)
-            h_init_high = trial.suggest_float("h_init_high", 0.5, 3.0)
+            num_inducing_points = trial.suggest_int("num_inducing_points", 5, 15)
+            z_init_low = trial.suggest_float("z_init_low", -2.0, -0.5)
+            z_init_high = trial.suggest_float("z_init_high", 0.5, 2.0)
+            h_init_low = trial.suggest_float("h_init_low", -2.0, -0.5)
+            h_init_high = trial.suggest_float("h_init_high", 0.5, 2.0)
 
-            global_length_scale = trial.suggest_float("global_length_scale", 0.01, 5.0)
-            min_length_scale = trial.suggest_float("min_length_scale", 0.01, 5.0)
+            global_length_scale = trial.suggest_float("global_length_scale", 0.1, 2.0)
+            min_length_scale = trial.suggest_float("min_length_scale", 0.1, 1.0)
 
             global_covariance_scale = trial.suggest_float(
-                "global_covariance_scale", 0.01, 5.0
+                "global_covariance_scale", 0.1, 2.0
             )
             min_covariance_scale = trial.suggest_float(
-                "min_covariance_scale", 0.01, 5.0
+                "min_covariance_scale", 0.05, 0.5
             )
 
-            global_jitter = trial.suggest_float("global_jitter", 1e-3, 1e-1, log=True)
+            global_jitter = trial.suggest_float("global_jitter", 1e-3, 1e-2, log=True)
             baseline_jitter = trial.suggest_float(
-                "baseline_jitter", 1e-3, 1e-1, log=True
+                "baseline_jitter", 1e-3, 1e-2, log=True
             )
 
-            min_var = trial.suggest_float("min_var", 0.01, 0.5)
+            min_var = trial.suggest_float("min_var", 0.05, 0.3)
 
-            learning_rate = trial.suggest_float("learning_rate", 1e-4, 1, log=True)
-            batch_size = trial.suggest_int("batch_size", 16, 128)
+            learning_rate = trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True)
+            batch_size = trial.suggest_int("batch_size", 16, 64)
 
             config = ConfigParser()
             config["NETWORK"] = {"input_size": str(self.n_features), "output_size": "1"}
@@ -362,6 +382,7 @@ class GPKANAutoTuner:
         print(f"Max hidden layers: {self.max_hidden_layers}")
         print(f"Max hidden size: {self.max_hidden_size}")
         print(f"Metric: {self.metric}")
+        print(f"Sampler: {self.sampler}")
         if self.metric == "BIC":
             print("  BIC balances accuracy and model complexity")
         elif self.metric == "R2":
@@ -371,7 +392,7 @@ class GPKANAutoTuner:
 
         study = optuna.create_study(
             direction="minimize",
-            sampler=optuna.samplers.TPESampler(seed=42),
+            sampler=self._get_sampler(),
             pruner=optuna.pruners.MedianPruner(),
         )
 
