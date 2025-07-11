@@ -184,7 +184,7 @@ def test_reset_gp_hyp(sample_layer):
     sample_layer.reset_gp_hyp()
 
     new_params = sample_layer.get_params()
-    for key in ["length_scale", "s", "jitter"]:
+    for key in ["l", "s", "jitter"]:
         assert not jnp.allclose(
             original_params[key] + 1.0, new_params[key]
         ), f"Parameter {key} should change after reset"
