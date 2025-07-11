@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from src.gp_kan.auto_tune import (
+from src.gp_kan.auto_tune_kan import (
     GPKANAutoTuner,
     create_optimized_network,
     load_gpkan_params_from_file,

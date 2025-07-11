@@ -9,7 +9,7 @@ from configparser import ConfigParser
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import cdist
 
-from src.gp_kan.auto_tune import GPKANAutoTuner, load_gpkan_params_from_file, create_optimized_network
+from src.gp_kan.auto_tune_kan import GPKANAutoTuner, load_gpkan_params_from_file, create_optimized_network
 from src.gp_kan.normal_dist import NormalDist
 
 plt.style.use('seaborn-v0_8')
