@@ -320,7 +320,7 @@ class GPAutoTuner:
             pass
 
         self._save_best_parameters(best_params)
-        return best_params
+        return best_params  # type: ignore[no-any-return]
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
 

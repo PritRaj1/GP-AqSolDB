@@ -63,7 +63,7 @@ class NormaliseGaussian:
         out_mean, out_var = self._normalize_core_jit(
             x.mean, x.var, self.sigmoid_offset, self.min_var
         )
-        result = NormalDist(out_mean, out_var)
+        result = NormalDist(out_mean, out_var)  # type: ignore[call-arg]
 
         if self.device_config["use_gpu"]:
             return result.to_device("gpu")
@@ -86,6 +86,8 @@ class ReshapeGaussian:
         out_var = jnp.reshape(x.var, self.new_shape)
 
         if self.device_config["use_gpu"]:
-            return NormalDist(out_mean, out_var).to_device("gpu")
+            return NormalDist(out_mean, out_var).to_device(
+                "gpu"
+            )  # type: ignore[call-arg]
 
-        return NormalDist(out_mean, out_var)
+        return NormalDist(out_mean, out_var)  # type: ignore[call-arg]

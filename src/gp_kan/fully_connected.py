@@ -251,7 +251,9 @@ class GP_KAN:
 
             X_batch_mean = X_batch
             X_batch_var = jnp.zeros_like(X_batch)
-            X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
+            X_batch_dist = NormalDist(
+                X_batch_mean, X_batch_var
+            )  # type: ignore[call-arg]
 
             output_dist = self.forward(X_batch_dist)
             return -self._condlikelihood(output_dist.mean, output_dist.var, y_batch)
