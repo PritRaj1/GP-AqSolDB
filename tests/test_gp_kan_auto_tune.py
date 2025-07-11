@@ -262,7 +262,6 @@ def test_mse(sample_data, temp_config_dir):
     assert tuner.metric == "MSE", "Metric should be MSE"
     assert isinstance(result, dict), "Result should be a dictionary"
     assert "best_params" in result, "Should have best_params"
-    best_params = result["best_params"]
 
 
 def test_gpu_tuning(sample_data, temp_config_dir):
@@ -290,7 +289,6 @@ def test_gpu_tuning(sample_data, temp_config_dir):
     assert tuner.config["DEVICE"]["device"] == "gpu"
     assert isinstance(result, dict), "Result should be a dictionary"
     assert "best_params" in result, "Should have best_params"
-    best_params = result["best_params"]
 
 
 if __name__ == "__main__":
