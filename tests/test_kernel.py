@@ -1,5 +1,6 @@
 import configparser
 import os
+import shutil
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -171,6 +172,8 @@ def test_invalid_kernel_type():
 
 
 def test_visual():
+    if shutil.which("latex") is None:
+        pytest.skip("LaTeX is not installed")
     config = configparser.ConfigParser()
     config.read("config/test.ini")
 
