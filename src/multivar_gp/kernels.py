@@ -79,7 +79,7 @@ class KernelCache:
     """Simple cache for repeated kernel computation"""
 
     def __init__(self, max_size: int = 100) -> None:
-        self.cache: Dict[str, np.ndarray] = {}
+        self.cache: Dict[str, Union[np.ndarray, Tuple[np.ndarray, ...]]] = {}
         self.max_size = max_size
         self.hit_count = 0
         self.miss_count = 0
@@ -141,12 +141,14 @@ class KernelCache:
         """Get cached intermediate computations"""
         key = self._hash_intermediate(X1, X2, sigma)
         value = self.cache.get(key, None)
+
         if (
-            isinstance(value, tuple)
+            value is not None
+            and isinstance(value, tuple)
             and len(value) == 5
             and all(isinstance(v, np.ndarray) for v in value)
         ):
-            return value  # type: ignore
+            return value
         return None
 
     def set(
@@ -261,7 +263,7 @@ def _compute_rbf_chunk(
     inner_prod = X1_norm @ X2_norm.T
 
     sq_dist = X1_sq + X2_sq - 2 * inner_prod
-    return np.exp(-0.5 * sq_dist)
+    return np.asarray(np.exp(-0.5 * sq_dist))
 
 
 def _compute_rq_chunk(
@@ -279,7 +281,7 @@ def _compute_rq_chunk(
     inner_prod = X1_norm @ X2_norm.T
 
     sq_dist = X1_sq + X2_sq - 2 * inner_prod
-    return (1 + 0.5 * sq_dist / alpha) ** (-alpha)
+    return np.asarray((1 + 0.5 * sq_dist / alpha) ** (-alpha))
 
 
 def _compute_matern_chunk(
@@ -301,22 +303,22 @@ def _compute_matern_chunk(
 
     # Matern 1/2: k(r) = exp(-r)
     if alpha == 0.5:
-        return np.exp(-dist)
+        return np.asarray(np.exp(-dist))
 
     # Matern 3/2: k(r) = (1 + sqrt(3)*r) * exp(-sqrt(3)*r)
     elif alpha == 1.5:
         sqrt3_dist = np.sqrt(3) * dist
-        return (1 + sqrt3_dist) * np.exp(-sqrt3_dist)
+        return np.asarray((1 + sqrt3_dist) * np.exp(-sqrt3_dist))
 
     # Matern 5/2: k(r) = (1 + sqrt(5)*r + 5*r²/3) * exp(-sqrt(5)*r)
     elif alpha == 2.5:
         sqrt5_dist = np.sqrt(5) * dist
-        return (1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist)
+        return np.asarray((1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist))
 
     # Generalize with scipy's modified Bessel function
     else:
         dist_safe = np.where(dist < 1e-10, 1e-10, dist)  # Avoid division by zero
-        return (
+        return np.asarray(
             (2 ** (1 - alpha) / math.gamma(alpha))
             * (np.sqrt(2 * alpha) * dist_safe) ** alpha
             * kv(alpha, np.sqrt(2 * alpha) * dist_safe)
@@ -370,7 +372,8 @@ def _parallel_kernel_computation(
     else:
         try:
             # Use a more conservative approach for multiprocessing
-            with ProcessPoolExecutor(max_workers=min(int(n_jobs), 4)) as executor:
+            n_jobs_int = int(n_jobs) if n_jobs is not None else 1
+            with ProcessPoolExecutor(max_workers=min(n_jobs_int, 4)) as executor:
                 # Add timeout to prevent hanging
                 result_chunks = list(
                     executor.map(_compute_kernel_chunk, chunks, timeout=300)
@@ -431,8 +434,12 @@ def _cupy_kernel(
         if kernel_type == "RBF":
             result = cp.exp(-0.5 * sq_dist)
         elif kernel_type == "RQ":
+            if alpha is None:
+                raise ValueError("Alpha parameter must not be None for RQ kernel.")
             result = (1 + 0.5 * sq_dist / alpha) ** (-alpha)
         elif kernel_type == "MATERN":
+            if alpha is None:
+                raise ValueError("Alpha parameter must not be None for MATERN kernel.")
             dist = cp.sqrt(cp.maximum(sq_dist, 0))
             if alpha == 0.5:
                 result = cp.exp(-dist)
@@ -530,7 +537,7 @@ def RBF(
         inner_prod = X1_norm @ X2_norm.T
 
     sq_dist = X1_sq + X2_sq - 2 * inner_prod
-    result = np.exp(-0.5 * sq_dist)
+    result = np.asarray(np.exp(-0.5 * sq_dist))
 
     if use_cache:
         _kernel_cache.set(X1, X2, sigma, alpha=None, kernel_type="RBF", result=result)
@@ -615,7 +622,7 @@ def RQ(
         inner_prod = X1_norm @ X2_norm.T
 
     sq_dist = X1_sq + X2_sq - 2 * inner_prod
-    result = (1 + 0.5 * sq_dist / alpha) ** (-alpha)
+    result = np.asarray((1 + 0.5 * sq_dist / alpha) ** (-alpha))
 
     if use_cache:
         _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result)
@@ -706,22 +713,22 @@ def MATERN(
 
     # Matern 1/2: k(r) = exp(-r)
     if alpha == 0.5:
-        result = np.exp(-dist)
+        result = np.asarray(np.exp(-dist))
 
     # Matern 3/2: k(r) = (1 + sqrt(3)*r) * exp(-sqrt(3)*r)
     elif alpha == 1.5:
         sqrt3_dist = np.sqrt(3) * dist
-        result = (1 + sqrt3_dist) * np.exp(-sqrt3_dist)
+        result = np.asarray((1 + sqrt3_dist) * np.exp(-sqrt3_dist))
 
     # Matern 5/2: k(r) = (1 + sqrt(5)*r + 5*r²/3) * exp(-sqrt(5)*r)
     elif alpha == 2.5:
         sqrt5_dist = np.sqrt(5) * dist
-        result = (1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist)
+        result = np.asarray((1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist))
 
     # General case using scipy's modified Bessel function
     else:
         dist_safe = np.where(dist < 1e-10, 1e-10, dist)  # Avoid division by zero
-        result = (
+        result = np.asarray(
             (2 ** (1 - alpha) / math.gamma(alpha))
             * (np.sqrt(2 * alpha) * dist_safe) ** alpha
             * kv(alpha, np.sqrt(2 * alpha) * dist_safe)
