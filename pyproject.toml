@@ -9,7 +9,7 @@ authors = [{name = "Prithvi Raj", email = "prithvi@zettalaboratories.com"}]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "jax[cuda12_pip]",
+    "jax[cuda12]",
     "optax",
     "jax_dataclasses",
     "numpy",

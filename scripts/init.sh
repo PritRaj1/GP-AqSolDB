@@ -67,8 +67,6 @@ echo -e "${GREEN}Installing tmux for development sessions...${NC}"
 conda install -c conda-forge tmux -y
 
 echo -e "${GREEN}Installing project dependencies...${NC}"
-cd "$(dirname "$0")/.."
-
 pip install -e ".[dev]"
 
 if [ $? -eq 0 ]; then
