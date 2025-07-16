@@ -222,7 +222,7 @@ class GPKANAutoTuner:
             min_length_scale = trial.suggest_float("min_length_scale", 0.1, 1.0)
 
             global_covariance_scale = trial.suggest_float(
-                "global_covariance_scale", 0.1, 2.0
+                "global_covariance_scale", 0.01, 2.0
             )
             min_covariance_scale = trial.suggest_float(
                 "min_covariance_scale", 0.05, 0.5
