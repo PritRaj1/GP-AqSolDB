@@ -363,10 +363,10 @@ def main():
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
-            max_hidden_layers=4,
+            max_hidden_layers=3,
             max_hidden_size=100,
-            num_epochs=50,
-            pretrain_iters=20,
+            num_epochs=100,
+            pretrain_iters=50,
             sampler='bayesian',
         )
         tuner.optimize(n_trials=100)

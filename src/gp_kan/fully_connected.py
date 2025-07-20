@@ -235,7 +235,7 @@ class GP_KAN:
         self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
 
         optimizer = optax.chain(
-            optax.clip_by_global_norm(1.0),  # GPs are always unstable, so clip
+            # optax.clip_by_global_norm(0.5),  # Uncomment for stability
             optax.adam(learning_rate),
         )
 
