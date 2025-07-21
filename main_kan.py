@@ -364,12 +364,12 @@ def main():
             n_jobs=4,
             use_gpu=True,
             max_hidden_layers=3,
-            max_hidden_size=100,
+            max_hidden_size=200,
             num_epochs=100,
             pretrain_iters=50,
-            sampler='bayesian',
+            sampler='tpe',
         )
-        tuner.optimize(n_trials=100)
+        tuner.optimize(n_trials=200)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
