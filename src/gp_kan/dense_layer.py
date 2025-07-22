@@ -309,6 +309,7 @@ class DenseGPLayer:
         output_dim: int,
         P: int,
     ) -> jax.Array:
+        # GP PREDICTION: μ* = K(x*,z) @ K(z,z)^(-1) @ h
         query_inducing_weighted = query_inducing_kernel @ inducing_kernel_inverse
         inducing_function_values = self.h.reshape(1, input_dim, output_dim, P, 1)
         weighted_function_values = query_inducing_weighted @ inducing_function_values
@@ -366,7 +367,7 @@ class DenseGPLayer:
 
         s, length_scale, jitter, z = self._reshape_params()
 
-        # Kernel function with input variance for q_xh
+        # FUNCTION INNER PRODUCT: ∫ N(x|μ, σ²) k(x, z) dx = k(μ, z) * exp(σ²/(2ℓ²))
         def kernel_with_var(x1: jax.Array, x2: jax.Array) -> jax.Array:
             N = x_var.shape[0]
             x_var_reshaped = x_var.reshape(N, input_dim, 1, 1, 1)
@@ -376,17 +377,18 @@ class DenseGPLayer:
             )
             return normal_pdf(x1, x2, input_variance + length_scale_b**2)
 
-        # Kernel function for inducing points (for Q_hh)
+        # Kernel for inducing points (no input uncertainty)
         def kernel_inducing_points(x1: jax.Array, x2: jax.Array) -> jax.Array:
             length_scale_reshaped = length_scale.reshape(1, input_dim, output_dim, 1, 1)
             length_scale_b = jnp.broadcast_to(length_scale_reshaped, x1.shape)
             return normal_pdf(x1, x2, length_scale_b**2)
 
+        # Build kernel matrices
         inducing_kernel_matrix = build_kernel_mat(z, z, kernel_inducing_points)
         query_inducing_kernel_matrix = build_kernel_mat(
             jnp.repeat(x_mean, output_dim, axis=2).reshape(N, input_dim, output_dim, 1),
             z,
-            kernel_with_var,
+            kernel_with_var,  # With input uncertainty
         )
 
         inducing_kernel_with_noise = self._jitter(
