@@ -232,11 +232,15 @@ class GP_KAN:
 
         # Pretrain hps
         print("Pretraining GP hyperparameters...")
-        self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
+        try:
+            self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
+        except Exception as e:
+            print(f"Warning: Pretraining failed: {e}")
+            print("Continuing with default hyperparameters...")
 
         optimizer = optax.chain(
-            # optax.clip_by_global_norm(0.5),  # Uncomment for stability
-            optax.adam(learning_rate),
+            optax.clip_by_global_norm(1.0),
+            optax.sgd(learning_rate, momentum=0.9),
         )
 
         params = self.get_params()
@@ -261,55 +265,67 @@ class GP_KAN:
 
         best_val_loss = float("inf")
         patience_counter = 0
+        best_params = None
 
         for epoch in range(num_epochs):
-            key, subkey = jax.random.split(key)
-            indices = jax.random.permutation(subkey, len(X_train))
-            X_train_shuffled = X_train[indices]
-            y_train_shuffled = y_train[indices]
+            try:
+                key, subkey = jax.random.split(key)
+                indices = jax.random.permutation(subkey, len(X_train))
+                X_train_shuffled = X_train[indices]
+                y_train_shuffled = y_train[indices]
 
-            total_loss = 0.0
-            num_batches = 0
+                total_loss = 0.0
+                num_batches = 0
 
-            for i in range(0, len(X_train), batch_size):
-                X_batch = X_train_shuffled[i : i + batch_size]
-                y_batch = y_train_shuffled[i : i + batch_size]
+                for i in range(0, len(X_train), batch_size):
+                    X_batch = X_train_shuffled[i : i + batch_size]
+                    y_batch = y_train_shuffled[i : i + batch_size]
 
-                grads = grad_fn(params, X_batch, y_batch)
-                updates, opt_state = optimizer.update(grads, opt_state)
-                params = optax.apply_updates(params, updates)
+                    grads = grad_fn(params, X_batch, y_batch)
+                    updates, opt_state = optimizer.update(grads, opt_state)
+                    params = optax.apply_updates(params, updates)
 
-                loss = loss_fn_jit(params, X_batch, y_batch)
-                total_loss += loss
-                num_batches += 1
+                    loss = loss_fn_jit(params, X_batch, y_batch)
+                    total_loss += loss
+                    num_batches += 1
 
-            avg_loss = total_loss / num_batches
+                avg_loss = total_loss / num_batches
 
-            if X_val is not None:
-                val_loss = loss_fn_jit(params, X_val, y_val)
+                if X_val is not None:
+                    val_loss = loss_fn_jit(params, X_val, y_val)
 
-                if epoch % 5 == 0:
-                    print(
-                        f"Epoch {epoch}: Train Loss = {avg_loss:.4f}, "
-                        f"Val Loss = {val_loss:.4f}"
-                    )
+                    if epoch % 5 == 0:
+                        print(
+                            f"Epoch {epoch}: Train Loss = {avg_loss:.4f}, "
+                            f"Val Loss = {val_loss:.4f}"
+                        )
 
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    patience_counter = 0
-                    best_params = params.copy()
+                    if val_loss < best_val_loss:
+                        best_val_loss = val_loss
+                        patience_counter = 0
+                        best_params = params.copy()
+                    else:
+                        patience_counter += 1
+
+                    if patience_counter >= patience:
+                        print(f"Early stopping at epoch {epoch}")
+                        if best_params is not None:
+                            self.set_params(best_params)
+                        break
                 else:
-                    patience_counter += 1
+                    if epoch % 5 == 0:
+                        print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
 
-                if patience_counter >= patience:
-                    print(f"Early stopping at epoch {epoch}")
+            except Exception as e:
+                print(f"Training failed at epoch {epoch}: {e}")
+                if best_params is not None:
                     self.set_params(best_params)
-                    break
-            else:
-                if epoch % 5 == 0:
-                    print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
+                break
 
-        self.set_params(params)
+        if best_params is not None:
+            self.set_params(best_params)
+        else:
+            self.set_params(params)
 
     def _pretrain_gp_hyperparameters(
         self, X_train: jax.Array, y_train: jax.Array, num_iters: int
@@ -323,21 +339,26 @@ class GP_KAN:
         grad_fn = jit(grad(pretrain_loss_fn))
 
         optimizer = optax.chain(
-            optax.clip_by_global_norm(1.0),  # GPs are always unstable, so clip
-            optax.adam(0.001),
+            optax.clip_by_global_norm(0.5),
+            optax.sgd(0.001, momentum=0.9),
         )
 
         params = self.get_params()
         opt_state = optimizer.init(params)
 
         for i in range(num_iters):
-            grads = grad_fn(params)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            params = optax.apply_updates(params, updates)
+            try:
+                grads = grad_fn(params)
+                updates, opt_state = optimizer.update(grads, opt_state)
+                params = optax.apply_updates(params, updates)
 
-            if i % 2 == 0:
-                loss = pretrain_loss_fn(params)
-                print(f"  Pretrain {i}: Inducing point log-likelihood {-loss:.4f}")
+                if i % 5 == 0:
+                    loss = pretrain_loss_fn(params)
+                    print(f"  Pretrain {i}: Inducing point log-likelihood {-loss:.4f}")
+
+            except Exception as e:
+                print(f"  Pretraining failed at iteration {i}: {e}")
+                break
 
         self.set_params(params)
 

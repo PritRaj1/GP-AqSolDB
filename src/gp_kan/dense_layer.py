@@ -333,12 +333,13 @@ class DenseGPLayer:
             query_inducing_weighted_for_variance, (0, 1, 2, 4, 3)
         )
 
+        # s^2 * |l| / sqrt(l^2 + 2 * x_var)
         signal_variance_component = (s**2) * (
             jnp.abs(length_scale) / jnp.sqrt(length_scale**2 + 2 * x_var)
         )
         length_scale_scaling_factor = SQRT_2PI * (s**2) * jnp.abs(length_scale)
 
-        # Uncertainty reduction from inducing points
+        # Uncertainty reduction from inducing points 2πs⁴l² q_xh K_hh⁻¹ q_hx
         uncertainty_reduction_matrix = (
             query_inducing_weighted_for_variance @ query_inducing_weighted_transpose
         )
@@ -436,14 +437,12 @@ class DenseGPLayer:
         ) -> jax.Array:
             I, O, P = z.shape
 
-            def rbf_kernel(x1: jax.Array, x2: jax.Array) -> jax.Array:
+            def gaussian_kernel(x1: jax.Array, x2: jax.Array) -> jax.Array:
                 signal_variance = s.reshape(I, O, 1, 1)
                 length_scale_sq = length_scale.reshape(I, O, 1, 1) ** 2
-                return signal_variance**2 * jnp.exp(
-                    -((x1 - x2) ** 2) / (2 * length_scale_sq)
-                )
+                return signal_variance**2 * normal_pdf(x1, x2, length_scale_sq)
 
-            inducing_kernel_matrix = build_kernel_mat(z, z, rbf_kernel)
+            inducing_kernel_matrix = build_kernel_mat(z, z, gaussian_kernel)
             inducing_kernel_with_noise = (
                 inducing_kernel_matrix
                 + (jitter.reshape(I, O, 1, 1) ** 2)
