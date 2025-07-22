@@ -31,6 +31,7 @@ class GPKANAutoTuner:
         max_hidden_size: int = 8,
         num_epochs: int = 50,
         pretrain_iters: int = 10,
+        patience: int = 10,
         sampler: str = "bayesian",
     ) -> None:
         """
@@ -60,6 +61,8 @@ class GPKANAutoTuner:
             Number of training epochs for each trial
         pretrain_iters : int
             Number of pretraining iterations for each trial
+        patience : int
+            Number of epochs to wait before early stopping
         sampler : str
             Optimization sampler: "bayesian" (GPSampler), "tpe" (TPESampler),
             "random" (RandomSampler), or "cmaes" (CmaEsSampler)
@@ -78,6 +81,7 @@ class GPKANAutoTuner:
         self.max_hidden_size = max_hidden_size
         self.num_epochs = num_epochs
         self.pretrain_iters = pretrain_iters
+        self.patience = patience
         self.sampler = sampler.lower()
 
         if self.metric not in ["BIC", "MSE", "R2"]:
@@ -331,7 +335,7 @@ class GPKANAutoTuner:
                     learning_rate=learning_rate,
                     num_epochs=self.num_epochs,
                     batch_size=batch_size,
-                    patience=10,
+                    patience=self.patience,
                     pretrain_iters=pretrain_iters,
                 )
 
