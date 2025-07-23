@@ -364,9 +364,9 @@ def main():
             n_jobs=4,
             use_gpu=True,
             max_hidden_layers=4,
-            max_hidden_size=200,
-            num_epochs=100,
-            pretrain_iters=50,
+            max_hidden_size=30,
+            num_epochs=20,
+            pretrain_iters=10,
             patience=100,
             sampler='tpe',
         )
