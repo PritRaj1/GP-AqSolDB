@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from typing import Dict, List, Optional, Tuple, Union, Sequence
+from typing import Dict, List, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -90,6 +90,7 @@ class ReshapeGaussian:
 
         return NormalDist(out_mean, out_var)
 
+
 class ReduceSumGaussian:
     def __init__(
         self, dim: int, keep_dim: bool = False, config: Optional[ConfigParser] = None
@@ -110,4 +111,3 @@ class ReduceSumGaussian:
             return NormalDist(out_mean, out_var).to_device("gpu")
 
         return NormalDist(out_mean, out_var)
-

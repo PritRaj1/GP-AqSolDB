@@ -86,12 +86,12 @@ class GPKANAutoTuner:
         self.pretrain_iters = pretrain_iters
         self.patience = patience
         self.sampler = sampler.lower()
-        
+
         self.available_acts = available_acts or [
             "NormaliseGaussian",
-            "ReshapeGaussian", 
+            "ReshapeGaussian",
             "ReduceSumGaussian",
-            "None"
+            "None",
         ]
 
         if self.metric not in ["BIC", "MSE", "R2"]:
@@ -227,19 +227,26 @@ class GPKANAutoTuner:
                     f"hidden_size_{i}", 2, self.max_hidden_size
                 )
                 hidden_sizes.append(hidden_size)
-                
+
                 activation_type = trial.suggest_categorical(
                     f"activation_type_{i}", self.available_acts
                 )
                 activation_types.append(activation_type)
-                
-                activation_param = {}
+
+                activation_param: Dict[str, Any] = {}
                 if activation_type == "ReshapeGaussian":
-                    activation_param["new_shape"] = [hidden_size, 1]  # Simple reshape, to allow support (not recommended)
+                    activation_param["new_shape"] = [
+                        hidden_size,
+                        1,
+                    ]  # Simple reshape, to allow support (not recommended)
                 elif activation_type == "ReduceSumGaussian":
-                    activation_param["dim"] = trial.suggest_int(f"reducesum_dim_{i}", -1, 0)
-                    activation_param["keep_dim"] = trial.suggest_categorical(f"reducesum_keepdim_{i}", [True, False])
-                
+                    activation_param["dim"] = trial.suggest_int(
+                        f"reducesum_dim_{i}", -1, 0
+                    )
+                    activation_param["keep_dim"] = trial.suggest_categorical(
+                        f"reducesum_keepdim_{i}", [True, False]
+                    )
+
                 activation_params.append(activation_param)
 
             num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
@@ -254,9 +261,7 @@ class GPKANAutoTuner:
             global_covariance_scale = trial.suggest_float(
                 "global_covariance_scale", 0.1, 1.0
             )
-            min_covariance_scale = trial.suggest_float(
-                "min_covariance_scale", 0.1, 1.0
-            )
+            min_covariance_scale = trial.suggest_float("min_covariance_scale", 0.1, 1.0)
 
             global_jitter = trial.suggest_float("global_jitter", 1e-3, 1e-1, log=True)
             baseline_jitter = trial.suggest_float(
@@ -316,12 +321,12 @@ class GPKANAutoTuner:
             return float("inf")  # Return large value for failed trials
 
     def _cross_validate_gpkan(
-        self, 
-        config: ConfigParser, 
-        hidden_sizes: List[int], 
+        self,
+        config: ConfigParser,
+        hidden_sizes: List[int],
         activation_types: List[str],
         activation_params: List[Dict[str, Any]],
-        n_splits: int = 5
+        n_splits: int = 5,
     ) -> Dict[str, List[float]]:
         """
         Perform cross-validation for GP-KAN with given hyperparameters
@@ -361,10 +366,10 @@ class GPKANAutoTuner:
 
             try:
                 network = GP_KAN(
-                    config, 
+                    config,
                     hidden_sizes=hidden_sizes,
                     activation_types=activation_types,
-                    activation_params=activation_params
+                    activation_params=activation_params,
                 )
 
                 network.train(
@@ -457,18 +462,20 @@ class GPKANAutoTuner:
         hidden_sizes = []
         activation_types = []
         activation_params = []
-        
+
         for i in range(best_params.get("num_hidden_layers", 0)):
             hidden_sizes.append(best_params[f"hidden_size_{i}"])
             activation_types.append(best_params[f"activation_type_{i}"])
-            
+
             activation_param = {}
             if best_params[f"activation_type_{i}"] == "ReshapeGaussian":
                 activation_param["new_shape"] = [best_params[f"hidden_size_{i}"], 1]
             elif best_params[f"activation_type_{i}"] == "ReduceSumGaussian":
                 activation_param["dim"] = best_params.get(f"reducesum_dim_{i}", -1)
-                activation_param["keep_dim"] = best_params.get(f"reducesum_keepdim_{i}", False)
-            
+                activation_param["keep_dim"] = best_params.get(
+                    f"reducesum_keepdim_{i}", False
+                )
+
             activation_params.append(activation_param)
 
         print(f"Best architecture: {[self.n_features] + hidden_sizes + [1]}")
@@ -485,10 +492,10 @@ class GPKANAutoTuner:
         }
 
     def _save_best_parameters(
-        self, 
-        best_params: Dict[str, Any], 
+        self,
+        best_params: Dict[str, Any],
         activation_types: List[str],
-        activation_params: List[Dict[str, Any]]
+        activation_params: List[Dict[str, Any]],
     ) -> None:
 
         hidden_sizes = []
@@ -547,10 +554,10 @@ class GPKANAutoTuner:
 
         print("Training final network with best hyperparameters...")
         final_network = GP_KAN(
-            self.config, 
+            self.config,
             hidden_sizes=hidden_sizes,
             activation_types=activation_types,
-            activation_params=activation_params
+            activation_params=activation_params,
         )
 
         learning_rate = float(best_params["learning_rate"])
@@ -594,7 +601,9 @@ class GPKANAutoTuner:
         print(f"Pretrain iterations: {self.pretrain_iters}")
         print(f"Num epochs: {self.num_epochs}")
 
-    def load_optimized_parameters(self) -> Tuple[ConfigParser, List[int], List[str], List[Dict[str, Any]]]:
+    def load_optimized_parameters(
+        self,
+    ) -> Tuple[ConfigParser, List[int], List[str], List[Dict[str, Any]]]:
         config = ConfigParser()
         config.read(self.config_path)
 
@@ -605,10 +614,10 @@ class GPKANAutoTuner:
             raise FileNotFoundError(f"Params file not found: {self.params_save_path}")
 
         return (
-            config, 
+            config,
             params_data["hidden_sizes"],
             params_data.get("activation_types", []),
-            params_data.get("activation_params", [])
+            params_data.get("activation_params", []),
         )
 
 
@@ -631,10 +640,10 @@ def create_optimized_network(config_path: str, params_path: str) -> GP_KAN:
     activation_params = params_data.get("activation_params", [])
 
     network = GP_KAN(
-        config, 
+        config,
         hidden_sizes=hidden_sizes,
         activation_types=activation_types,
-        activation_params=activation_params
+        activation_params=activation_params,
     )
 
     if "network_params" in params_data:
