@@ -311,29 +311,36 @@ def test_activation_functions_in_auto_tune(sample_data, temp_config_dir):
 
     assert "activation_types" in result, "Should have activation_types"
     assert "activation_params" in result, "Should have activation_params"
-    
+
     activation_types = result["activation_types"]
     for act_type in activation_types:
-        assert act_type in ["NormaliseGaussian", "ReduceSumGaussian", "None"], f"Invalid activation type: {act_type}"
-    
+        assert act_type in [
+            "NormaliseGaussian",
+            "ReduceSumGaussian",
+            "None",
+        ], f"Invalid activation type: {act_type}"
+
     if len(result["hidden_sizes"]) > 0:
         network = GP_KAN(
             tuner.config,
             hidden_sizes=result["hidden_sizes"],
             activation_types=result["activation_types"],
-            activation_params=result["activation_params"]
+            activation_params=result["activation_params"],
         )
-        
+
         # Test forward pass wiht optimizer params and chosen acts
         input_mean = jnp.array(X[:5])
         input_var = jnp.ones_like(input_mean) * 0.01
         input_dist = NormalDist(input_mean, input_var)
-        
+
         output_dist = network.forward(input_dist)
-        
+
         assert output_dist.mean.shape == (5, 1), "Output mean should have shape (5, 1)"
-        assert output_dist.var.shape == (5, 1), "Output variance should have shape (5, 1)"
-        
+        assert output_dist.var.shape == (
+            5,
+            1,
+        ), "Output variance should have shape (5, 1)"
+
         print("Auto-tuning with activation functions test passed!")
 
 

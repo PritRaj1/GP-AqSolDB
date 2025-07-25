@@ -6,7 +6,11 @@ import jax.numpy as jnp
 import pytest
 
 from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
-from src.gp_kan.invariant_acts import NormaliseGaussian, ReshapeGaussian, ReduceSumGaussian
+from src.gp_kan.invariant_acts import (
+    NormaliseGaussian,
+    ReduceSumGaussian,
+    ReshapeGaussian,
+)
 from src.gp_kan.normal_dist import NormalDist
 
 
@@ -290,33 +294,38 @@ def test_random_seed_consistency():
 def test_activation_functions():
     config = create_default_conf()
     config["NORMALIZATION"] = {"min_var": "0.2"}
-    
+
     norm_act = NormaliseGaussian(min_var=0.2, config=config)
     test_input = NormalDist(
-        jnp.array([[1.0, -1.0, 0.5]]), 
-        jnp.array([[0.1, 0.2, 0.15]])
+        jnp.array([[1.0, -1.0, 0.5]]), jnp.array([[0.1, 0.2, 0.15]])
     )
     norm_output = norm_act(test_input)
-    
+
     assert norm_output.mean.shape == (1, 3), "Output mean should have correct shape"
     assert norm_output.var.shape == (1, 3), "Output var should have correct shape"
     assert jnp.all(norm_output.var >= 0.2), "Variance should respect min_var"
-    assert jnp.all(norm_output.mean >= -1) and jnp.all(norm_output.mean <= 1), "Mean should be in [-1, 1]"
-    
+    assert jnp.all(norm_output.mean >= -1) and jnp.all(
+        norm_output.mean <= 1
+    ), "Mean should be in [-1, 1]"
+
     reshape_act = ReshapeGaussian(new_shape=[3], config=config)
     reshape_output = reshape_act(test_input)
-    
+
     assert reshape_output.mean.shape == (3,), "Output mean should have correct shape"
     assert reshape_output.var.shape == (3,), "Output var should have correct shape"
-    
+
     reduce_act = ReduceSumGaussian(dim=1, keep_dim=True, config=config)
     reduce_output = reduce_act(test_input)
-    
+
     assert reduce_output.mean.shape == (1, 1), "Output mean should have correct shape"
     assert reduce_output.var.shape == (1, 1), "Output var should have correct shape"
-    assert jnp.allclose(reduce_output.mean, jnp.sum(test_input.mean, axis=1, keepdims=True)), "Sum should be correct"
-    assert jnp.allclose(reduce_output.var, jnp.sum(test_input.var, axis=1, keepdims=True)), "Variance sum should be correct"
-    
+    assert jnp.allclose(
+        reduce_output.mean, jnp.sum(test_input.mean, axis=1, keepdims=True)
+    ), "Sum should be correct"
+    assert jnp.allclose(
+        reduce_output.var, jnp.sum(test_input.var, axis=1, keepdims=True)
+    ), "Variance sum should be correct"
+
     print("All activation function tests passed!")
 
 
