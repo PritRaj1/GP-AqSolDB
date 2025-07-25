@@ -288,7 +288,6 @@ def test_random_seed_consistency():
 
 
 def test_activation_functions():
-    """Test the new activation functions work correctly"""
     config = create_default_conf()
     config["NORMALIZATION"] = {"min_var": "0.2"}
     

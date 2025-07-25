@@ -291,6 +291,52 @@ def test_gpu_tuning(sample_data, temp_config_dir):
     assert "best_params" in result, "Should have best_params"
 
 
+def test_activation_functions_in_auto_tune(sample_data, temp_config_dir):
+    X, y = sample_data
+    config_path = os.path.join(temp_config_dir, "test_config.ini")
+    params_path = os.path.join(temp_config_dir, "test_params.pkl")
+
+    tuner = GPKANAutoTuner(
+        X_train=X,
+        y_train=y,
+        config_path=config_path,
+        params_save_path=params_path,
+        max_hidden_layers=1,
+        max_hidden_size=3,
+        num_epochs=3,
+        available_acts=["NormaliseGaussian", "ReduceSumGaussian", "None"],
+    )
+
+    result = tuner.optimize(n_trials=2)
+
+    assert "activation_types" in result, "Should have activation_types"
+    assert "activation_params" in result, "Should have activation_params"
+    
+    activation_types = result["activation_types"]
+    for act_type in activation_types:
+        assert act_type in ["NormaliseGaussian", "ReduceSumGaussian", "None"], f"Invalid activation type: {act_type}"
+    
+    if len(result["hidden_sizes"]) > 0:
+        network = GP_KAN(
+            tuner.config,
+            hidden_sizes=result["hidden_sizes"],
+            activation_types=result["activation_types"],
+            activation_params=result["activation_params"]
+        )
+        
+        # Test forward pass wiht optimizer params and chosen acts
+        input_mean = jnp.array(X[:5])
+        input_var = jnp.ones_like(input_mean) * 0.01
+        input_dist = NormalDist(input_mean, input_var)
+        
+        output_dist = network.forward(input_dist)
+        
+        assert output_dist.mean.shape == (5, 1), "Output mean should have shape (5, 1)"
+        assert output_dist.var.shape == (5, 1), "Output variance should have shape (5, 1)"
+        
+        print("Auto-tuning with activation functions test passed!")
+
+
 if __name__ == "__main__":
     print("\nRunning GP-KAN auto tune tests...")
 
@@ -313,6 +359,7 @@ if __name__ == "__main__":
         test_invalid_metric()
         test_mse((X, y), temp_dir)
         test_gpu_tuning((X, y), temp_dir)
+        test_activation_functions_in_auto_tune((X, y), temp_dir)
         print("All tests passed!")
     finally:
         shutil.rmtree(temp_dir)
