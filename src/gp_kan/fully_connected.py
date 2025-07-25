@@ -7,8 +7,12 @@ import optax
 from jax import grad, jit
 
 from src.gp_kan.dense_layer import DenseGPLayer
-from src.gp_kan.invariant_acts import NormaliseGaussian
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
+from src.gp_kan.invariant_acts import (
+    NormaliseGaussian,
+    ReshapeGaussian,
+    ReduceSumGaussian,
+)
 
 
 def ensure_int(val: Any, name: str = "value") -> int:
@@ -91,11 +95,15 @@ class GP_KAN:
     """Gaussian Process Kolmogorov-Arnold Network."""
 
     def __init__(
-        self, config: ConfigParser, hidden_sizes: Optional[List[int]] = None
+        self, 
+        config: ConfigParser, 
+        hidden_sizes: Optional[List[int]] = None,
+        activation_types: Optional[List[str]] = None,
+        activation_params: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self.config = config
         self.layers: List[DenseGPLayer] = []
-        self.normalizers: List[Optional[NormaliseGaussian]] = []
+        self.activations: List[Optional[Any]] = []
 
         self.device_config = get_device_config(config)
         setup_jax_device(config)
@@ -105,6 +113,9 @@ class GP_KAN:
         self.output_size = config_params["output_size"]
         self.hidden_sizes = hidden_sizes if hidden_sizes is not None else []
         self.seed = config_params["seed"]
+        
+        self.activation_types = activation_types if activation_types is not None else []
+        self.activation_params = activation_params if activation_params is not None else []
 
         self._build_network()
 
@@ -127,20 +138,50 @@ class GP_KAN:
             self.layers.append(layer)
 
             if i < len(layer_sizes) - 2:
-                min_var = float(self.config["NORMALIZATION"].get("min_var", "0.2"))
-                normalizer = NormaliseGaussian(min_var=min_var, config=self.config)
-                self.normalizers.append(normalizer)
+                activation = self._create_activation(i)
+                self.activations.append(activation)
             else:
-                self.normalizers.append(None)
+                self.activations.append(None)
+
+    def _create_activation(self, layer_idx: int) -> Optional[Any]:
+        if layer_idx >= len(self.activation_types):
+            min_var = float(self.config["NORMALIZATION"].get("min_var", "0.2"))
+            return NormaliseGaussian(min_var=min_var, config=self.config) # Default normalizer
+        
+        activation_type = self.activation_types[layer_idx]
+        activation_param = self.activation_params[layer_idx] if layer_idx < len(self.activation_params) else {}
+        
+        if activation_type == "NormaliseGaussian":
+            min_var = activation_param.get("min_var", float(self.config["NORMALIZATION"].get("min_var", "0.2")))
+            return NormaliseGaussian(min_var=min_var, config=self.config)
+        
+        elif activation_type == "ReshapeGaussian":
+            new_shape = activation_param.get("new_shape", [])
+            if not new_shape:
+                return ReshapeGaussian(new_shape=[-1], config=self.config) # Default falttener
+            return ReshapeGaussian(new_shape=new_shape, config=self.config)
+        
+
+        
+        elif activation_type == "ReduceSumGaussian":
+            dim = activation_param.get("dim", -1)
+            keep_dim = activation_param.get("keep_dim", False)
+            return ReduceSumGaussian(dim=dim, keep_dim=keep_dim, config=self.config)
+        
+        elif activation_type == "None" or activation_type is None:
+            return None
+        
+        else:
+            raise ValueError(f"Unknown activation type: {activation_type}")
 
     def forward(self, x: NormalDist) -> NormalDist:
         current = x
 
-        for i, (layer, normalizer) in enumerate(zip(self.layers, self.normalizers)):
+        for i, (layer, activation) in enumerate(zip(self.layers, self.activations)):
             current = layer.forward(current)
 
-            if normalizer is not None:
-                current = normalizer(current)
+            if activation is not None:
+                current = activation(current)
 
         return current
 
@@ -375,9 +416,9 @@ class GP_KAN:
             for layer in self.layers:
                 layer._move_to_gpu()
 
-            for normalizer in self.normalizers:
-                if normalizer is not None and hasattr(normalizer, "device_config"):
-                    normalizer.device_config["use_gpu"] = True
+            for activation in self.activations:
+                if activation is not None and hasattr(activation, "device_config"):
+                    activation.device_config["use_gpu"] = True
         else:
             cpu_device = jax.devices("cpu")[0]
             for layer in self.layers:
