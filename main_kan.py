@@ -365,13 +365,13 @@ def main():
             use_gpu=True,
             max_hidden_layers=4,
             max_hidden_size=30,
-            num_epochs=50,
-            pretrain_iters=20,
+            num_epochs=100,
+            pretrain_iters=50,
             patience=100,
             sampler='tpe',
             available_acts=["NormaliseGaussian", "ReshapeGaussian", "ReduceSumGaussian", "None"],
         )
-        tuner.optimize(n_trials=200)
+        tuner.optimize(n_trials=300)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")

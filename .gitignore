@@ -52,15 +52,13 @@ logs/
 figures/*.png
 figures/*.gif
 tests/figures/*.png
-config/*.ini
-config/*.pkl
 htmlcov/
 .coverage
 coverage.xml
 .pytest_cache/
 
 # JAX/ML specific
-*.pkl
+# *.pkl
 *.h5
 *.hdf5
 *.ckpt
