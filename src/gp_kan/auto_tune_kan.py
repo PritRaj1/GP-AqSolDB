@@ -249,7 +249,7 @@ class GPKANAutoTuner:
 
                 activation_params.append(activation_param)
 
-            num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
+            num_inducing_points = trial.suggest_int("num_inducing_points", 5, 20)
             z_init_low = trial.suggest_float("z_init_low", -2.0, -0.1)
             z_init_high = trial.suggest_float("z_init_high", 0.1, 2.0)
             h_init_low = trial.suggest_float("h_init_low", -2.0, -0.1)
@@ -390,6 +390,9 @@ class GPKANAutoTuner:
 
                 output_dist = network.forward(X_val_dist)
                 y_pred = np.array(output_dist.mean).flatten()
+
+                y_val_fold = np.array(y_val_fold).ravel()
+                y_pred = np.array(y_pred).ravel()
 
                 mse = mean_squared_error(y_val_fold, y_pred)
                 r2 = r2_score(y_val_fold, y_pred)

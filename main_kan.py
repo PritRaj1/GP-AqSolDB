@@ -364,12 +364,12 @@ def main():
             n_jobs=4,
             use_gpu=True,
             max_hidden_layers=4,
-            max_hidden_size=30,
+            max_hidden_size=100,
             num_epochs=50,
             pretrain_iters=20,
             patience=100,
             sampler='tpe',
-            available_acts=["NormaliseGaussian", "ReshapeGaussian", "ReduceSumGaussian", "None"],
+            available_acts=["NormaliseGaussian", "ReduceSumGaussian", "None"],
         )
         tuner.optimize(n_trials=300)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
@@ -378,9 +378,9 @@ def main():
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        num_epochs=100,
+        num_epochs=50,
         patience=300,
-        pretrain_iters=200,
+        pretrain_iters=20,
     )
 
     X_test_mean = X_test
