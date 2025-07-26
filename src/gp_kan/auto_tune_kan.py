@@ -389,10 +389,7 @@ class GPKANAutoTuner:
                 X_val_dist = NormalDist(jnp.array(X_val_mean), jnp.array(X_val_var))
 
                 output_dist = network.forward(X_val_dist)
-                y_pred = np.array(output_dist.mean).flatten()
-
-                y_val_fold = np.array(y_val_fold).ravel()
-                y_pred = np.array(y_pred).ravel()
+                y_pred = np.array(output_dist.mean.squeeze())
 
                 mse = mean_squared_error(y_val_fold, y_pred)
                 r2 = r2_score(y_val_fold, y_pred)
