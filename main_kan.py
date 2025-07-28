@@ -363,24 +363,24 @@ def main():
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
-            max_hidden_layers=4,
+            max_hidden_layers=3,
             max_hidden_size=100,
-            num_epochs=50,
-            pretrain_iters=20,
+            num_epochs=60,
+            pretrain_iters=30,
             patience=100,
             sampler='tpe',
-            available_acts=["NormaliseGaussian", "ReduceSumGaussian", "None"],
+            available_acts=["NormaliseGaussian"],
         )
-        tuner.optimize(n_trials=300)
+        tuner.optimize(n_trials=100)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
     gp_kan.train(
         X_train, y_train,
         X_test, y_test,
-        num_epochs=50,
+        num_epochs=60,
         patience=300,
-        pretrain_iters=20,
+        pretrain_iters=30,
     )
 
     X_test_mean = X_test
