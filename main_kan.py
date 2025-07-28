@@ -363,12 +363,12 @@ def main():
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
-            max_hidden_layers=3,
+            max_hidden_layers=4,
             max_hidden_size=100,
             num_epochs=60,
             pretrain_iters=30,
             patience=100,
-            sampler='cmaes',
+            sampler='tpe',
             available_acts=["NormaliseGaussian", "ReduceSumGaussian", "None"],
         )
         tuner.optimize(n_trials=300)
