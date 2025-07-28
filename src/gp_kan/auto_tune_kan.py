@@ -249,7 +249,7 @@ class GPKANAutoTuner:
 
                 activation_params.append(activation_param)
 
-            num_inducing_points = trial.suggest_int("num_inducing_points", 1, 5)
+            num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
             z_init_low = trial.suggest_float("z_init_low", -2.0, -0.1)
             z_init_high = trial.suggest_float("z_init_high", 0.1, 2.0)
             h_init_low = trial.suggest_float("h_init_low", -2.0, -0.1)

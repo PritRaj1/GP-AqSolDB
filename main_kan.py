@@ -368,10 +368,10 @@ def main():
             num_epochs=60,
             pretrain_iters=30,
             patience=100,
-            sampler='tpe',
-            available_acts=["NormaliseGaussian"],
+            sampler='cmaes',
+            available_acts=["NormaliseGaussian", "ReduceSumGaussian", "None"],
         )
-        tuner.optimize(n_trials=100)
+        tuner.optimize(n_trials=300)
         gp_kan = create_optimized_network(CONFIG_PATH, PARAMS_PATH)
 
     print("Training GP-KAN network...")
