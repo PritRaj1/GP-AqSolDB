@@ -355,17 +355,21 @@ class DenseGPLayer:
         return predictive_variance_per_neuron
 
     def forward(self, x: NormalDist) -> NormalDist:
-        assert x.mean.ndim == 2
-        assert x.mean.shape[1] == self.input_dim
-
-        N = x.mean.shape[0]
+        mean = x.mean
+        var = x.var
+        if mean.ndim == 1:
+            mean = mean.reshape(-1, self.input_dim)
+            var = var.reshape(-1, self.input_dim)
+        if mean.ndim != 2 or mean.shape[1] != self.input_dim:
+            raise ValueError(
+                f"Input mean must have shape (N, {self.input_dim}), got {mean.shape}"
+            )
+        N = mean.shape[0]
         input_dim = self.input_dim
         output_dim = self.output_dim
         P = self.P
-
-        x_mean = x.mean.reshape(N, input_dim, 1)
-        x_var = x.var.reshape(N, input_dim, 1, 1)
-
+        x_mean = mean.reshape(N, input_dim, 1)
+        x_var = var.reshape(N, input_dim, 1, 1)
         s, length_scale, jitter, z = self._reshape_params()
 
         # FUNCTION INNER PRODUCT: ∫ N(x|μ, σ²) k(x, z) dx = k(μ, z) * exp(σ²/(2ℓ²))
@@ -391,14 +395,12 @@ class DenseGPLayer:
             z,
             kernel_with_var,  # With input uncertainty
         )
-
         inducing_kernel_with_noise = self._jitter(
             inducing_kernel_matrix, jitter, s, length_scale, int(P)
         )
         cholesky_factor, cholesky_inverse, cholesky_inverse_transpose = (
             self._scipy_cholesky(inducing_kernel_with_noise)
         )
-
         inducing_kernel_inverse = cholesky_inverse_transpose @ cholesky_inverse
         weighted_function_values = self._predictive_mean(
             query_inducing_kernel_matrix,
@@ -408,7 +410,6 @@ class DenseGPLayer:
             output_dim,
             int(P),
         )
-
         out_mean = jnp.sum(weighted_function_values, axis=1).reshape(N, output_dim)
         predictive_variance_per_neuron = self._predictive_variance(
             query_inducing_kernel_matrix,
@@ -422,7 +423,6 @@ class DenseGPLayer:
         )
         out_var = jnp.sum(predictive_variance_per_neuron, axis=1).reshape(N, output_dim)
         out_var = jnp.maximum(out_var, 1e-6)  # Positive variance
-
         return NormalDist(out_mean, out_var)
 
     def loglikelihood(self) -> jax.Array:
