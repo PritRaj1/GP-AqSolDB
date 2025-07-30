@@ -190,12 +190,13 @@ def test_saving_loading(sample_data, temp_config_dir):
     )
 
     tuner.optimize(n_trials=3)
-    loaded_config, loaded_hidden_sizes = tuner.load_optimized_parameters()
-
+    loaded_config, loaded_hidden_sizes, loaded_activation_types, loaded_activation_params = tuner.load_optimized_parameters()
     assert isinstance(
         loaded_config, ConfigParser
     ), "Loaded config should be ConfigParser"
     assert isinstance(loaded_hidden_sizes, list), "Loaded hidden sizes should be list"
+    assert isinstance(loaded_activation_types, list), "Loaded activation types should be list"
+    assert isinstance(loaded_activation_params, list), "Loaded activation params should be list"
 
     params_data = load_gpkan_params_from_file(params_path)
     assert "hidden_sizes" in params_data, "Params data should have hidden_sizes"
