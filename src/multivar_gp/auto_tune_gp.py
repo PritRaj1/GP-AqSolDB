@@ -12,6 +12,8 @@ from sklearn.model_selection import KFold
 from src.multivar_gp.gp import GP
 from src.multivar_gp.kernels import get_parallel_info, load_parallel_conf
 
+from .config_utils import create_default_config
+
 warnings.filterwarnings("ignore")
 
 
@@ -84,7 +86,12 @@ class GPAutoTuner:
         if os.path.exists(config_path):
             self.config.read(config_path)
         else:
-            self._create_default_config()
+            self.config = create_default_config(
+                n_jobs=self.n_jobs,
+                use_gpu=self.use_gpu,
+                chunk_size=self.chunk_size,
+                min_size_for_parallel=self.min_size_for_parallel,
+            )
 
         self._load_parallel_settings()
 
@@ -109,27 +116,6 @@ class GPAutoTuner:
 
         except Exception as e:
             print(f"Warning: Could not load parallel settings: {e}")
-
-    def _create_default_config(self) -> None:
-        self.config["KERNEL"] = {
-            "type": "RBF",
-            "lmbda": "0.1",
-            "alpha": "1.0",
-            "use_cache": "true",
-            "cache_size": "100",
-        }
-        self.config["SPARSE"] = {
-            "use_sparse": "false",
-            "num_inducing": "20",
-            "inducing_method": "random",
-        }
-        self.config["PARALLEL"] = {
-            "use_parallel": "true",
-            "n_jobs": str(self.n_jobs),
-            "chunk_size": str(self.chunk_size),
-            "use_gpu": str(self.use_gpu).lower(),
-            "min_size_for_parallel": str(self.min_size_for_parallel),
-        }
 
     def calculate_bic(self, mse: float, n_params: int, n_samples: int) -> float:
         """
