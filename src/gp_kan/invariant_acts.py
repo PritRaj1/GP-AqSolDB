@@ -4,9 +4,8 @@ from typing import List, Optional, Tuple
 import jax
 import jax.numpy as jnp
 
+from src.config_utils import load_normalization_config
 from src.gp_kan.normal_dist import NormalDist, get_device_config
-
-from .config_utils import load_normalization_config
 
 
 class NormaliseGaussian:

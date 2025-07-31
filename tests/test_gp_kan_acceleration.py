@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from src.gp_kan.config_utils import create_default_config
+from src.config_utils import create_default_config
 from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 

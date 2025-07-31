@@ -8,10 +8,10 @@ import seaborn as sns
 from scipy.spatial.distance import cdist
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 from src.gp_kan.auto_tune_kan import GPKANAutoTuner, create_optimized_network
 from src.gp_kan.normal_dist import NormalDist
+from src.data_utils import load_aqsol_data
 
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
@@ -21,91 +21,6 @@ plt.rcParams['font.size'] = 16
 CONFIG_PATH = "config/gp_kan.ini"
 PARAMS_PATH = "config/gp_kan_params.pkl"
 FIGURE_DIR = "figures"
-
-
-def load_data():
-    proplist = [
-        'HeavyAtomCount', 'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms',
-        'NumRotatableBonds', 'NumValenceElectrons', 'NumAromaticRings',
-        'NumSaturatedRings', 'NumAliphaticRings', 'RingCount'
-    ]
-    sol = pd.read_csv("data/solubility-dataset.csv")
-    sol["NumHAcceptors"] = sol["NumHAcceptors"] + 1
-
-    # FEATURE ENGINEERING - run data_stats.py to see why
-    X_basic = np.array([list(sol[prop] / sol['MolWt']) for prop in proplist]).T
-    X_basic = np.insert(X_basic, 0, list(np.log(sol['MolWt'])), axis=1)
-    X_enhanced = X_basic.copy()  # Extra for better modeling
-
-    # Skewed distributins are log-transformed
-    log_features = []
-    for i, prop in enumerate(proplist):
-        if prop in ['NumSaturatedRings', 'NumAliphaticRings']:  # Highly skewed features - run data_stats.py
-            log_feat = np.log1p(sol[prop] / sol['MolWt'])  # log1p is log(1+x) because zeros are problematic
-            X_enhanced = np.column_stack([X_enhanced, log_feat])
-            log_features.append(f'log_{prop}/MolWt')
-
-    # Iteraction terms for highly correlated features - (correlation ~0.9, see data_stats.py)
-    heavy_atom_idx = 1  # After log_MolWt
-    valence_idx = 6     # NumValenceElectrons/MolWt
-    interaction = (
-        X_basic[:, heavy_atom_idx] * X_basic[:, valence_idx]
-    )
-    X_enhanced = np.column_stack([X_enhanced, interaction])
-
-    # Add polynomial features for important features (log_MolWt squared)
-    log_molwt_sq = X_basic[:, 0] ** 2
-    X_enhanced = np.column_stack([X_enhanced, log_molwt_sq])
-
-    # Add ratio features (H-bond acceptors to donors ratio)
-    acceptors_idx = 2  # NumHAcceptors/MolWt
-    donors_idx = 3     # NumHDonors/MolWt
-    hbond_ratio = np.where(
-        X_basic[:, donors_idx] > 0,
-        X_basic[:, acceptors_idx] / X_basic[:, donors_idx],
-        0,
-    )  # Avoid scalar division
-    X_enhanced = np.column_stack([X_enhanced, hbond_ratio])
-
-    # Add molecular complexity features (total rings normalized by molecular weight)
-    total_rings = (
-        sol['NumAromaticRings'] + sol['NumSaturatedRings'] + sol['NumAliphaticRings']
-    ) / sol['MolWt']
-    X_enhanced = np.column_stack([X_enhanced, total_rings])
-
-    basic_names = ['log_MolWt'] + [f'{prop}/MolWt' for prop in proplist]
-    enhanced_names = basic_names + log_features + [
-        'HeavyAtom_Valence_Interaction',
-        'log_MolWt_squared',
-        'HBond_Acceptor_Donor_Ratio',
-        'Total_Rings_per_MolWt'
-    ]
-
-    # Remove highly correlated features (only keep one, the other is redundant because ~90% correlated acc. data_stats.py)
-    corr_with_target = np.corrcoef(X_enhanced.T, sol['Solubility'])[:-1, -1]
-    heavy_atom_corr = abs(corr_with_target[1])  # HeavyAtomCount/MolWt
-    valence_corr = abs(corr_with_target[6])     # NumValenceElectrons/MolWt
-
-    if heavy_atom_corr < valence_corr:
-        X_final = np.delete(X_enhanced, 1, axis=1)
-        feature_names = [name for i, name in enumerate(enhanced_names) if i != 1]
-    else:
-        X_final = np.delete(X_enhanced, 6, axis=1)
-        feature_names = [name for i, name in enumerate(enhanced_names) if i != 6]
-
-    scaler = StandardScaler()
-    X_final = scaler.fit_transform(X_final)
-
-    y = np.array(sol['Solubility'])
-
-    print("Feature engineering summary:")
-    print(f"  Original features: {len(basic_names)}")
-    print(f"  Enhanced features: {len(enhanced_names)}")
-    print(f"  Final features (after correlation removal): {len(feature_names)}")
-    print("  Features removed due to high correlation: 1")
-    print("  Features standardized: Yes")
-
-    return X_final, y, feature_names
 
 
 def uncertainty_plot(gp_kan, X_train, X_test, y_test):
@@ -345,7 +260,7 @@ def main():
     print("Tuning/training GP-KAN on AqSolDB")
     print("="*80)
 
-    X, y, feature_names = load_data()
+    X, y, feature_names = load_aqsol_data()
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
 
     if os.path.exists(CONFIG_PATH) and os.path.exists(PARAMS_PATH):

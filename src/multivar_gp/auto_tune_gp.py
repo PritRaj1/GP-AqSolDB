@@ -9,10 +9,9 @@ import optuna
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
+from src.config_utils import create_default_config
 from src.multivar_gp.gp import GP
 from src.multivar_gp.kernels import get_parallel_info, load_parallel_conf
-
-from .config_utils import create_default_config
 
 warnings.filterwarnings("ignore")
 

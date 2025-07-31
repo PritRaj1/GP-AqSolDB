@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import optax
 from jax import grad, jit
 
+from src.config_utils import load_kan_conf
 from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.invariant_acts import (
     NormaliseGaussian,
@@ -13,8 +14,6 @@ from src.gp_kan.invariant_acts import (
     ReshapeGaussian,
 )
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
-
-from .config_utils import load_kan_conf
 
 
 def ensure_int(val: Any, name: str = "value") -> int:

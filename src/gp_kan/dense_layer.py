@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
-
-from .config_utils import create_default_config, load_gp_config
+from src.config_utils import create_default_config, load_gp_config
 
 SQRT_2PI = jnp.sqrt(2 * jnp.pi)
 
@@ -127,16 +126,16 @@ class DenseGPLayer:
 
     # Getters to ensure consistent transformation applied
     def get_jitter(self) -> jax.Array:
-        return jnp.exp(self.jitter) + self.baseline_jitter
+        return jnp.asarray(jnp.exp(self.jitter) + self.baseline_jitter)
 
     def get_s(self) -> jax.Array:
-        return jnp.exp(self.s) + self.min_covariance_scale
+        return jnp.asarray(jnp.exp(self.s) + self.min_covariance_scale)
 
     def get_length_scale(self) -> jax.Array:
-        return jnp.exp(self.length_scale) + self.min_length_scale
+        return jnp.asarray(jnp.exp(self.length_scale) + self.min_length_scale)
 
     def get_z(self) -> jax.Array:
-        return jnp.tanh(self.z)
+        return jnp.asarray(jnp.tanh(self.z))
 
     def reset_gp_hyp(self) -> None:
         z_tanh = self.get_z()
@@ -312,7 +311,7 @@ class DenseGPLayer:
             - length_scale_scaling_factor * uncertainty_reduction_reshaped
             + self.global_jitter
         )
-        return predictive_variance_per_neuron
+        return jnp.asarray(predictive_variance_per_neuron)
 
     def forward(self, x: NormalDist) -> NormalDist:
         mean = x.mean
