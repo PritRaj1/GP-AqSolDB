@@ -5,7 +5,8 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
+from src.gp_kan.config_utils import create_default_config
+from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.invariant_acts import (
     NormaliseGaussian,
     ReduceSumGaussian,
@@ -16,7 +17,7 @@ from src.gp_kan.normal_dist import NormalDist
 
 @pytest.fixture
 def sample_gp_config():
-    config = create_default_conf()
+    config = create_default_config()
     config["GP"]["num_inducing_points"] = "5"
     config["GP"]["z_init_low"] = "-2.0"
     config["GP"]["z_init_high"] = "2.0"
@@ -211,11 +212,11 @@ def test_invalid_input_shapes(sample_layer):
 
 
 def test_different_configurations():
-    config1 = create_default_conf()
+    config1 = create_default_config()
     config1["GP"]["num_inducing_points"] = "3"
     config1["GP"]["global_length_scale"] = "0.1"
 
-    config2 = create_default_conf()
+    config2 = create_default_config()
     config2["GP"]["num_inducing_points"] = "7"
     config2["GP"]["global_length_scale"] = "0.8"
 
@@ -275,7 +276,7 @@ def test_layer_repr(sample_layer):
 
 
 def test_random_seed_consistency():
-    config = create_default_conf()
+    config = create_default_config()
     config["GP"]["num_inducing_points"] = "5"
     key = jax.random.PRNGKey(42)
 
@@ -292,7 +293,7 @@ def test_random_seed_consistency():
 
 
 def test_activation_functions():
-    config = create_default_conf()
+    config = create_default_config()
     config["NORMALIZATION"] = {"min_var": "0.2"}
 
     norm_act = NormaliseGaussian(min_var=0.2, config=config)
@@ -332,7 +333,7 @@ def test_activation_functions():
 if __name__ == "__main__":
     print("\nRunning KAN layer tests...")
 
-    test_config = create_default_conf()
+    test_config = create_default_config()
     test_config["GP"]["num_inducing_points"] = "5"
     test_config["GP"]["z_init_low"] = "-2.0"
     test_config["GP"]["z_init_high"] = "2.0"

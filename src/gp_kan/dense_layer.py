@@ -8,49 +8,9 @@ import numpy as np
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
+from .config_utils import create_default_config, load_gp_config
+
 SQRT_2PI = jnp.sqrt(2 * jnp.pi)
-
-
-def load_gp_config(config: ConfigParser) -> Dict[str, float]:
-    if "GP" not in config:
-        raise ValueError("GP section not found in config")
-
-    gp_section = config["GP"]
-
-    return {
-        "num_inducing_points": int(gp_section.get("num_inducing_points", "10")),
-        "z_init_low": float(gp_section.get("z_init_low", "-2.0")),
-        "z_init_high": float(gp_section.get("z_init_high", "2.0")),
-        "h_init_low": float(gp_section.get("h_init_low", "-1.0")),
-        "h_init_high": float(gp_section.get("h_init_high", "1.0")),
-        "global_length_scale": float(gp_section.get("global_length_scale", "0.4")),
-        "min_length_scale": float(gp_section.get("min_length_scale", "0.2")),
-        "global_covariance_scale": float(
-            gp_section.get("global_covariance_scale", "1.0")
-        ),
-        "min_covariance_scale": float(gp_section.get("min_covariance_scale", "0.1")),
-        "global_jitter": float(gp_section.get("global_jitter", "0.001")),
-        "baseline_jitter": float(gp_section.get("baseline_jitter", "0.01")),
-    }
-
-
-def create_default_conf() -> ConfigParser:
-    config = ConfigParser()
-    config["GP"] = {
-        "num_inducing_points": "10",
-        "z_init_low": "-2.0",
-        "z_init_high": "2.0",
-        "h_init_low": "-1.0",
-        "h_init_high": "1.0",
-        "global_length_scale": "0.4",
-        "min_length_scale": "0.2",
-        "global_covariance_scale": "1.0",
-        "min_covariance_scale": "0.1",
-        "global_jitter": "0.001",
-        "baseline_jitter": "0.01",
-    }
-    config["DEVICE"] = {"use_gpu": "false", "device": "cpu", "precision": "float32"}
-    return config
 
 
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
@@ -105,7 +65,7 @@ class DenseGPLayer:
         self.output_dim = output_size
 
         if config is None:
-            config = create_default_conf()
+            config = create_default_config()
 
         self.config = config
         gp_params = load_gp_config(config)

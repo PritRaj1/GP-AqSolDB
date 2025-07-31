@@ -4,13 +4,14 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from src.gp_kan.dense_layer import DenseGPLayer, create_default_conf
+from src.gp_kan.config_utils import create_default_config
+from src.gp_kan.dense_layer import DenseGPLayer
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
 
 @pytest.fixture
 def sample_gp_config():
-    config = create_default_conf()
+    config = create_default_config()
     config["GP"]["num_inducing_points"] = "5"
     config["GP"]["z_init_low"] = "-2.0"
     config["GP"]["z_init_high"] = "2.0"
@@ -38,7 +39,7 @@ def sample_input_dist():
 
 
 def test_device_config():
-    config = create_default_conf()
+    config = create_default_config()
     device_config = get_device_config(config)
 
     assert "use_gpu" in device_config
@@ -50,7 +51,7 @@ def test_device_config():
 
 
 def test_gpu_setup():
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["use_gpu"] = "true"
     config["DEVICE"]["device"] = "gpu"
     config["DEVICE"]["precision"] = "float32"
@@ -66,7 +67,7 @@ def test_gpu_setup():
 
 
 def test_cpu_setup():
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["use_gpu"] = "false"
     config["DEVICE"]["device"] = "cpu"
     config["DEVICE"]["precision"] = "float32"
@@ -76,7 +77,7 @@ def test_cpu_setup():
 
 
 def test_gpu_layer_init():
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["use_gpu"] = "true"
     config["DEVICE"]["device"] = "gpu"
 
@@ -100,7 +101,7 @@ def test_gpu_layer_init():
 
 
 def test_cpu_layer_init():
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["use_gpu"] = "false"
     config["DEVICE"]["device"] = "cpu"
 
@@ -118,7 +119,7 @@ def test_cpu_layer_init():
 
 
 def test_jit_forward():
-    config = create_default_conf()
+    config = create_default_config()
     layer = DenseGPLayer(
         input_size=3, output_size=2, config=config, key=jax.random.PRNGKey(42)
     )
@@ -150,7 +151,7 @@ def test_jit_forward():
 
 
 def test_jit_loglikelihood():
-    config = create_default_conf()
+    config = create_default_config()
     layer = DenseGPLayer(
         input_size=3, output_size=2, config=config, key=jax.random.PRNGKey(42)
     )
@@ -177,7 +178,7 @@ def test_jit_loglikelihood():
 
 
 def test_gpu_vs_cpu_forward():
-    cpu_config = create_default_conf()
+    cpu_config = create_default_config()
     cpu_config["DEVICE"]["use_gpu"] = "false"
     cpu_config["DEVICE"]["device"] = "cpu"
 
@@ -191,7 +192,7 @@ def test_gpu_vs_cpu_forward():
 
     cpu_output = cpu_layer.forward(input_dist)
 
-    gpu_config = create_default_conf()
+    gpu_config = create_default_config()
     gpu_config["DEVICE"]["use_gpu"] = "true"
     gpu_config["DEVICE"]["device"] = "gpu"
 
@@ -214,7 +215,7 @@ def test_gpu_vs_cpu_forward():
 
 
 def test_gpu_vs_cpu_loglikelihood():
-    cpu_config = create_default_conf()
+    cpu_config = create_default_config()
     cpu_config["DEVICE"]["use_gpu"] = "false"
     cpu_config["DEVICE"]["device"] = "cpu"
 
@@ -224,7 +225,7 @@ def test_gpu_vs_cpu_loglikelihood():
 
     cpu_ll = cpu_layer.loglikelihood()
 
-    gpu_config = create_default_conf()
+    gpu_config = create_default_config()
     gpu_config["DEVICE"]["use_gpu"] = "true"
     gpu_config["DEVICE"]["device"] = "gpu"
 
@@ -252,7 +253,7 @@ def test_batch_perf(batch_size):
     input_dist = NormalDist(input_mean, input_var)
 
     # CPU timing
-    cpu_config = create_default_conf()
+    cpu_config = create_default_config()
     cpu_config["DEVICE"]["use_gpu"] = "false"
     cpu_layer = DenseGPLayer(
         input_size=3, output_size=2, config=cpu_config, key=jax.random.PRNGKey(42)
@@ -266,7 +267,7 @@ def test_batch_perf(batch_size):
     cpu_time = time.time() - start_time
 
     # GPU timing
-    gpu_config = create_default_conf()
+    gpu_config = create_default_config()
     gpu_config["DEVICE"]["use_gpu"] = "true"
 
     try:
@@ -294,7 +295,7 @@ def test_batch_perf(batch_size):
 
 
 def test_xla_opt():
-    config = create_default_conf()
+    config = create_default_config()
     layer = DenseGPLayer(
         input_size=3, output_size=2, config=config, key=jax.random.PRNGKey(42)
     )
@@ -327,11 +328,11 @@ def test_xla_opt():
 
 
 def test_memory_efficiency():
-    config = create_default_conf()
+    config = create_default_config()
     config["GP"]["num_inducing_points"] = "20"
 
     # CPU test
-    cpu_config = create_default_conf()
+    cpu_config = create_default_config()
     cpu_config["GP"]["num_inducing_points"] = "20"
     cpu_config["DEVICE"]["use_gpu"] = "false"
 
@@ -353,7 +354,7 @@ def test_memory_efficiency():
         pytest.fail(f"CPU memory test failed: {e}")
 
     # GPU test
-    gpu_config = create_default_conf()
+    gpu_config = create_default_config()
     gpu_config["GP"]["num_inducing_points"] = "20"
     gpu_config["DEVICE"]["use_gpu"] = "true"
 
@@ -401,7 +402,7 @@ def test_device_transfer():
 
 @pytest.mark.parametrize("precision", ["float32"])
 def test_precision_configuration(precision):
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["precision"] = precision
 
     try:
@@ -431,7 +432,7 @@ def test_precision_configuration(precision):
 
 
 def test_error_handling():
-    config = create_default_conf()
+    config = create_default_config()
     config["DEVICE"]["precision"] = "invalid_precision"
 
     # This should not raise an exception currently

@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import jax
 import jax.numpy as jnp
@@ -14,6 +14,8 @@ from src.gp_kan.invariant_acts import (
 )
 from src.gp_kan.normal_dist import NormalDist, get_device_config, setup_jax_device
 
+from .config_utils import load_kan_conf
+
 
 def ensure_int(val: Any, name: str = "value") -> int:
     if val is None:
@@ -22,73 +24,6 @@ def ensure_int(val: Any, name: str = "value") -> int:
         return int(val)
     except Exception:
         raise ValueError(f"{name} must be convertible to int, got {val!r}")
-
-
-def load_kan_conf(config: ConfigParser) -> Dict[str, Union[int, float]]:
-    if "NETWORK" not in config:
-        raise ValueError("NETWORK section not found in config")
-    if "GP" not in config:
-        raise ValueError("GP section not found in config")
-    if "NORMALIZATION" not in config:
-        raise ValueError("NORMALIZATION section not found in config")
-    if "TRAINING" not in config:
-        raise ValueError("TRAINING section not found in config")
-
-    network_section = config["NETWORK"]
-    normalization_section = config["NORMALIZATION"]
-    training_section = config["TRAINING"]
-
-    return {
-        "input_size": ensure_int(network_section.get("input_size")),
-        "output_size": ensure_int(network_section.get("output_size")),
-        "num_inducing_points": int(config["GP"].get("num_inducing_points", "10")),
-        "z_init_low": float(config["GP"].get("z_init_low", "-2.0")),
-        "z_init_high": float(config["GP"].get("z_init_high", "2.0")),
-        "h_init_low": float(config["GP"].get("h_init_low", "-1.0")),
-        "h_init_high": float(config["GP"].get("h_init_high", "1.0")),
-        "global_length_scale": float(config["GP"].get("global_length_scale", "0.4")),
-        "min_length_scale": float(config["GP"].get("min_length_scale", "0.2")),
-        "global_covariance_scale": float(
-            config["GP"].get("global_covariance_scale", "1.0")
-        ),
-        "min_covariance_scale": float(config["GP"].get("min_covariance_scale", "0.1")),
-        "global_jitter": float(config["GP"].get("global_jitter", "0.001")),
-        "baseline_jitter": float(config["GP"].get("baseline_jitter", "0.01")),
-        "min_var": float(normalization_section.get("min_var", "0.2")),
-        "seed": int(training_section.get("seed", "42")),
-        "learning_rate": float(training_section.get("learning_rate", "0.001")),
-        "num_epochs": int(training_section.get("num_epochs", "30")),
-        "batch_size": int(training_section.get("batch_size", "32")),
-        "pretrain_iters": int(training_section.get("pretrain_iters", "10")),
-    }
-
-
-def create_default_conf() -> ConfigParser:
-    config = ConfigParser()
-    config["NETWORK"] = {"input_size": "3", "output_size": "1"}
-    config["GP"] = {
-        "num_inducing_points": "10",
-        "z_init_low": "-2.0",
-        "z_init_high": "2.0",
-        "h_init_low": "-1.0",
-        "h_init_high": "1.0",
-        "global_length_scale": "0.4",
-        "min_length_scale": "0.2",
-        "global_covariance_scale": "1.0",
-        "min_covariance_scale": "0.1",
-        "global_jitter": "0.001",
-        "baseline_jitter": "0.01",
-    }
-    config["NORMALIZATION"] = {"min_var": "0.2"}
-    config["TRAINING"] = {
-        "seed": "42",
-        "learning_rate": "0.001",
-        "num_epochs": "30",
-        "batch_size": "32",
-        "pretrain_iters": "10",
-    }
-    config["DEVICE"] = {"use_gpu": "false", "device": "cpu", "precision": "float32"}
-    return config
 
 
 class GP_KAN:

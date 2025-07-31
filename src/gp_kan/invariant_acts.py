@@ -1,26 +1,12 @@
 from configparser import ConfigParser
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 
 from src.gp_kan.normal_dist import NormalDist, get_device_config
 
-
-def load_normalization_config(config: ConfigParser) -> Dict[str, float]:
-    if "NORMALIZATION" not in config:
-        raise ValueError("NORMALIZATION section not found in config")
-
-    normalization_section = config["NORMALIZATION"]
-
-    return {"min_var": float(normalization_section.get("min_var", "0.2"))}
-
-
-def create_default_conf() -> ConfigParser:
-    config = ConfigParser()
-    config["NORMALIZATION"] = {"min_var": "0.2"}
-    config["DEVICE"] = {"use_gpu": "false", "device": "cpu", "precision": "float32"}
-    return config
+from .config_utils import load_normalization_config
 
 
 class NormaliseGaussian:
