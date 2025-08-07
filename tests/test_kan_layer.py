@@ -199,15 +199,14 @@ def test_reset_gp_hyp(sample_layer):
 def test_invalid_input_shapes(sample_layer):
     wrong_dim_input = NormalDist(jnp.array([0.0, 1.0]), jnp.array([0.1, 0.1]))
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         sample_layer.forward(wrong_dim_input)
 
-    # Wrong input size
     wrong_size_input = NormalDist(
-        jnp.array([[0.0, 1.0, 0.5, 0.3]]), jnp.array([[0.1, 0.1, 0.1, 0.1]])
+        jnp.array([0.0, 1.0, 0.5, 0.3]), jnp.array([0.1, 0.1, 0.1, 0.1])
     )
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         sample_layer.forward(wrong_size_input)
 
 
