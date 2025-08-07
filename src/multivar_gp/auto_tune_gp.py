@@ -184,7 +184,16 @@ class GPAutoTuner:
                     "num_inducing", min_inducing, max_inducing
                 )
                 inducing_method = trial.suggest_categorical(
-                    "inducing_method", ["random", "uniform"]
+                    "inducing_method",
+                    [
+                        "random",
+                        "uniform",
+                        "kmeans",
+                        "kmeans_plus_plus",
+                        "stratified",
+                        "adaptive",
+                        "furthest_point",
+                    ],
                 )
             else:
                 num_inducing = 20

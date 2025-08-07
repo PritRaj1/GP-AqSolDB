@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 from scipy import linalg
 
+from src.multivar_gp.inducing_point_selectors import get_inducing_selector
 from src.multivar_gp.kernels import clear_kernel_cache, get_cache_stats, get_kernel
 
 
@@ -51,17 +52,20 @@ class SparseGP:
         return X
 
     def _select_inducing_points(
-        self, X: np.ndarray, method: str = "random"
+        self, X: np.ndarray, y: Optional[np.ndarray] = None, method: str = "kmeans"
     ) -> np.ndarray:
         """
-        Select inducing points from training data.
+        Sample inducing points from training data.
 
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
             Training data
+        y : array-like, shape (n_samples,), optional
+            Target values for adaptive selection
         method : str, optional
-            Selection method: 'random' or 'uniform'
+            Selection method: 'random', 'uniform', 'kmeans', 'kmeans_plus_plus',
+            'stratified', 'adaptive', 'furthest_point'
 
         Returns
         -------
@@ -74,24 +78,23 @@ class SparseGP:
         if self.num_inducing >= N:
             return X
 
-        # Selection method
-        if method == "random":
-            idx = np.random.choice(N, self.num_inducing, replace=False)
-            return np.asarray(X[idx])
-        elif method == "uniform":
-            step = N // self.num_inducing
-            idx = np.arange(0, N, step)[: self.num_inducing]
-            return np.asarray(X[idx])
-        else:
-            raise ValueError(f"Unknown inducing point selection method: {method}")
+        selector = get_inducing_selector(method, self.num_inducing, random_state=42)
+        return selector.select(X, y)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray, inducing_method: str = "random"
+        self, X: np.ndarray, y: np.ndarray, inducing_method: str = "kmeans"
     ) -> "SparseGP":
         self.X_train = self._recast_2D(X)
         self.y_train = y
 
-        self.Z = self._select_inducing_points(self.X_train, method=inducing_method)
+        self._inducing_method = inducing_method
+
+        if inducing_method in ["stratified", "adaptive"]:
+            self.Z = self._select_inducing_points(
+                self.X_train, y, method=inducing_method
+            )
+        else:
+            self.Z = self._select_inducing_points(self.X_train, method=inducing_method)
         M = self.Z.shape[0]
 
         self.Kmm = self.kernel(self.Z, self.Z) + 1e-6 * np.eye(M)
@@ -175,6 +178,7 @@ class SparseGP:
                 "num_training": self.X_train.shape[0],
                 "compression_ratio": self.Z.shape[0] / self.X_train.shape[0],
                 "inducing_points": self.Z,
+                "inducing_method": getattr(self, "_inducing_method", "unknown"),
             }
         else:
             return None

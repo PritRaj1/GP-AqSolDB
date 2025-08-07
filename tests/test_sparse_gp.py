@@ -223,7 +223,9 @@ def test_sparse_gp_with_different_kernels(kernel_type):
     ), f"Sparse GP predictions should be finite for {kernel_type} kernel"
 
 
-@pytest.mark.parametrize("method", ["random", "uniform"])
+@pytest.mark.parametrize(
+    "method", ["random", "uniform", "kmeans", "kmeans_plus_plus", "furthest_point"]
+)
 def test_inducing_point_selection_methods(method):
     np.random.seed(42)
     X_train = np.random.randn(100, 2)
@@ -246,6 +248,9 @@ def test_inducing_point_selection_methods(method):
     assert (
         sparse_info["compression_ratio"] <= 1.0
     ), f"Compression ratio should be <= 1 for {method} method"
+    assert (
+        sparse_info["num_inducing"] == 20
+    ), f"Should have 20 inducing points for {method} method"
 
 
 def test_sparse_gp_complexity():
@@ -299,6 +304,71 @@ def test_sparse_gp_cache_integration():
     gp.clear_cache()
 
 
+def test_inducing_point_sampling():
+    np.random.seed(42)
+    X_train = np.random.randn(200, 3)
+    y_train = np.sin(X_train[:, 0]) * np.exp(X_train[:, 1] / 5) + np.random.normal(
+        0, 0.1, 200
+    )
+    X_test = np.random.randn(50, 3)
+    y_test = np.sin(X_test[:, 0]) * np.exp(X_test[:, 1] / 5) + np.random.normal(
+        0, 0.1, 50
+    )
+
+    sigma = np.array([1.0, 1.0, 1.0])
+    config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=30)
+
+    methods = ["random", "kmeans", "kmeans_plus_plus", "furthest_point"]
+    results = {}
+
+    for method in methods:
+        gp = SparseGP(config, sigma)
+        gp.fit(X_train, y_train, inducing_method=method)
+        y_pred = gp.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        results[method] = mse
+
+    for method, mse in results.items():
+        assert mse > 0, f"{method} method should produce positive MSE"
+        assert np.isfinite(mse), f"{method} method should produce finite MSE"
+
+
+def test_adaptive_inducing_point():
+    np.random.seed(42)
+    X_train = np.random.randn(100, 2)
+    y_train = np.sin(X_train[:, 0]) + np.random.normal(0, 0.1, 100)
+    X_test = np.random.randn(20, 2)
+    y_test = np.sin(X_test[:, 0]) + np.random.normal(0, 0.1, 20)
+
+    sigma = np.array([1.0, 1.0])
+    config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=20)
+
+    # Test stratified selection
+    gp_stratified = SparseGP(config, sigma)
+    gp_stratified.fit(X_train, y_train, inducing_method="stratified")
+    y_pred_stratified = gp_stratified.predict(X_test)
+    mse_stratified = mean_squared_error(y_test, y_pred_stratified)
+
+    # Test adaptive selection
+    gp_adaptive = SparseGP(config, sigma)
+    gp_adaptive.fit(X_train, y_train, inducing_method="adaptive")
+    y_pred_adaptive = gp_adaptive.predict(X_test)
+    mse_adaptive = mean_squared_error(y_test, y_pred_adaptive)
+
+    assert mse_stratified > 0, "Stratified method should produce positive MSE"
+    assert mse_adaptive > 0, "Adaptive method should produce positive MSE"
+
+    sparse_info_stratified = gp_stratified.get_sparse_info()
+    sparse_info_adaptive = gp_adaptive.get_sparse_info()
+
+    assert (
+        sparse_info_stratified["num_inducing"] == 20
+    ), "Stratified should have 20 inducing points"
+    assert (
+        sparse_info_adaptive["num_inducing"] == 20
+    ), "Adaptive should have 20 inducing points"
+
+
 def test_sparse_gp_fit_predict_cycle():
     np.random.seed(42)
     X_train = np.random.randn(80, 2)
@@ -336,8 +406,12 @@ if __name__ == "__main__":
     test_sparse_gp_edge_cases()
     test_sparse_gp_with_different_kernels("RBF")
     test_sparse_gp_with_different_kernels("RQ")
-    test_inducing_point_selection_methods("random")
-    test_inducing_point_selection_methods("uniform")
+
+    for method in ["random", "uniform", "kmeans", "kmeans_plus_plus", "furthest_point"]:
+        test_inducing_point_selection_methods(method)
+
+    test_adaptive_inducing_point()
+    test_inducing_point_sampling()
     test_sparse_gp_complexity()
     test_sparse_gp_cache_integration()
     test_sparse_gp_fit_predict_cycle()
