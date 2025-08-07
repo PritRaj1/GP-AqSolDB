@@ -8,7 +8,7 @@ help:
 	@echo "Available targets:"
 	@echo "  install  - Set up conda environment and install dependencies"
 	@echo "  clean    - Remove conda environment"
-	@echo "  test     - Run tests with coverage"
+	@echo "  test     - Run tests (logs to logs/test_YYYYMMDD_HHMMSS.log)"
 	@echo "  dev      - Start development session"
 	@echo "  run-gp   - Run GP model in tmux"
 	@echo "  run-kan  - Run KAN model in tmux"
@@ -46,15 +46,29 @@ define conda_run
 endef
 
 test:
-	$(call conda_run,python -m pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing)
+	@mkdir -p logs
+	@echo "Running tests in tmux session and logging to logs/test_$(shell date +%Y%m%d_%H%M%S).log"
+	@tmux kill-session -t gp_sol_test 2>/dev/null || true
+	@tmux new-session -d -s gp_sol_test -n test
+	@tmux send-keys -t gp_sol_test:test "conda activate $(ENV_NAME) && python -m pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing" Enter
+	@tmux pipe-pane -t gp_sol_test:test "cat > logs/test_$(shell date +%Y%m%d_%H%M%S).log"
+	@echo "Test session ready: tmux attach-session -t gp_sol_test"
+	@echo "Log file: logs/test_$(shell date +%Y%m%d_%H%M%S).log"
 
 test-file:
 	@if [ -z "$(FILE)" ]; then \
-		echo "Error: Please specify FILE parameter"; \
+		echo "Error: Please specify FILE"; \
 		echo "Usage: make test-file FILE=tests/test_gp.py"; \
 		exit 1; \
 	fi
-	$(call conda_run,python -m pytest $(FILE) -v)
+	@mkdir -p logs
+	@echo "Running test file $(FILE) in tmux session and logging to logs/test_$(shell date +%Y%m%d_%H%M%S).log"
+	@tmux kill-session -t gp_sol_test 2>/dev/null || true
+	@tmux new-session -d -s gp_sol_test -n test
+	@tmux send-keys -t gp_sol_test:test "conda activate $(ENV_NAME) && python -m pytest $(FILE) -v" Enter
+	@tmux pipe-pane -t gp_sol_test:test "cat > logs/test_$(shell date +%Y%m%d_%H%M%S).log"
+	@echo "Test session ready: tmux attach-session -t gp_sol_test"
+	@echo "Log file: logs/test_$(shell date +%Y%m%d_%H%M%S).log"
 
 dev:
 	@tmux kill-session -t gp_dev 2>/dev/null || true
@@ -99,6 +113,7 @@ kill-sessions:
 	@tmux kill-session -t gp_dev 2>/dev/null || echo "No dev session to kill"
 	@tmux kill-session -t gp_sol_gp 2>/dev/null || echo "No GP session to kill"
 	@tmux kill-session -t gp_sol_kan 2>/dev/null || echo "No KAN session to kill"
+	@tmux kill-session -t gp_sol_test 2>/dev/null || echo "No test session to kill"
 	@echo "Sessions killed!"
 
 clean-figures:
@@ -123,6 +138,15 @@ logs:
 		echo "Found log files:"; \
 		ls -la logs/*.log; \
 		echo ""; \
+		echo "=== Latest Test Log ==="; \
+		LATEST_TEST_LOG=$$(ls -t logs/test_*.log 2>/dev/null | head -1); \
+		if [ -n "$$LATEST_TEST_LOG" ]; then \
+			echo "Last 20 lines of $$LATEST_TEST_LOG:"; \
+			tail -20 "$$LATEST_TEST_LOG"; \
+		else \
+			echo "No test logs found"; \
+		fi; \
+		echo ""; \
 		echo "=== GP Model Log ==="; \
 		if [ -f "logs/gp.log" ]; then \
 			echo "Last 20 lines of gp.log:"; \
@@ -140,7 +164,7 @@ logs:
 		fi; \
 	else \
 		echo "No log files found in logs/ directory"; \
-		echo "Run 'make run-gp' or 'make run-kan' to generate logs"; \
+		echo "Run 'make test', 'make run-gp', or 'make run-kan' to generate logs"; \
 	fi
 
 clean-logs:
