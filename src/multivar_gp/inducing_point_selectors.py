@@ -67,7 +67,7 @@ class KMeansSelector(InducingPointSelector):
             n_clusters=self.num_inducing, random_state=self.random_state, n_init=10
         )
         kmeans.fit(X)
-        return kmeans.cluster_centers_
+        return np.asarray(kmeans.cluster_centers_)
 
 
 class KMeansPlusPlusSelector(InducingPointSelector):
@@ -81,7 +81,7 @@ class KMeansPlusPlusSelector(InducingPointSelector):
             n_init=10,
         )
         kmeans.fit(X)
-        return kmeans.cluster_centers_
+        return np.asarray(kmeans.cluster_centers_)
 
 
 class StratifiedSelector(InducingPointSelector):
@@ -169,7 +169,7 @@ class FurthestPointSelector(InducingPointSelector):
                 n_init=1,
             )
             kmeans.fit(X_norm)
-            return kmeans.cluster_centers_
+            return np.asarray(kmeans.cluster_centers_)
 
         # Else use exact furthest point sampling
         selected_idx = [np.random.randint(0, N)]
