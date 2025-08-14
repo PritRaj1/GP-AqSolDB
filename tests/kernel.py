@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import seaborn as sns
 
-from src.multivar_gp.kernels import get_kernel
+from src.core.kernels import get_kernel
 
 sns.set_theme(style="whitegrid", palette="husl")
 sns.set_context("paper", font_scale=1.2)

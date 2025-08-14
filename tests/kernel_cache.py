@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from src.multivar_gp.dense_gp import DenseGP
-from src.multivar_gp.kernels import clear_kernel_cache, get_cache_stats
+from src.core.kernels import clear_kernel_cache, get_cache_stats
 
 
 def create_config(

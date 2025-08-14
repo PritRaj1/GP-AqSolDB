@@ -4,13 +4,13 @@ from configparser import ConfigParser
 import numpy as np
 import pytest
 
-from src.multivar_gp.kernels import (
-    RBF,
-    RQ,
-    configure_parallel_settings,
+from src.core.kernels import (
     get_parallel_info,
     load_parallel_conf,
 )
+from src.core.kernels.rbf import RBF
+from src.core.kernels.rq import RQ
+from src.utils.kernel_utils import configure_parallel_settings
 
 
 @pytest.fixture
