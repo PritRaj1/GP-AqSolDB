@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.utils.kernel_utils import PARALLEL_SETTINGS, CUPY_AVAILABLE
+from ...utils import CUPY_AVAILABLE, PARALLEL_SETTINGS
 from .cache import _kernel_cache
 
 try:
@@ -45,12 +45,15 @@ def _compute_kernel_chunk(
 
     if kernel_type == "RBF":
         from .rbf import _compute_rbf_chunk
+
         return _compute_rbf_chunk(X1_chunk, X2, sigma)
     elif kernel_type == "RQ":
         from .rq import _compute_rq_chunk
+
         return _compute_rq_chunk(X1_chunk, X2, sigma, alpha)
     elif kernel_type == "MATERN":
         from .matern import _compute_matern_chunk
+
         return _compute_matern_chunk(X1_chunk, X2, sigma, alpha)
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
@@ -112,11 +115,17 @@ def _parallel_kernel_computation(
     # Cache the result
     if use_cache:
         if kernel_type == "RBF":
-            _kernel_cache.set(X1, X2, sigma, alpha=None, kernel_type="RBF", result=result)
+            _kernel_cache.set(
+                X1, X2, sigma, alpha=None, kernel_type="RBF", result=result
+            )
         elif kernel_type == "RQ":
-            _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result)
+            _kernel_cache.set(
+                X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result
+            )
         elif kernel_type == "MATERN":
-            _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="MATERN", result=result)
+            _kernel_cache.set(
+                X1, X2, sigma, alpha=alpha, kernel_type="MATERN", result=result
+            )
 
     return result
 

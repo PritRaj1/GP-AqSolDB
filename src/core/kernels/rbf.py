@@ -1,12 +1,13 @@
 import warnings
+
 import numpy as np
 
+from ...utils import CUPY_AVAILABLE, PARALLEL_SETTINGS
 from .base import (
-    _should_use_parallel,
     _parallel_kernel_computation,
+    _should_use_parallel,
 )
 from .cache import _kernel_cache
-from src.utils.kernel_utils import PARALLEL_SETTINGS, CUPY_AVAILABLE
 
 try:
     import cupy as cp
@@ -64,10 +65,7 @@ def _cupy_rbf(X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray) -> np.ndarray:
 
 
 def RBF(
-    X1: np.ndarray,
-    X2: np.ndarray, 
-    sigma: np.ndarray,
-    use_cache: bool = True
+    X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray, use_cache: bool = True
 ) -> np.ndarray:
     """
     k(x, y) = exp(-||x - y||² / (2 * σ²))

@@ -5,12 +5,12 @@ from typing import Optional
 import numpy as np
 from scipy.special import kv
 
+from ...utils import CUPY_AVAILABLE, PARALLEL_SETTINGS
 from .base import (
-    _should_use_parallel,
     _parallel_kernel_computation,
+    _should_use_parallel,
 )
 from .cache import _kernel_cache
-from src.utils.kernel_utils import PARALLEL_SETTINGS, CUPY_AVAILABLE
 
 try:
     import cupy as cp
@@ -59,7 +59,9 @@ def _compute_matern_chunk(
         )
 
 
-def _cupy_matern(X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: float) -> np.ndarray:
+def _cupy_matern(
+    X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray, alpha: float
+) -> np.ndarray:
     """Matérn kernel using GPU acceleration"""
     if not CUPY_AVAILABLE or cp is None:
         raise RuntimeError("GPU acceleration not available. Install cupy.")

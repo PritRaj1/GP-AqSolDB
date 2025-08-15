@@ -1,12 +1,9 @@
-"""
-Kernel utilities for parallel processing and configuration.
-"""
-
 import warnings
 from typing import Any, Dict
 
 try:
     import cupy as cp
+
     CUPY_AVAILABLE = True
 except ImportError:
     CUPY_AVAILABLE = False

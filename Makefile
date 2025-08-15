@@ -1,4 +1,4 @@
-.PHONY: install clean test dev train format lint help logs clean-logs clean-tuned-gp clean-tuned-kan
+.PHONY: install clean test dev train format lint help logs clear-logs clean-tuned-gp clean-tuned-kan
 
 ENV_NAME = GP_sol
 CONDA_BASE := $(shell conda info --base 2>/dev/null || echo "")
@@ -15,7 +15,7 @@ help:
 	@echo "  format   - Format code"
 	@echo "  lint     - Run linting"
 	@echo "  logs     - Display log files"
-	@echo "  clean-logs - Delete log files"
+	@echo "  clear-logs - Delete log files"
 	@echo "  clean-tuned-gp - Delete GP tuned files (.ini and .pkl)"
 	@echo "  clean-tuned-kan - Delete KAN tuned files (.ini and .pkl)"
 	@echo "  help     - Show this help"
@@ -167,7 +167,7 @@ logs:
 		echo "Run 'make test', 'make run-gp', or 'make run-kan' to generate logs"; \
 	fi
 
-clean-logs:
+clear-logs:
 	@echo "Cleaning log files..."
 	@if [ -d "logs" ]; then \
 		rm -f logs/*.log; \

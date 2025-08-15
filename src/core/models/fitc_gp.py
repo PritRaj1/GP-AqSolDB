@@ -1,11 +1,10 @@
-import numpy as np
-import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
+import numpy as np
 from scipy import linalg
 
+from ...utils import get_inducing_selector
 from ..kernels import clear_kernel_cache, get_cache_stats, get_kernel
-from src.utils.inducing_point_selectors import get_inducing_selector
 
 
 class FITCGP:

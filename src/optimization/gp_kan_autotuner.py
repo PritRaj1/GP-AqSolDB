@@ -11,8 +11,7 @@ import optuna
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
-from ..core.models.gp_kan import GP_KAN
-from ..core.models.gp_kan import NormalDist
+from ..core.models.gp_kan import GP_KAN, NormalDist
 
 warnings.filterwarnings("ignore")
 

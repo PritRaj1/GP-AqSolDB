@@ -1,17 +1,16 @@
-from configparser import ConfigParser
 import os
 import pickle
 import warnings
-from typing import Any, Dict, List, Optional, Tuple, Union
+from configparser import ConfigParser
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import optuna
-
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
-from ..core.models import GP
 from ..core.kernels import get_cache_stats, get_parallel_info, load_parallel_conf
+from ..core.models import GP
 from ..utils.config_utils import create_default_config
 
 warnings.filterwarnings("ignore")

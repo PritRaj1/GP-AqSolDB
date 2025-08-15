@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import mean_squared_error
 
-from src.core.models import DenseGP, FITCGP
+from src.core.models import FITCGP, DenseGP
 
 
 def create_config(

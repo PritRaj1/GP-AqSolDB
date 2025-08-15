@@ -2,11 +2,10 @@ from typing import Any
 
 import numpy as np
 
-from .cache import _kernel_cache
+from ...utils import load_parallel_conf
+from .matern import MATERN
 from .rbf import RBF
 from .rq import RQ
-from .matern import MATERN
-from src.utils.kernel_utils import load_parallel_conf
 
 
 def get_kernel(
@@ -31,11 +30,7 @@ def get_kernel(
     kernel_func : function
         Vectorized kernel function that takes (X1, X2) and returns kernel matrix
     """
-    global _kernel_cache
     load_parallel_conf(config)
-
-    if use_cache and _kernel_cache.max_size != cache_size:
-        _kernel_cache = _kernel_cache.__class__(max_size=cache_size)
 
     kernel_type = config.get("KERNEL", "type")
     alpha = config.getfloat("KERNEL", "alpha")

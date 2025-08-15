@@ -1,10 +1,16 @@
+import time
+
 import jax
 import jax.numpy as jnp
 import pytest
 
+from src.core.models.gp_kan import (
+    DenseGPLayer,
+    NormalDist,
+    get_device_config,
+    setup_jax_device,
+)
 from src.utils.config_utils import create_default_config
-from src.core.models.gp_kan import DenseGPLayer
-from src.core.models.gp_kan import NormalDist, get_device_config, setup_jax_device
 
 
 @pytest.fixture
