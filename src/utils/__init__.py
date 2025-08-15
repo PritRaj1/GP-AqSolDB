@@ -22,7 +22,12 @@ from .inducing_point_selectors import (
     UniformSelector,
     get_inducing_selector,
 )
-from .kernel_utils import CUPY_AVAILABLE, PARALLEL_SETTINGS, configure_parallel_settings
+from .kernel_utils import (
+    CUPY_AVAILABLE,
+    PARALLEL_SETTINGS,
+    configure_parallel_settings,
+    load_parallel_conf,
+)
 
 __all__ = [
     "create_default_config",
@@ -37,6 +42,7 @@ __all__ = [
     "load_kan_conf",
     "load_aqsol_data",
     "configure_parallel_settings",
+    "load_parallel_conf",
     "PARALLEL_SETTINGS",
     "CUPY_AVAILABLE",
     "InducingPointSelector",
