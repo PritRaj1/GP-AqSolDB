@@ -11,7 +11,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
 from ..core.models.gp_kan import GP_KAN, NormalDist
-from ..utils.config_utils import create_default_config
 from .base_autotuner import BaseAutoTuner
 
 
@@ -118,7 +117,7 @@ class GPKANAutoTuner(BaseAutoTuner):
         except Exception as e:
             print(f"Warning: Could not load device settings: {e}")
 
-    def _create_default_config(self) -> None:
+    def _create_default_config(self) -> ConfigParser:
         self.config["NETWORK"] = {
             "input_size": str(self.n_features),
             "output_size": "1",
@@ -143,6 +142,7 @@ class GPKANAutoTuner(BaseAutoTuner):
             "device": "gpu" if self.use_gpu else "cpu",
             "precision": "float32",
         }
+        return self.config
 
     def calculate_bic(self, mse: float, n_params: int, n_samples: int) -> float:
         """

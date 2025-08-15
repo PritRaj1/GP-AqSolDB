@@ -10,7 +10,6 @@ from sklearn.model_selection import KFold
 
 from ..core.kernels import get_cache_stats, get_parallel_info, load_parallel_conf
 from ..core.models import GP
-from ..utils.config_utils import create_default_config
 from .base_autotuner import BaseAutoTuner
 
 
@@ -256,9 +255,10 @@ class GPAutoTuner(BaseAutoTuner):
     def optimize(
         self, n_trials: int = 100, timeout: Optional[int] = None
     ) -> Dict[str, Any]:
-        best_params = super().optimize(n_trials, timeout)
-        self._save_best_parameters(best_params["best_params"])
-        return best_params["best_params"]
+        result: Dict[str, Any] = super().optimize(n_trials, timeout)
+        best_params: Dict[str, Any] = result["best_params"]
+        self._save_best_parameters(best_params)
+        return best_params
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
         if self.force_dense:

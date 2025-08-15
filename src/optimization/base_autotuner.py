@@ -100,7 +100,8 @@ class BaseAutoTuner(ABC):
 
     def _print_optimization_start(self, n_trials: int) -> None:
         print(
-            f"Starting {self._get_model_name()} hyperparameter optimization with {n_trials} trials..."
+            f"Starting {self._get_model_name()} hyperparameter optimization "
+            f"with {n_trials} trials..."
         )
         print(f"Features: {self.n_features}")
         print(f"Samples: {self.n_samples}")
@@ -149,7 +150,8 @@ class BaseAutoTuner(ABC):
         if hasattr(self, "pretrain_iters"):
             kwargs["pretrain_iters"] = self.pretrain_iters
 
-        return create_default_config(**kwargs)
+        config: ConfigParser = create_default_config(**kwargs)
+        return config
 
     @abstractmethod
     def _get_model_name(self) -> str:
