@@ -101,7 +101,7 @@ class StratifiedSelector(InducingPointSelector):
         for train_idx, test_idx in splitter.split(X, y_binned):
             return X[test_idx]  # type: ignore
 
-        return X[: self.num_inducing]  # type: ignore
+        return X[: self.num_inducing]
 
 
 class AdaptiveSelector(InducingPointSelector):
@@ -147,7 +147,7 @@ class AdaptiveSelector(InducingPointSelector):
             N, size=self.num_inducing, replace=False, p=combined_weights
         )
 
-        return X[idx]  # type: ignore
+        return X[idx]
 
 
 class FurthestPointSelector(InducingPointSelector):
@@ -191,7 +191,7 @@ class FurthestPointSelector(InducingPointSelector):
             selected_idx.append(furthest_idx)
             remaining_idx.remove(furthest_idx)
 
-        return X[selected_idx]  # type: ignore
+        return X[selected_idx]
 
 
 def get_inducing_selector(
