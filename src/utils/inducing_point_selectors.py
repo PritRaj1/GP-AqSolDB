@@ -99,7 +99,7 @@ class StratifiedSelector(InducingPointSelector):
         )
 
         for train_idx, test_idx in splitter.split(X, y_binned):
-            return X[test_idx]  # type: ignore
+            return X[test_idx]
 
         return X[: self.num_inducing]
 
