@@ -1,6 +1,5 @@
 import os
 import pickle
-import warnings
 from configparser import ConfigParser
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,11 +11,11 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
 from ..core.models.gp_kan import GP_KAN, NormalDist
+from ..utils.config_utils import create_default_config
+from .base_autotuner import BaseAutoTuner
 
-warnings.filterwarnings("ignore")
 
-
-class GPKANAutoTuner:
+class GPKANAutoTuner(BaseAutoTuner):
     def __init__(
         self,
         X_train: np.ndarray,
@@ -69,22 +68,12 @@ class GPKANAutoTuner:
         available_acts : List[str], optional
             List of activation functions to consider during optimization
         """
-        self.X_train = X_train
-        self.y_train = y_train
-        self.config_path = config_path
         self.params_save_path = params_save_path
-        self.n_features = X_train.shape[1]
-        self.n_samples = X_train.shape[0]
-        self.metric = metric.upper()
-
-        self.n_jobs = n_jobs
-        self.use_gpu = use_gpu
         self.max_hidden_layers = max_hidden_layers
         self.max_hidden_size = max_hidden_size
         self.num_epochs = num_epochs
         self.pretrain_iters = pretrain_iters
         self.patience = patience
-        self.sampler = sampler.lower()
 
         self.available_acts = available_acts or [
             "NormaliseGaussian",
@@ -93,11 +82,9 @@ class GPKANAutoTuner:
             "None",
         ]
 
-        if self.metric not in ["BIC", "MSE", "R2"]:
-            raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
-
-        if self.sampler not in ["bayesian", "tpe", "random", "cmaes"]:
-            raise ValueError("sampler must be 'bayesian', 'tpe', 'random', or 'cmaes'")
+        super().__init__(
+            X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
+        )
 
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -169,7 +156,6 @@ class GPKANAutoTuner:
         return float(n_samples * np.log(mse) + n_params * np.log(n_samples))
 
     def _count_network_parameters(self, hidden_sizes: List[int]) -> int:
-        """Count total number of parameters in the network"""
         layer_sizes = [self.n_features] + hidden_sizes + [1]
         total_params = 0
 
@@ -188,31 +174,7 @@ class GPKANAutoTuner:
 
         return total_params
 
-    def _get_sampler(self) -> optuna.samplers.BaseSampler:
-        if self.sampler == "bayesian":
-            return optuna.samplers.GPSampler(seed=42)
-        elif self.sampler == "tpe":
-            return optuna.samplers.TPESampler(seed=42)
-        elif self.sampler == "random":
-            return optuna.samplers.RandomSampler(seed=42)
-        elif self.sampler == "cmaes":
-            return optuna.samplers.CmaEsSampler(seed=42)
-        else:
-            raise ValueError(f"Unknown sampler: {self.sampler}")
-
     def _objective(self, trial: optuna.Trial) -> float:
-        """
-        Objective function for Optuna optimization
-
-        Parameters:
-        -----------
-        trial : optuna.Trial
-            Optuna trial object
-
-        Returns:
-        --------
-        float : Cross-validation score (negative BIC for minimization)
-        """
         try:
             num_hidden_layers = trial.suggest_int(
                 "num_hidden_layers", 0, self.max_hidden_layers
@@ -407,57 +369,10 @@ class GPKANAutoTuner:
 
         return {"mse": mse_scores, "bic": bic_scores, "r2": r2_scores}
 
-    def optimize(
-        self, n_trials: int = 100, timeout: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Run hyperparameter optimization
+    def _get_model_name(self) -> str:
+        return "GP-KAN"
 
-        Parameters:
-        -----------
-        n_trials : int
-            Number of optimization trials
-        timeout : int
-            Timeout in seconds (None for no timeout)
-
-        Returns:
-        --------
-        dict : Best hyperparameters
-        """
-        print(f"Starting GP-KAN hyperparameter optimization with {n_trials} trials...")
-        print(f"Features: {self.n_features}")
-        print(f"Samples: {self.n_samples}")
-        print(f"Max hidden layers: {self.max_hidden_layers}")
-        print(f"Max hidden size: {self.max_hidden_size}")
-        print(f"Metric: {self.metric}")
-        print(f"Sampler: {self.sampler}")
-        print(f"Available activations: {self.available_acts}")
-        if self.metric == "BIC":
-            print("  BIC balances accuracy and model complexity")
-        elif self.metric == "R2":
-            print("  R² optimizes for prediction accuracy (higher is better)")
-        else:
-            print("  MSE optimizes for pure prediction accuracy")
-
-        study = optuna.create_study(
-            direction="minimize",
-            sampler=self._get_sampler(),
-            pruner=optuna.pruners.MedianPruner(),
-        )
-
-        study.optimize(self._objective, n_trials=n_trials, timeout=timeout)
-
-        best_params = study.best_params
-        best_value = study.best_value
-
-        print("\nOptimization completed!")
-        if self.metric == "BIC":
-            print(f"Best CV BIC: {-best_value:.2f}")
-        elif self.metric == "R2":
-            print(f"Best CV R²: {-best_value:.4f}")
-        else:
-            print(f"Best CV MSE: {best_value:.4f}")
-
+    def _print_best_parameters(self, best_params: Dict[str, Any]) -> None:
         hidden_sizes = []
         activation_types = []
         activation_params = []
@@ -480,6 +395,28 @@ class GPKANAutoTuner:
         print(f"Best architecture: {[self.n_features] + hidden_sizes + [1]}")
         print(f"Best activation types: {activation_types}")
         print(f"Best parameters: {best_params}")
+
+    def _process_optimization_results(
+        self, best_params: Dict[str, Any], best_value: float
+    ) -> Dict[str, Any]:
+        hidden_sizes = []
+        activation_types = []
+        activation_params = []
+
+        for i in range(best_params.get("num_hidden_layers", 0)):
+            hidden_sizes.append(best_params[f"hidden_size_{i}"])
+            activation_types.append(best_params[f"activation_type_{i}"])
+
+            activation_param = {}
+            if best_params[f"activation_type_{i}"] == "ReshapeGaussian":
+                activation_param["new_shape"] = [best_params[f"hidden_size_{i}"], 1]
+            elif best_params[f"activation_type_{i}"] == "ReduceSumGaussian":
+                activation_param["dim"] = best_params.get(f"reducesum_dim_{i}", -1)
+                activation_param["keep_dim"] = best_params.get(
+                    f"reducesum_keepdim_{i}", False
+                )
+
+            activation_params.append(activation_param)
 
         self._save_best_parameters(best_params, activation_types, activation_params)
         return {

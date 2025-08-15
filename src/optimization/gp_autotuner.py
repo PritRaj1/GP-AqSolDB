@@ -1,6 +1,5 @@
 import os
 import pickle
-import warnings
 from configparser import ConfigParser
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,11 +11,10 @@ from sklearn.model_selection import KFold
 from ..core.kernels import get_cache_stats, get_parallel_info, load_parallel_conf
 from ..core.models import GP
 from ..utils.config_utils import create_default_config
+from .base_autotuner import BaseAutoTuner
 
-warnings.filterwarnings("ignore")
 
-
-class GPAutoTuner:
+class GPAutoTuner(BaseAutoTuner):
     def __init__(
         self,
         X_train: np.ndarray,
@@ -60,37 +58,14 @@ class GPAutoTuner:
             Optimization sampler: "bayesian" (GPSampler), "tpe" (TPESampler),
             "random" (RandomSampler), or "cmaes" (CmaEsSampler)
         """
-        self.X_train = X_train
-        self.y_train = y_train
-        self.config_path = config_path
         self.sigma_save_path = sigma_save_path
-        self.n_features = X_train.shape[1]
-        self.n_samples = X_train.shape[0]
         self.force_dense = force_dense
-        self.metric = metric.upper()
-
-        self.n_jobs = n_jobs
-        self.use_gpu = use_gpu
         self.chunk_size = chunk_size
         self.min_size_for_parallel = min_size_for_parallel
-        self.sampler = sampler.lower()
 
-        if self.metric not in ["BIC", "MSE", "R2"]:
-            raise ValueError("metric must be 'BIC', 'MSE', or 'R2'")
-
-        if self.sampler not in ["bayesian", "tpe", "random", "cmaes"]:
-            raise ValueError("sampler must be 'bayesian', 'tpe', 'random', or 'cmaes'")
-
-        self.config = ConfigParser()
-        if os.path.exists(config_path):
-            self.config.read(config_path)
-        else:
-            self.config = create_default_config(
-                n_jobs=self.n_jobs,
-                use_gpu=self.use_gpu,
-                chunk_size=self.chunk_size,
-                min_size_for_parallel=self.min_size_for_parallel,
-            )
+        super().__init__(
+            X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
+        )
 
         self._load_parallel_settings()
 
@@ -127,31 +102,7 @@ class GPAutoTuner:
         """
         return float(n_samples * np.log(mse) + n_params * np.log(n_samples))
 
-    def _get_sampler(self) -> optuna.samplers.BaseSampler:
-        if self.sampler == "bayesian":
-            return optuna.samplers.GPSampler(seed=42)
-        elif self.sampler == "tpe":
-            return optuna.samplers.TPESampler(seed=42)
-        elif self.sampler == "random":
-            return optuna.samplers.RandomSampler(seed=42)
-        elif self.sampler == "cmaes":
-            return optuna.samplers.CmaEsSampler(seed=42)
-        else:
-            raise ValueError(f"Unknown sampler: {self.sampler}")
-
     def _objective(self, trial: optuna.Trial) -> float:
-        """
-        Objective function for Optuna optimization
-
-        Parameters:
-        -----------
-        trial : optuna.Trial
-            Optuna trial object
-
-        Returns:
-        --------
-        float : Cross-validation score (negative BIC for minimization)
-        """
         try:
             if self.force_dense:
                 use_sparse = False
@@ -276,40 +227,10 @@ class GPAutoTuner:
 
         return {"mse": mse_scores, "bic": bic_scores, "r2": r2_scores}
 
-    def optimize(
-        self, n_trials: int = 100, timeout: Optional[int] = None
-    ) -> Dict[str, Any]:
-        print(f"Starting GP hyperparameter optimization with {n_trials} trials...")
-        print(f"Features: {self.n_features}")
-        print(f"Samples: {self.n_samples}")
-        print(f"Metric: {self.metric}")
-        print(f"Sampler: {self.sampler}")
-        if self.metric == "BIC":
-            print("  BIC balances accuracy and model complexity")
-        elif self.metric == "R2":
-            print("  R² optimizes for prediction accuracy (higher is better)")
-        else:
-            print("  MSE optimizes for pure prediction accuracy")
+    def _get_model_name(self) -> str:
+        return "GP"
 
-        study = optuna.create_study(
-            direction="minimize",
-            sampler=self._get_sampler(),
-            pruner=optuna.pruners.MedianPruner(),
-        )
-
-        study.optimize(self._objective, n_trials=n_trials, timeout=timeout)
-
-        best_params = study.best_params
-        best_value = study.best_value
-
-        print("\nOptimization completed!")
-        if self.metric == "BIC":
-            print(f"Best CV BIC: {-best_value:.2f}")
-        elif self.metric == "R2":
-            print(f"Best CV R²: {-best_value:.4f}")
-        else:
-            print(f"Best CV MSE: {best_value:.4f}")
-
+    def _print_best_parameters(self, best_params: Dict[str, Any]) -> None:
         print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
         print(f"Best kernel: {best_params['kernel_type']}")
         if best_params["kernel_type"] == "MATERN":
@@ -332,11 +253,14 @@ class GPAutoTuner:
         except Exception:
             pass
 
-        self._save_best_parameters(best_params)
-        return best_params
+    def optimize(
+        self, n_trials: int = 100, timeout: Optional[int] = None
+    ) -> Dict[str, Any]:
+        best_params = super().optimize(n_trials, timeout)
+        self._save_best_parameters(best_params["best_params"])
+        return best_params["best_params"]
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
-        """Save the best parameters to files."""
         if self.force_dense:
             use_sparse = "false"
         else:
@@ -400,7 +324,6 @@ class GPAutoTuner:
             print(f"Preserved sections: {preserved_sections}")
 
     def load_optimized_parameters(self) -> Tuple[ConfigParser, np.ndarray]:
-        """Load optimized parameters from files."""
         config = ConfigParser()
         config.read(self.config_path)
 
@@ -414,7 +337,6 @@ class GPAutoTuner:
 
 
 def load_sigmas_from_file(file_path: str) -> np.ndarray:
-    """Load sigma values from a pickle file."""
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
             return np.array(pickle.load(f))

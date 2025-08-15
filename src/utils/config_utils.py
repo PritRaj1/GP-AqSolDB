@@ -88,9 +88,6 @@ def create_default_config(
     return config
 
 
-# Loader functions for each section
-
-
 def load_network_config(config: ConfigParser) -> Dict[str, int]:
     if "NETWORK" not in config:
         raise ValueError("NETWORK section not found in config")
