@@ -1,11 +1,9 @@
 # Gaussian Processes - AqSolDB
 
-Forward uncertainty quantification using Gaussian Processes and Gaussian Process Kolmogorov-Arnold Networks.
-
 <p align="center">
   <img src="figures/learning_evolution.gif" alt="Active Learning">
   <br>
-  <em>Active Learning of Gaussian Process</em>
+  <em>Epistemic uncertainty reduction</em>
 </p>
 
 ## Setup
