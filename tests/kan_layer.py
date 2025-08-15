@@ -1,18 +1,15 @@
-import os
-import shutil
-
 import jax
 import jax.numpy as jnp
 import pytest
 
-from src.config_utils import create_default_config
-from src.gp_kan.dense_layer import DenseGPLayer
-from src.gp_kan.invariant_acts import (
+from src.utils.config_utils import create_default_config
+from src.core.models.gp_kan import DenseGPLayer
+from src.core.models.gp_kan import (
     NormaliseGaussian,
     ReduceSumGaussian,
     ReshapeGaussian,
 )
-from src.gp_kan.normal_dist import NormalDist
+from src.core.models.gp_kan import NormalDist
 
 
 @pytest.fixture

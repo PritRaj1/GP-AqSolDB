@@ -9,9 +9,9 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-from src.gp_kan.auto_tune_kan import GPKANAutoTuner, create_optimized_network
-from src.gp_kan.normal_dist import NormalDist
-from src.data_utils import load_aqsol_data
+from src.optimization import GPKANAutoTuner
+from src.core.models.gp_kan import NormalDist
+from src.utils.data_utils import load_aqsol_data
 
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")

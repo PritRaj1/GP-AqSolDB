@@ -1,5 +1,4 @@
 import os
-import shutil
 import tempfile
 from configparser import ConfigParser
 
@@ -8,13 +7,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from src.gp_kan.auto_tune_kan import (
-    GPKANAutoTuner,
-    create_optimized_network,
-    load_gpkan_params_from_file,
-)
-from src.gp_kan.fully_connected import GP_KAN
-from src.gp_kan.normal_dist import NormalDist
+from src.optimization import GPKANAutoTuner
+from src.core.models.gp_kan import GP_KAN
+from src.core.models.gp_kan import NormalDist
 
 
 @pytest.fixture

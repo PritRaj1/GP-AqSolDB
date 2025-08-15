@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 
 from .dense_gp import DenseGP
-from .sparse_gp import FITCGP
+from .fitc_gp import FITCGP
 
 
 class GP:

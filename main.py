@@ -11,10 +11,10 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-from src.multivar_gp.auto_tune_gp import GPAutoTuner
-from src.multivar_gp.gp import GP
-from src.multivar_gp.kernels import configure_parallel_settings
-from src.data_utils import load_aqsol_data
+from src.optimization import GPAutoTuner, load_sigmas_from_file
+from src.core.models import GP
+from src.utils.kernel_utils import configure_parallel_settings
+from src.utils.data_utils import load_aqsol_data
 
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
@@ -476,7 +476,6 @@ def main():
         print("Loading previously optimized hyperparameters...")
         from configparser import ConfigParser
 
-        from src.multivar_gp.auto_tune_gp import load_sigmas_from_file
         config = ConfigParser()
         config.read(CONFIG_PATH)
         sigmas = load_sigmas_from_file(SIGMA_PATH)
