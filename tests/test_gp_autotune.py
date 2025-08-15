@@ -23,7 +23,7 @@ plt.rcParams.update(
 )
 
 
-def test_auto_tuner_initialization():
+def test_autotuner_initialization():
     np.random.seed(42)
     for n_features in [1, 2, 3]:
         X_train = np.random.uniform(0, 5, (30, n_features))
@@ -36,7 +36,7 @@ def test_auto_tuner_initialization():
         assert "KERNEL" in tuner.config
 
 
-def test_auto_tuner_default_config():
+def test_autotuner_default_config():
     np.random.seed(42)
     X_train = np.random.uniform(0, 5, (20, 2))
     y_train = np.random.normal(0, 1, 20)
@@ -57,7 +57,7 @@ def test_auto_tuner_default_config():
             os.unlink(non_existent_config)
 
 
-def test_auto_tuner_preserves_existing_config():
+def test_autotuner_preserves_existing_config():
     np.random.seed(42)
     X_train = np.random.uniform(0, 5, (20, 2))
     y_train = np.random.normal(0, 1, 20)
@@ -520,11 +520,11 @@ if __name__ == "__main__":
     with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as temp_sigma:
         temp_sigma_path = temp_sigma.name
     try:
-        test_auto_tuner_initialization()
+        test_autotuner_initialization()
         test_objective_function()
         test_cross_validation_gp()
-        test_auto_tuner_default_config()
-        test_auto_tuner_preserves_existing_config()
+        test_autotuner_default_config()
+        test_autotuner_preserves_existing_config()
         test_save_best_parameters()
         test_load_optimized_parameters()
         test_load_sigmas_from_file()
