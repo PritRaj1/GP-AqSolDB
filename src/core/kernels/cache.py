@@ -140,9 +140,9 @@ class KernelCache:
 _kernel_cache = KernelCache()
 
 
-def get_cache_stats():
+def get_cache_stats() -> Dict[str, Union[int, float]]:
     return _kernel_cache.get_stats()
 
 
-def clear_kernel_cache():
+def clear_kernel_cache() -> None:
     _kernel_cache.clear()

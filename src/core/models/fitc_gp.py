@@ -18,6 +18,7 @@ class FITCGP:
 
     def __init__(self, config: Any, sigma: np.ndarray) -> None:
         self.config = config
+        self.sigma = np.asarray(sigma)
         self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)
         cache_size = config.getint("KERNEL", "cache_size", fallback=100)
         self.num_inducing = config.getint("KERNEL", "num_inducing", fallback=20)
@@ -79,7 +80,8 @@ class FITCGP:
             return X
 
         selector = get_inducing_selector(method, self.num_inducing, random_state=42)
-        return selector.select(X, y)
+        result = selector.select(X, y)
+        return np.asarray(result)
 
     def fit(
         self, X: np.ndarray, y: np.ndarray, inducing_method: str = "kmeans"
@@ -188,6 +190,14 @@ class FITCGP:
             return get_cache_stats()
         else:
             return None
+
+    def get_model_complexity(self) -> int:
+        """Get the number of parameters in the model"""
+        n_params: int = len(self.sigma) + 1  # sigmas + lambda
+        if hasattr(self, "kernel") and hasattr(self.kernel, "alpha"):
+            n_params += 1  # alpha parameter for RQ kernel
+        n_params += self.num_inducing * len(self.sigma)  # inducing points
+        return int(n_params)
 
     def clear_cache(self) -> None:
         if self.use_cache:

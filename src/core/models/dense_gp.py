@@ -9,6 +9,7 @@ from ..kernels import clear_kernel_cache, get_cache_stats, get_kernel
 class DenseGP:
     def __init__(self, config: Any, sigma: np.ndarray) -> None:
         self.config = config
+        self.sigma = np.asarray(sigma)
         self.use_cache = config.getboolean("KERNEL", "use_cache", fallback=True)
         cache_size = config.getint("KERNEL", "cache_size", fallback=100)
 
@@ -123,6 +124,13 @@ class DenseGP:
             return get_cache_stats()
         else:
             return None
+
+    def get_model_complexity(self) -> int:
+        """Get the number of parameters in the model"""
+        n_params = len(self.sigma) + 1  # sigmas + lambda
+        if hasattr(self, "kernel") and hasattr(self.kernel, "alpha"):
+            n_params += 1  # alpha parameter for RQ kernel
+        return n_params
 
     def clear_cache(self) -> None:
         if self.use_cache:

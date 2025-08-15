@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 try:
     import cupy as cp
@@ -71,7 +71,7 @@ def load_parallel_conf(config: Any) -> Dict[str, Any]:
 
 def configure_parallel_settings(
     use_parallel: bool = False,
-    n_jobs: int = None,
+    n_jobs: Optional[int] = None,
     chunk_size: int = 1000,
     use_gpu: bool = False,
     min_size_for_parallel: int = 500,
