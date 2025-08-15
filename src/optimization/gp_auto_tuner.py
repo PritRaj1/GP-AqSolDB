@@ -1,23 +1,17 @@
-import configparser
 from configparser import ConfigParser
 import os
 import pickle
-import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import optuna
 
-from scipy.optimize import minimize
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
-from ..core.models import DenseGP, FITCGP, GP
-from ..core.kernels import get_parallel_info, load_parallel_conf
+from ..core.models import GP
+from ..core.kernels import get_cache_stats, get_parallel_info, load_parallel_conf
 from ..utils.config_utils import create_default_config
 
 warnings.filterwarnings("ignore")
@@ -328,8 +322,6 @@ class GPAutoTuner:
 
         # Report cache stats
         try:
-            from ..core.kernels import get_cache_stats
-
             cache_stats = get_cache_stats()
             total_requests = cache_stats["hits"] + cache_stats["misses"]
             if total_requests > 0:
