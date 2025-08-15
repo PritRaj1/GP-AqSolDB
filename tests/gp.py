@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import mean_squared_error
 
-from src.multivar_gp.gp import GP
+from src.core.models import GP
 
 
 def create_config(use_sparse=False, num_inducing=20, inducing_method="random"):

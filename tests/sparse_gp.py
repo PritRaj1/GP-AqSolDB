@@ -5,8 +5,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import mean_squared_error
 
-from src.multivar_gp.dense_gp import DenseGP
-from src.multivar_gp.sparse_gp import SparseGP
+from src.core.models import DenseGP, FITCGP
 
 
 def create_config(
@@ -61,7 +60,7 @@ def test_sparse_vs_full_gp():
     config_sparse = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=50)
 
     start_time = time.time()
-    gp_sparse = SparseGP(config_sparse, sigma)
+    gp_sparse = FITCGP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
     fit_time_sparse = time.time() - start_time
 
@@ -109,7 +108,7 @@ def test_different_inducing_points(num_inducing):
     config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=num_inducing)
 
     start_time = time.time()
-    gp = SparseGP(config, sigma)
+    gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train)
     fit_time = time.time() - start_time
 
@@ -144,7 +143,7 @@ def test_sparse_gp_with_uncertainty():
 
     # Sparse GP with uncertainty
     config_sparse = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=30)
-    gp_sparse = SparseGP(config_sparse, sigma)
+    gp_sparse = FITCGP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
     y_pred_sparse, y_std_sparse = gp_sparse.predict(X_test, return_std=True)
 
@@ -167,7 +166,7 @@ def test_sparse_gp_edge_cases():
 
     # 1. num_inducing >= N (should use all points)
     config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=100)
-    gp = SparseGP(config, sigma)
+    gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train)
 
     sparse_info = gp.get_sparse_info()
@@ -175,7 +174,7 @@ def test_sparse_gp_edge_cases():
     assert gp.is_fitted is True, "GP should be fitted"
 
     # 2. Test prediction without fitting
-    gp_unfitted = SparseGP(config, sigma)
+    gp_unfitted = FITCGP(config, sigma)
     with pytest.raises(
         ValueError, match="Model must be fitted before making predictions"
     ):
@@ -207,7 +206,7 @@ def test_sparse_gp_with_different_kernels(kernel_type):
     config_sparse = create_config(
         kernel_type, lmbda=0.1, alpha=2.0, sparse=True, num_inducing=40
     )
-    gp_sparse = SparseGP(config_sparse, sigma)
+    gp_sparse = FITCGP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
     y_pred_sparse = gp_sparse.predict(X_test)
     mse_sparse = mean_squared_error(y_test, y_pred_sparse)
@@ -236,7 +235,7 @@ def test_inducing_point_selection_methods(method):
     sigma = np.array([1.0, 1.0])
     config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=20)
 
-    gp = SparseGP(config, sigma)
+    gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train, inducing_method=method)
 
     y_pred = gp.predict(X_test)
@@ -264,7 +263,7 @@ def test_sparse_gp_complexity():
 
     for num_inducing in inducing_counts:
         config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=num_inducing)
-        gp = SparseGP(config, sigma)
+        gp = FITCGP(config, sigma)
         gp.fit(X_train, y_train)
 
         X_test = np.random.randn(10, 3)
@@ -291,7 +290,7 @@ def test_sparse_gp_cache_integration():
     config = create_config(
         "RBF", lmbda=0.1, sparse=True, num_inducing=15, use_cache=True
     )
-    gp = SparseGP(config, sigma)
+    gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train)
 
     # Multiple predictions to test cache hits
@@ -322,7 +321,7 @@ def test_inducing_point_sampling():
     results = {}
 
     for method in methods:
-        gp = SparseGP(config, sigma)
+        gp = FITCGP(config, sigma)
         gp.fit(X_train, y_train, inducing_method=method)
         y_pred = gp.predict(X_test)
         mse = mean_squared_error(y_test, y_pred)
@@ -344,13 +343,13 @@ def test_adaptive_inducing_point():
     config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=20)
 
     # Test stratified selection
-    gp_stratified = SparseGP(config, sigma)
+    gp_stratified = FITCGP(config, sigma)
     gp_stratified.fit(X_train, y_train, inducing_method="stratified")
     y_pred_stratified = gp_stratified.predict(X_test)
     mse_stratified = mean_squared_error(y_test, y_pred_stratified)
 
     # Test adaptive selection
-    gp_adaptive = SparseGP(config, sigma)
+    gp_adaptive = FITCGP(config, sigma)
     gp_adaptive.fit(X_train, y_train, inducing_method="adaptive")
     y_pred_adaptive = gp_adaptive.predict(X_test)
     mse_adaptive = mean_squared_error(y_test, y_pred_adaptive)
@@ -377,7 +376,7 @@ def test_sparse_gp_fit_predict_cycle():
     sigma = np.array([1.0, 1.0])
 
     config = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=20)
-    gp = SparseGP(config, sigma)
+    gp = FITCGP(config, sigma)
 
     gp.fit(X_train, y_train)
     assert gp.is_fitted is True, "GP should be marked as fitted"

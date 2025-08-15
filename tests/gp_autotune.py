@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-from src.multivar_gp.auto_tune_gp import GPAutoTuner, load_sigmas_from_file
-from src.multivar_gp.dense_gp import DenseGP
+from src.optimization import GPAutoTuner, load_sigmas_from_file
+from src.core.models import DenseGP
 
 sns.set_theme(style="whitegrid", palette="husl")
 sns.set_context("paper", font_scale=1.2)

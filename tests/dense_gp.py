@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import seaborn as sns
 
-from src.multivar_gp.dense_gp import DenseGP
+from src.core.models import DenseGP
 from tests.fcn import get_data
 
 sns.set_theme(style="whitegrid", palette="husl")
