@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 import jax
 import jax.numpy as jnp
 
-from ...utils.config_utils import load_normalization_config
+from src.utils.config_utils import load_normalization_config
 from .normal_dist import NormalDist, get_device_config
 
 

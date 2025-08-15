@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...utils.config_utils import create_default_config, load_gp_config
+from src.utils.config_utils import create_default_config, load_gp_config
 from .normal_dist import NormalDist, get_device_config, setup_jax_device
 
 SQRT_2PI = jnp.sqrt(2 * jnp.pi)

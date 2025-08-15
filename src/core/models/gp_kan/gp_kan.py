@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import optax
 from jax import grad, jit
 
-from ...utils.config_utils import load_kan_conf
+from src.utils.config_utils import load_kan_conf
 from .dense_layer import DenseGPLayer
 from .invariant_acts import (
     NormaliseGaussian,
