@@ -101,51 +101,28 @@ def _parallel_kernel_computation(
         X1_chunk = X1[i_start:i_end]
         chunks.append((X1_chunk, X2, sigma, kernel_type, alpha))
 
+    # Process chunks in parallel
     n_jobs = _get_n_jobs()
-    n_jobs_int = (
-        int(n_jobs) if n_jobs is not None and not isinstance(n_jobs, bool) else 1
-    )
-    result_chunks = []
+    with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+        results = list(executor.map(_compute_kernel_chunk, chunks))
 
-    # If single chunk, no need for parallel processing
-    if len(chunks) == 1:
-        result_chunks = [_compute_kernel_chunk(chunks[0])]
-    else:
-        try:
-            # Use a more conservative approach for multiprocessing
-            with ProcessPoolExecutor(max_workers=min(n_jobs_int, 4)) as executor:
-                # Add timeout to prevent hanging
-                result_chunks = list(
-                    executor.map(_compute_kernel_chunk, chunks, timeout=300)
-                )
-        except Exception as e:
-            print(
-                f"Parallel processing failed: {e}. "
-                f"Falling back to sequential computation."
-            )
-            # Fallback to sequential processing
-            result_chunks = [_compute_kernel_chunk(chunk) for chunk in chunks]
+    # Combine results
+    result = np.vstack(results)
 
-    result = np.vstack(result_chunks)
-
+    # Cache the result
     if use_cache:
         if kernel_type == "RBF":
-            _kernel_cache.set(
-                X1, X2, sigma, alpha=None, kernel_type="RBF", result=result
-            )
+            _kernel_cache.set(X1, X2, sigma, alpha=None, kernel_type="RBF", result=result)
         elif kernel_type == "RQ":
-            _kernel_cache.set(
-                X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result
-            )
+            _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="RQ", result=result)
         elif kernel_type == "MATERN":
-            _kernel_cache.set(
-                X1, X2, sigma, alpha=alpha, kernel_type="MATERN", result=result
-            )
+            _kernel_cache.set(X1, X2, sigma, alpha=alpha, kernel_type="MATERN", result=result)
 
     return result
 
 
 def get_parallel_info() -> Dict[str, Any]:
+    """Get parallel processing capabilities"""
     info = {
         "parallel_available": PARALLEL_SETTINGS["use_parallel"],
         "cpu_cores": mp.cpu_count(),
