@@ -1,4 +1,4 @@
-.PHONY: install clean test dev train format lint help logs clear-logs clean-tuned-gp clean-tuned-kan
+.PHONY: install uninstall clean test dev train format lint help logs clear-logs clean-tuned-gp clean-tuned-kan
 
 ENV_NAME = GP_sol
 CONDA_BASE := $(shell conda info --base 2>/dev/null || echo "")
@@ -6,23 +6,28 @@ CONDA_ACTIVATE := $(shell if [ -f "$(CONDA_BASE)/etc/profile.d/conda.sh" ]; then
 
 help:
 	@echo "Available targets:"
-	@echo "  install  - Set up conda environment and install dependencies"
-	@echo "  clean    - Remove conda environment"
-	@echo "  test     - Run tests (logs to logs/test_YYYYMMDD_HHMMSS.log)"
-	@echo "  dev      - Start development session"
-	@echo "  run-gp   - Run GP model in tmux"
-	@echo "  run-kan  - Run KAN model in tmux"
-	@echo "  format   - Format code"
-	@echo "  lint     - Run linting"
-	@echo "  logs     - Display log files"
+	@echo "  install    - Set up conda environment and install dependencies"
+	@echo "  uninstall  - Remove conda environment and clean all generated files"
+	@echo "  clean      - Remove conda environment"
+	@echo "  test       - Run tests (logs to logs/test_YYYYMMDD_HHMMSS.log)"
+	@echo "  dev        - Start development session"
+	@echo "  run-gp     - Run GP model in tmux"
+	@echo "  run-kan    - Run KAN model in tmux"
+	@echo "  format     - Format code"
+	@echo "  lint       - Run linting"
+	@echo "  logs       - Display log files"
 	@echo "  clear-logs - Delete log files"
 	@echo "  clean-tuned-gp - Delete GP tuned files (.ini and .pkl)"
 	@echo "  clean-tuned-kan - Delete KAN tuned files (.ini and .pkl)"
-	@echo "  help     - Show this help"
+	@echo "  help       - Show this help"
 
 install:
 	@chmod +x scripts/init.sh
 	@./scripts/init.sh
+
+uninstall: clean-all clean
+	@echo "GP_sol has been removed."
+	@echo "To reinstall, run 'make install'"
 
 clean:
 	@echo "Removing conda environment..."

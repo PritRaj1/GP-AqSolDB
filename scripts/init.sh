@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${GREEN}Setting up GP-KAN development environment...${NC}"
+echo -e "${GREEN}Running install script:${NC}"
 
 if ! command -v conda &> /dev/null; then
     echo -e "${RED}Error: conda is not installed or not in PATH${NC}"
@@ -46,28 +46,21 @@ if conda env list | grep -q "$ENV_NAME"; then
     fi
 fi
 
-echo -e "${GREEN}Creating new conda environment '$ENV_NAME'...${NC}"
-conda create -n "$ENV_NAME" python=3.11 -y
+echo -e "${GREEN}Creating GP_col conda environment.yml.${NC}"
+conda env create -f environment.yml
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to create conda environment${NC}"
+    echo -e "${RED}Failed to create conda environment from environment.yml${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}Activating environment...${NC}"
+echo -e "${GREEN}Environment created successfully from environment.yml!${NC}"
+echo -e "${GREEN}Activating environment:${NC}"
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$ENV_NAME"
 
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to activate conda environment${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}Installing tmux for development sessions...${NC}"
-conda install -c conda-forge tmux -y
-
-echo -e "${GREEN}Installing project dependencies...${NC}"
-pip install -e ".[dev]"
+echo -e "${GREEN}Installing additional project dependencies...${NC}"
+pip install -e ".[dev,notebooks]"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Dependencies installed successfully!${NC}"
@@ -81,10 +74,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from src.gp_kan.fully_connected import GP_KAN
-from src.gp_kan.dense_layer import DenseGPLayer
-from src.gp_kan.normal_dist import NormalDist
-from configparser import ConfigParser
+import rdkit
 
 print('✓ All imports successful!')
 print(f'✓ JAX version: {jax.__version__}')
