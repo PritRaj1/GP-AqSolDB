@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 from scipy import linalg, stats
 
-from ..kernels import clear_kernel_cache, get_cache_stats, get_kernel
+from ...kernels import clear_kernel_cache, get_cache_stats, get_kernel
 
 
 class DenseGP:

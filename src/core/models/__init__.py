@@ -1,6 +1,3 @@
-from .dense_gp import DenseGP
-from .fitc_gp import FITCGP
-from .gp import GP
 from .gp_kan import (
     GP_KAN,
     DenseGPLayer,
@@ -9,6 +6,7 @@ from .gp_kan import (
     ReduceSumGaussian,
     ReshapeGaussian,
 )
+from .multivar_gp import FITCGP, GP, DenseGP
 
 __all__ = [
     "DenseGP",

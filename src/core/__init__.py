@@ -1,4 +1,4 @@
-from .kernels import (
+from ..core.kernels import (
     clear_kernel_cache,
     get_cache_stats,
     get_kernel,
