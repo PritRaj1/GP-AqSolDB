@@ -462,8 +462,15 @@ def main():
     print("Tuning/training on AqSolDB")
     print("="*80)
 
-    X, y, feature_names = load_aqsol_data()
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
+    X_df, y, feature_names, scaler = load_aqsol_data(
+        scale=False, return_frame=True, return_scaler=True
+    )
+    X_train_df, X_test_df, y_train, y_test = train_test_split(
+        X_df, y, test_size=0.1, random_state=69
+    )
+    X_train = scaler.fit_transform(X_train_df)
+    X_test = scaler.transform(X_test_df)
+    X = scaler.transform(X_df)
 
     try:
         configure_parallel_settings(use_parallel=True, n_jobs=4, use_gpu=True)

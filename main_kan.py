@@ -9,7 +9,7 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-from src.optimization import GPKANAutoTuner
+from src.optimization import GPKANAutoTuner, create_optimized_network
 from src.core.models.gp_kan import NormalDist
 from src.utils.data_utils import load_aqsol_data
 
@@ -260,8 +260,15 @@ def main():
     print("Tuning/training GP-KAN on AqSolDB")
     print("="*80)
 
-    X, y, feature_names = load_aqsol_data()
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=69)
+    X_df, y, feature_names, scaler = load_aqsol_data(
+        scale=False, return_frame=True, return_scaler=True
+    )
+    X_train_df, X_test_df, y_train, y_test = train_test_split(
+        X_df, y, test_size=0.1, random_state=69
+    )
+    X_train = scaler.fit_transform(X_train_df)
+    X_test = scaler.transform(X_test_df)
+    X = scaler.transform(X_df)
 
     if os.path.exists(CONFIG_PATH) and os.path.exists(PARAMS_PATH):
         print("Loading previously optimized hyperparameters...")

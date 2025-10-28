@@ -12,6 +12,37 @@ from .normal_dist import NormalDist, get_device_config, setup_jax_device
 SQRT_2PI = jnp.sqrt(2 * jnp.pi)
 
 
+class HyperParamsContext:
+    GLOBAL_JITTER: float = 1e-3
+    BASELINE_JITTER: float = 1e-2
+
+    @classmethod
+    def configure(
+        cls,
+        *,
+        global_jitter: Optional[float] = None,
+        baseline_jitter: Optional[float] = None,
+    ) -> None:
+        if global_jitter is not None:
+            cls.GLOBAL_JITTER = float(global_jitter)
+        if baseline_jitter is not None:
+            cls.BASELINE_JITTER = float(baseline_jitter)
+
+    @classmethod
+    def to_dict(cls) -> Dict[str, float]:
+        return {
+            "GLOBAL_JITTER": cls.GLOBAL_JITTER,
+            "BASELINE_JITTER": cls.BASELINE_JITTER,
+        }
+
+    @classmethod
+    def from_dict(cls, values: Dict[str, float]) -> None:
+        cls.configure(
+            global_jitter=values.get("GLOBAL_JITTER"),
+            baseline_jitter=values.get("BASELINE_JITTER"),
+        )
+
+
 def normal_pdf(x1: jax.Array, x2: jax.Array, var: jax.Array) -> jax.Array:
     return jnp.exp(-0.5 * (x1 - x2) ** 2 / var) / jnp.sqrt(2 * jnp.pi * var)
 
@@ -86,6 +117,10 @@ class DenseGPLayer:
         self.global_jitter = gp_params["global_jitter"]
         self.baseline_jitter = gp_params["baseline_jitter"]
 
+        HyperParamsContext.configure(
+            global_jitter=self.global_jitter, baseline_jitter=self.baseline_jitter
+        )
+
         if key is None:
             key = jax.random.PRNGKey(0)
 
@@ -126,7 +161,7 @@ class DenseGPLayer:
 
     # Getters to ensure consistent transformation applied
     def get_jitter(self) -> jax.Array:
-        return jnp.asarray(jnp.exp(self.jitter) + self.baseline_jitter)
+        return jnp.asarray(jnp.exp(self.jitter) + HyperParamsContext.BASELINE_JITTER)
 
     def get_s(self) -> jax.Array:
         return jnp.asarray(jnp.exp(self.s) + self.min_covariance_scale)
@@ -148,7 +183,8 @@ class DenseGPLayer:
             jnp.ones((self.input_dim, self.output_dim)) * self.global_covariance_scale
         )
         self.jitter = jnp.log(
-            jnp.ones((self.input_dim, self.output_dim)) * self.global_jitter
+            jnp.ones((self.input_dim, self.output_dim))
+            * HyperParamsContext.GLOBAL_JITTER
         )
 
     def get_params(self) -> Dict[str, jax.Array]:
@@ -309,7 +345,7 @@ class DenseGPLayer:
         predictive_variance_per_neuron = (
             signal_variance_component
             - length_scale_scaling_factor * uncertainty_reduction_reshaped
-            + self.global_jitter
+            + HyperParamsContext.GLOBAL_JITTER
         )
         return jnp.asarray(predictive_variance_per_neuron)
 
@@ -381,7 +417,6 @@ class DenseGPLayer:
             output_dim,
         )
         out_var = jnp.sum(predictive_variance_per_neuron, axis=1).reshape(N, output_dim)
-        out_var = jnp.maximum(out_var, 1e-6)  # Positive variance
         return NormalDist(out_mean, out_var)
 
     def loglikelihood(self) -> jax.Array:
@@ -399,7 +434,8 @@ class DenseGPLayer:
             def gaussian_kernel(x1: jax.Array, x2: jax.Array) -> jax.Array:
                 signal_variance = s.reshape(I, O, 1, 1)
                 length_scale_sq = length_scale.reshape(I, O, 1, 1) ** 2
-                return signal_variance**2 * normal_pdf(x1, x2, length_scale_sq)
+                sq_dist = (x1 - x2) ** 2
+                return signal_variance**2 * jnp.exp(-sq_dist / (2 * length_scale_sq))
 
             inducing_kernel_matrix = build_kernel_mat(z, z, gaussian_kernel)
             inducing_kernel_with_noise = (

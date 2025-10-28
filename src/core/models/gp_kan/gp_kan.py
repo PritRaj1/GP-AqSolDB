@@ -34,6 +34,7 @@ class GP_KAN:
         hidden_sizes: Optional[List[int]] = None,
         activation_types: Optional[List[str]] = None,
         activation_params: Optional[List[Dict[str, Any]]] = None,
+        input_noise_log_init: float = -4.0,
     ) -> None:
         self.config = config
         self.layers: List[DenseGPLayer] = []
@@ -52,6 +53,13 @@ class GP_KAN:
         self.activation_params = (
             activation_params if activation_params is not None else []
         )
+
+        if config.has_section("MODEL"):
+            init_val = config["MODEL"].get("input_noise_log_init")
+            if init_val is not None:
+                input_noise_log_init = float(init_val)
+
+        self.input_noise_log = jnp.array(input_noise_log_init, dtype=jnp.float32)
 
         self._build_network()
 
@@ -128,6 +136,17 @@ class GP_KAN:
                 current = activation(current)
 
         return current
+
+    def get_input_noise(self) -> jax.Array:
+        return jnp.exp(self.input_noise_log)
+
+    def _input_dist_from_tensor(self, x: jax.Array) -> NormalDist:
+        noise_var = self.get_input_noise() ** 2
+        input_var = jnp.full_like(x, noise_var)
+        return NormalDist(x, input_var)
+
+    def predict(self, x: jax.Array) -> NormalDist:
+        return self.forward(self._input_dist_from_tensor(x))
 
     def get_params(self) -> Dict[str, Any]:
         params = {}
@@ -238,11 +257,7 @@ class GP_KAN:
         ) -> jax.Array:
             self.set_params(params)
 
-            X_batch_mean = X_batch
-            X_batch_var = jnp.zeros_like(X_batch)
-            X_batch_dist = NormalDist(X_batch_mean, X_batch_var)
-
-            output_dist = self.forward(X_batch_dist)
+            output_dist = self.predict(X_batch)
             return -self._condlikelihood(output_dist.mean, output_dist.var, y_batch)
 
         grad_fn = jit(grad(loss_fn))
