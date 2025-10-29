@@ -76,8 +76,6 @@ class GPKANAutoTuner(BaseAutoTuner):
 
         self.available_acts = available_acts or [
             "NormaliseGaussian",
-            "ReshapeGaussian",
-            "ReduceSumGaussian",
             "None",
         ]
 
