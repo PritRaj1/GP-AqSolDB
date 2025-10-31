@@ -499,7 +499,7 @@ def main():
             use_gpu=True,
             chunk_size=200,
             min_size_for_parallel=500,
-            sampler='bayesian',
+            sampler='tpe',
             )
         tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()

@@ -67,7 +67,7 @@ class BaseAutoTuner(ABC):
 
     def _get_sampler(self) -> optuna.samplers.BaseSampler:
         if self.sampler == "bayesian":
-            return optuna.samplers.GPSampler(seed=42)
+            return optuna.samplers.GPSampler(seed=42, warn_independent_sampling=False)
         elif self.sampler == "tpe":
             return optuna.samplers.TPESampler(seed=42)
         elif self.sampler == "random":
