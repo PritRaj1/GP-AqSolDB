@@ -497,11 +497,11 @@ def main():
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
-            chunk_size=500,
+            chunk_size=200,
             min_size_for_parallel=500,
             sampler='bayesian',
             )
-        tuner.optimize(n_trials=3000)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
