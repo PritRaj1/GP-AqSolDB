@@ -20,7 +20,7 @@ class GPAutoTuner(BaseAutoTuner):
         y_train: np.ndarray,
         config_path: str = "../config/gp.ini",
         sigma_save_path: str = "../config/gp_sigmas.pkl",
-        force_dense: bool = False,
+        gp_mode: str = "both",  # "dense", "sparse", "both"
         metric: str = "BIC",
         n_jobs: int = 2,
         use_gpu: bool = False,
@@ -41,8 +41,9 @@ class GPAutoTuner(BaseAutoTuner):
             Path to save non-vector hyperparameters
         sigma_save_path : str
             Path to save vector sigma hyperparameters
-        force_dense : bool
-            Force dense GP (disable sparse GP)
+        gp_mode : str
+            GP optimization mode: "dense" (dense only), "sparse" (sparse only),
+            "both" (optimize both types)
         metric : str
             Optimization metric: 'BIC' or 'MSE'
         n_jobs : int
@@ -58,9 +59,12 @@ class GPAutoTuner(BaseAutoTuner):
             "random" (RandomSampler), or "cmaes" (CmaEsSampler)
         """
         self.sigma_save_path = sigma_save_path
-        self.force_dense = force_dense
+        self.gp_mode = gp_mode
         self.chunk_size = chunk_size
         self.min_size_for_parallel = min_size_for_parallel
+
+        if self.gp_mode not in ["dense", "sparse", "both"]:
+            raise ValueError("gp_mode must be 'dense', 'sparse', or 'both'")
 
         super().__init__(
             X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
@@ -103,8 +107,10 @@ class GPAutoTuner(BaseAutoTuner):
 
     def _objective(self, trial: optuna.Trial) -> float:
         try:
-            if self.force_dense:
+            if self.gp_mode == "dense":
                 use_sparse = False
+            elif self.gp_mode == "sparse":
+                use_sparse = True
             else:
                 use_sparse = trial.suggest_categorical("use_sparse", [True, False])
 
@@ -127,7 +133,7 @@ class GPAutoTuner(BaseAutoTuner):
 
             # Sparse GP specific parameters - suggest number of inducing points
             # (between 10% and 50% of data size)
-            if use_sparse and not self.force_dense:
+            if use_sparse:
                 min_inducing = max(10, int(0.1 * self.n_samples))
                 max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
                 num_inducing = trial.suggest_int(
@@ -166,7 +172,7 @@ class GPAutoTuner(BaseAutoTuner):
             if "PARALLEL" in self.config:
                 config["PARALLEL"] = dict(self.config["PARALLEL"])
 
-            cv_results = self._cross_validate_gp(config, sigmas, n_splits=5)
+            cv_results = self._cross_validate_gp(config, sigmas, n_splits=3)
 
             if self.metric == "BIC":
                 return float(-np.mean(cv_results["bic"]))  # Negative for minimization
@@ -180,7 +186,7 @@ class GPAutoTuner(BaseAutoTuner):
             return float("inf")  # Return large value for failed trials
 
     def _cross_validate_gp(
-        self, config: ConfigParser, sigmas: List[float], n_splits: int = 5
+        self, config: ConfigParser, sigmas: List[float], n_splits: int = 3
     ) -> Dict[str, List[float]]:
         """
         Perform cross-validation for GP with given hyperparameters
@@ -230,7 +236,16 @@ class GPAutoTuner(BaseAutoTuner):
         return "GP"
 
     def _print_best_parameters(self, best_params: Dict[str, Any]) -> None:
-        print(f"Best model type: {'Dense GP' if self.force_dense else 'Sparse GP'}")
+        if self.gp_mode == "dense":
+            model_type = "Dense GP"
+        elif self.gp_mode == "sparse":
+            model_type = "Sparse GP"
+        else:
+            model_type = (
+                "Sparse GP" if best_params.get("use_sparse", False) else "Dense GP"
+            )
+
+        print(f"Best model type: {model_type}")
         print(f"Best kernel: {best_params['kernel_type']}")
         if best_params["kernel_type"] == "MATERN":
             print(f"Best alpha: {best_params.get('matern_alpha', 1.5)}")
@@ -261,10 +276,12 @@ class GPAutoTuner(BaseAutoTuner):
         return best_params
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
-        if self.force_dense:
+        if self.gp_mode == "dense":
             use_sparse = "false"
+        elif self.gp_mode == "sparse":
+            use_sparse = "true"
         else:
-            use_sparse = best_params["use_sparse"]
+            use_sparse = str(best_params["use_sparse"]).lower()
 
         kernel_type = best_params["kernel_type"]
         lmbda = best_params["lmbda"]
@@ -285,8 +302,8 @@ class GPAutoTuner(BaseAutoTuner):
         self.config["KERNEL"]["lmbda"] = str(lmbda)
         self.config["KERNEL"]["alpha"] = str(alpha)
 
-        self.config["SPARSE"]["use_sparse"] = str(use_sparse).lower()
-        if use_sparse:
+        self.config["SPARSE"]["use_sparse"] = use_sparse
+        if use_sparse == "true":
             num_inducing = best_params.get("num_inducing", 20)
             inducing_method = best_params.get("inducing_method", "random")
             self.config["SPARSE"]["num_inducing"] = str(num_inducing)
@@ -303,7 +320,7 @@ class GPAutoTuner(BaseAutoTuner):
         print("\nSaved hyperparameters:")
         print(f"Config file: {self.config_path}")
         print(f"Sigma file: {self.sigma_save_path}")
-        print(f"Model type: {'Sparse' if use_sparse else 'Dense'}")
+        print(f"Model type: {'Sparse' if use_sparse == 'true' else 'Dense'}")
         print(f"Kernel type: {kernel_type}")
         print(f"Lambda: {lmbda}")
         if kernel_type == "MATERN":
@@ -311,7 +328,7 @@ class GPAutoTuner(BaseAutoTuner):
         elif kernel_type == "RQ":
             print(f"Alpha: {alpha}")
         print(f"Sigmas: {sigmas}")
-        if use_sparse:
+        if use_sparse == "true":
             print(f"Number of inducing points: {best_params.get('num_inducing', 20)}")
             print(f"Inducing method: {best_params.get('inducing_method', 'random')}")
 

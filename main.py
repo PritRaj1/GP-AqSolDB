@@ -493,7 +493,7 @@ def main():
             y_train,
             config_path=CONFIG_PATH,
             sigma_save_path=SIGMA_PATH,
-            force_dense=True,
+            gp_mode="sparse",  # Use sparse GP only since AqSolDB has > 9000 samples
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
