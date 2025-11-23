@@ -27,6 +27,7 @@ class GPAutoTuner(BaseAutoTuner):
         chunk_size: int = 500,
         min_size_for_parallel: int = 1000,
         sampler: str = "bayesian",  # "bayesian", "tpe", "random", "cmaes"
+        max_samples: Optional[int] = None,
     ) -> None:
         """
         Initialize the GP Auto Tuner
@@ -57,14 +58,29 @@ class GPAutoTuner(BaseAutoTuner):
         sampler : str
             Optimization sampler: "bayesian" (GPSampler), "tpe" (TPESampler),
             "random" (RandomSampler), or "cmaes" (CmaEsSampler)
+        max_samples : Optional[int]
+            If provided and dataset is larger, a random subset will be used for tuning.
+            Final model will still be trained on full dataset.
         """
         self.sigma_save_path = sigma_save_path
         self.gp_mode = gp_mode
         self.chunk_size = chunk_size
         self.min_size_for_parallel = min_size_for_parallel
+        self.max_samples = max_samples
 
         if self.gp_mode not in ["dense", "sparse", "both"]:
             raise ValueError("gp_mode must be 'dense', 'sparse', or 'both'")
+
+        self.X_train_full = X_train.copy()
+        self.y_train_full = y_train.copy()
+
+        if max_samples is not None and len(X_train) > max_samples:
+            print(f"Using subset of {max_samples} samples for autotuning...")
+            print(f"Full dataset size: {len(X_train)} samples")
+            np.random.seed(42)
+            subset_idx = np.random.choice(len(X_train), max_samples, replace=False)
+            X_train = X_train[subset_idx]
+            y_train = y_train[subset_idx]
 
         super().__init__(
             X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
@@ -273,6 +289,21 @@ class GPAutoTuner(BaseAutoTuner):
         result: Dict[str, Any] = super().optimize(n_trials, timeout)
         best_params: Dict[str, Any] = result["best_params"]
         self._save_best_parameters(best_params)
+
+        # Train final model on full dataset
+        if self.max_samples is not None and len(self.X_train_full) > self.max_samples:
+            print(
+                f"Training final model on full dataset "
+                f"({len(self.X_train_full)} samples)..."
+            )
+
+            config, sigmas = self.load_optimized_parameters()
+
+            gp = GP(config, sigmas)
+            gp.fit(self.X_train_full, self.y_train_full)
+
+            print("Final model training completed on full dataset.")
+
         return best_params
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:

@@ -493,15 +493,16 @@ def main():
             y_train,
             config_path=CONFIG_PATH,
             sigma_save_path=SIGMA_PATH,
-            gp_mode="sparse",  # Use sparse GP only since AqSolDB has > 9000 samples
+            gp_mode="dense",
             metric='MSE',
             n_jobs=4,
             use_gpu=True,
             chunk_size=200,
             min_size_for_parallel=500,
             sampler='tpe',
+            max_samples=4000,
             )
-        tuner.optimize(n_trials=1000)
+        tuner.optimize(n_trials=3000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)
