@@ -8,18 +8,29 @@
 
 ## Setup
 
-Need [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Choose your favourite installer. 
-
-Then can use the Makefile:
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
-# See all available commands
-make help
+uv sync          # install deps
+uv sync --group dev   # + dev tools
+```
 
-# Quick start
-make install    # Install everything
-make test       # Run tests
-make run-gp    # Run the standard GP
+## Usage
+
+```bash
+uv run gp-kan gp             # train standard GP
+uv run gp-kan kan            # train GP-KAN hybrid
+uv run gp-kan stats          # dataset statistics
+uv run gp-kan clean          # remove generated artifacts
+```
+
+## Dev
+
+```bash
+uv run pytest                        # tests
+uv run ruff check src/ tests/        # lint
+uv run ruff format src/ tests/       # format
+uv run mypy src/                     # type check
 ```
 
 ## Data

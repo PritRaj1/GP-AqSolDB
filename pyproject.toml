@@ -24,45 +24,36 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-cov",
-    "pytest-mock",
-    "black",
-    "isort",
-    "flake8",
-    "mypy",
-]
-
 notebooks = [
     "ipykernel",
     "jupyter",
     "pandas",
+    "rdkit",
 ]
 
-[tool.black]
-line-length = 88
-target-version = ['py310']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+[project.scripts]
+gp-kan = "src.__main__:main"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-known_first_party = ["src"]
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff",
+    "mypy",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E203", "W503"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -79,12 +70,9 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
-[tool.flake8]
-max-line-length = 88 
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --cov=src --cov-report=html --cov-report=term-missing" 
+addopts = "-v --tb=short --cov=src --cov-report=html --cov-report=term-missing"
