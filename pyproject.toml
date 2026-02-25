@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gp-kan"
 version = "0.1.0"
-authors = [{name = "Prithvi Raj", email = "prithvi@zettalaboratories.com"}]
+authors = [{name = "Prithvi Raj", email = "prithvi@zscc.ai"}]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -20,10 +20,12 @@ dependencies = [
     "seaborn",
     "pandas",
     "imageio",
-    "cupy-cuda12x",
 ]
 
 [project.optional-dependencies]
+gpu = [
+    "cupy-cuda12x",
+]
 notebooks = [
     "ipykernel",
     "jupyter",
@@ -50,13 +52,15 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E203", "W503"]
+ignore = ["E203"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
 [tool.mypy]
 python_version = "3.10"
+mypy_path = "."
+explicit_package_bases = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -71,8 +75,12 @@ warn_unreachable = true
 strict_equality = true
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --cov=src --cov-report=html --cov-report=term-missing"
+addopts = "-v --tb=short --cov=src --cov-report=html --cov-report=term-missing -m 'not slow'"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
