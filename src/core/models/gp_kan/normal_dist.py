@@ -26,6 +26,7 @@ def setup_jax_device(config: ConfigParser) -> None:
 
         if device_config["precision"] == "float64":
             jax.config.update("jax_enable_x64", True)
+
         elif device_config["precision"] == "float32":
             jax.config.update("jax_enable_x64", False)
     else:
@@ -110,6 +111,7 @@ class NormalDist:
         """
         if shape is None:
             sample_shape = self.mean.shape
+
         else:
             sample_shape = shape + self.mean.shape
 
@@ -136,15 +138,18 @@ class NormalDist:
     def std(self) -> jax.Array:
         return jnp.sqrt(self.var)
 
-    def to_numpy(self) -> "NormalDist":
-        return NormalDist(jnp.array(self.mean), jnp.array(self.var))
-
     def to_device(self, device: str) -> "NormalDist":
         if device == "gpu":
-            mean_gpu = jax.device_put(self.mean, jax.devices("gpu")[0])
-            var_gpu = jax.device_put(self.var, jax.devices("gpu")[0])
-            return NormalDist(mean_gpu, var_gpu)
+            gpu_devices = jax.devices("gpu")
+            if not gpu_devices:
+                return self
+
+            target = gpu_devices[0]
+
         else:
-            mean_cpu = jax.device_put(self.mean, jax.devices("cpu")[0])
-            var_cpu = jax.device_put(self.var, jax.devices("cpu")[0])
-            return NormalDist(mean_cpu, var_cpu)
+            target = jax.devices("cpu")[0]
+
+        return NormalDist(
+            jax.device_put(self.mean, target),
+            jax.device_put(self.var, target),
+        )

@@ -32,7 +32,14 @@ def _top2_from_sigmas(sigmas):
 
 
 def learning_evolution(
-    X, y, feature_names, config, sigmas, full_X, n_init=1, n_steps=300,
+    X,
+    y,
+    feature_names,
+    config,
+    sigmas,
+    full_X,
+    n_init=1,
+    n_steps=300,
     gif_path=f"{FIGURE_DIR}/learning_evolution.gif",
 ):
     np.random.seed(42)
@@ -42,8 +49,10 @@ def learning_evolution(
 
     for section in config.sections():
         gif_config[section] = dict(config[section])
+
     if "PARALLEL" not in gif_config:
         gif_config["PARALLEL"] = {}
+
     gif_config["PARALLEL"]["use_parallel"] = "false"
     gif_config["PARALLEL"]["n_jobs"] = "1"
     gif_config["PARALLEL"]["use_gpu"] = "false"
@@ -53,8 +62,12 @@ def learning_evolution(
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
 
     grid_size = 60
-    x1 = np.linspace(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), grid_size)
-    x2 = np.linspace(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), grid_size)
+    x1 = np.linspace(
+        np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), grid_size
+    )
+    x2 = np.linspace(
+        np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), grid_size
+    )
     X1g, X2g = np.meshgrid(x1, x2)
     X_grid = np.zeros((X1g.size, X.shape[1]))
     X_grid[:, x_idx] = X1g.ravel()
@@ -89,9 +102,13 @@ def learning_evolution(
             temp_train_idx.append(next_idx)
             temp_pool_idx = np.setdiff1d(temp_pool_idx, [next_idx])
 
-    if len(temp_mean_uncertainties) == 0 or not np.isfinite(temp_mean_uncertainties).all():
+    if (
+        len(temp_mean_uncertainties) == 0
+        or not np.isfinite(temp_mean_uncertainties).all()
+    ):
         unc_ylim = (0, 1)
         grid_unc_min, grid_unc_max = 0, 1
+
     else:
         unc_ylim = (
             min(temp_mean_uncertainties) * 0.95,
@@ -125,15 +142,40 @@ def learning_evolution(
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
         ax = axes[0]
-        ax.scatter(full_X[:, x_idx], full_X[:, y_idx], c="black", s=40, marker="x",
-                   label="All Data", alpha=0.8, zorder=1)
-        ax.scatter(X[train_idx, x_idx], X[train_idx, y_idx], c="lime", s=40, marker="x",
-                   label="Train", alpha=0.9, zorder=3)
+        ax.scatter(
+            full_X[:, x_idx],
+            full_X[:, y_idx],
+            c="black",
+            s=40,
+            marker="x",
+            label="All Data",
+            alpha=0.8,
+            zorder=1,
+        )
+        ax.scatter(
+            X[train_idx, x_idx],
+            X[train_idx, y_idx],
+            c="lime",
+            s=40,
+            marker="x",
+            label="Train",
+            alpha=0.9,
+            zorder=3,
+        )
 
         if len(train_idx) > n_init:
             last = train_idx[-1]
-            ax.scatter(X[last, x_idx], X[last, y_idx], c="red", s=120, marker="x",
-                       label="Newly Added", edgecolor="black", linewidth=3, zorder=4)
+            ax.scatter(
+                X[last, x_idx],
+                X[last, y_idx],
+                c="red",
+                s=120,
+                marker="x",
+                label="Newly Added",
+                edgecolor="black",
+                linewidth=3,
+                zorder=4,
+            )
 
         ax.set_xlabel(x_name)
         ax.set_ylabel(y_name)
@@ -146,8 +188,16 @@ def learning_evolution(
         _, y_std_grid = gp.predict(X_grid, return_std=True)
         y_std_grid = y_std_grid.reshape(X1g.shape)
         levels = np.linspace(grid_unc_min, grid_unc_max, 40)
-        im = ax.contourf(X1g, X2g, y_std_grid, levels=levels, cmap="plasma", alpha=0.7,
-                         vmin=grid_unc_min, vmax=grid_unc_max)
+        im = ax.contourf(
+            X1g,
+            X2g,
+            y_std_grid,
+            levels=levels,
+            cmap="plasma",
+            alpha=0.7,
+            vmin=grid_unc_min,
+            vmax=grid_unc_max,
+        )
         fig.colorbar(im, ax=ax, label="Uncertainty")
 
         ax2 = axes[1]
@@ -183,10 +233,15 @@ def main():
     print("=" * 80)
 
     X_df, y, feature_names, scaler = load_aqsol_data(
-        scale=False, return_frame=True, return_scaler=True,
+        scale=False,
+        return_frame=True,
+        return_scaler=True,
     )
     X_train_df, X_test_df, y_train, y_test = train_test_split(
-        X_df, y, test_size=0.1, random_state=69,
+        X_df,
+        y,
+        test_size=0.1,
+        random_state=69,
     )
     X_train = scaler.fit_transform(X_train_df)
     X_test = scaler.transform(X_test_df)
@@ -194,6 +249,7 @@ def main():
 
     try:
         configure_parallel_settings(use_parallel=True, n_jobs=4, use_gpu=True)
+
     except Exception as e:
         print(f"Warning: Could not configure parallel processing: {e}")
         print("Continuing with sequential processing...")
@@ -203,10 +259,12 @@ def main():
         config = ConfigParser()
         config.read(CONFIG_PATH)
         sigmas = load_sigmas_from_file(SIGMA_PATH)
+
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
         tuner = GPAutoTuner(
-            X_train, y_train,
+            X_train,
+            y_train,
             config_path=CONFIG_PATH,
             sigma_save_path=SIGMA_PATH,
             gp_mode="dense",
@@ -237,36 +295,59 @@ def main():
     x_idx, y_idx = top2[0], top2[1]
 
     plot_predictions(
-        y_test, y_pred, y_std,
+        y_test,
+        y_pred,
+        y_std,
         "GP Predictions with 95% Confidence Intervals",
         f"{FIGURE_DIR}/solubility_uncertainty.png",
     )
     plot_length_scales(
-        length_scales, feature_names, sorted_indices,
+        length_scales,
+        feature_names,
+        sorted_indices,
         f"{FIGURE_DIR}/kernel_length_scales.png",
     )
 
     X1g, X2g, X_grid = make_feature_grid(X, x_idx, y_idx, grid_size=60)
     _, y_std_grid = gp.predict(X_grid, return_std=True)
     plot_heatmap(
-        X1g, X2g, y_std_grid.reshape(X1g.shape),
-        feature_names[x_idx], feature_names[y_idx],
-        X_train, x_idx, y_idx,
+        X1g,
+        X2g,
+        y_std_grid.reshape(X1g.shape),
+        feature_names[x_idx],
+        feature_names[y_idx],
+        X_train,
+        x_idx,
+        y_idx,
         f"{FIGURE_DIR}/kernel_uncertainty_heatmap.png",
     )
 
-    X1g_s, X2g_s, X_grid_s = make_feature_grid(X, x_idx, y_idx, grid_size=80, pct_low=5, pct_high=95)
+    X1g_s, X2g_s, X_grid_s = make_feature_grid(
+        X, x_idx, y_idx, grid_size=80, pct_low=5, pct_high=95
+    )
     y_pred_grid = gp.predict(X_grid_s).reshape(X1g_s.shape)
     plot_surface(
-        X1g_s, X2g_s, y_pred_grid, x_idx, y_idx, X, y, feature_names,
-        "GP Solubility", f"{FIGURE_DIR}/solubility_surface.png",
+        X1g_s,
+        X2g_s,
+        y_pred_grid,
+        x_idx,
+        y_idx,
+        X,
+        y,
+        feature_names,
+        "GP Solubility",
+        f"{FIGURE_DIR}/solubility_surface.png",
     )
 
     subset_size = min(500, len(X))
     subset_idx = np.random.choice(len(X), subset_size, replace=False)
     learning_evolution(
-        X[subset_idx, :2], y[subset_idx], feature_names[:2],
-        config, sigmas[:2], full_X=X,
+        X[subset_idx, :2],
+        y[subset_idx],
+        feature_names[:2],
+        config,
+        sigmas[:2],
+        full_X=X,
         gif_path=f"{FIGURE_DIR}/learning_evolution.gif",
     )
 

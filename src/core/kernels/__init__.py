@@ -1,12 +1,8 @@
 from ...utils import load_parallel_conf
-from .base import get_parallel_info
-from .builder import get_kernel
-from .cache import clear_kernel_cache, get_cache_stats
+from .kernels import compute_kernel, get_parallel_info
 
 __all__ = [
-    "get_kernel",
-    "clear_kernel_cache",
-    "get_cache_stats",
+    "compute_kernel",
     "get_parallel_info",
     "load_parallel_conf",
 ]

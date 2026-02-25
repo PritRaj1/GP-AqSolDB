@@ -116,11 +116,15 @@ class AdaptiveSelector(InducingPointSelector):
         # Normalize features for distance calculations
         X_norm = (X - X.mean(axis=0)) / (X.std(axis=0) + 1e-8)
 
-        y_centered = y - y.mean()
-        y_weights = np.abs(y_centered) / (
-            y.std() + 1e-8
-        )  # Weight regions of high target variation more heavily
-        y_weights = y_weights / y_weights.sum()
+        y_std = y.std()
+        if y_std < 1e-10:
+            # Constant targets - use uniform weights
+            y_weights = np.ones(N) / N
+
+        else:
+            y_centered = y - y.mean()
+            y_weights = np.abs(y_centered) / y_std
+            y_weights = y_weights / y_weights.sum()
 
         # Use subsets if lots of samples
         if N > 1000:
@@ -129,6 +133,7 @@ class AdaptiveSelector(InducingPointSelector):
             X_sample = X_norm[sample_idx]
             distances = cdist(X_norm, X_sample)
             local_density = np.mean(distances, axis=1)
+
         else:
             distances = cdist(X_norm, X_norm)
             local_density = np.mean(distances, axis=1)
@@ -171,25 +176,22 @@ class FurthestPointSelector(InducingPointSelector):
             return np.asarray(kmeans.cluster_centers_)
 
         # Else use exact furthest point sampling
-        selected_idx = [np.random.randint(0, N)]
-        remaining_idx = list(range(N))
-        remaining_idx.remove(selected_idx[0])
+        first = np.random.randint(0, N)
+        selected_idx = [first]
+        remaining = set(range(N))
+        remaining.discard(first)
 
-        # Iteratively select the furthest point from current selection
         for _ in range(self.num_inducing - 1):
-            if len(remaining_idx) == 0:
+            if not remaining:
                 break
 
-            # Calculate distances from remaining points to selected points
-            distances = cdist(X_norm[remaining_idx], X_norm[selected_idx])
-
-            # Find minimum distance to any selected point for each remaining point
+            remaining_list = sorted(remaining)
+            distances = cdist(X_norm[remaining_list], X_norm[selected_idx])
             min_distances = np.min(distances, axis=1)
 
-            # Select the point with maximum minimum distance
-            furthest_idx = remaining_idx[np.argmax(min_distances)]
+            furthest_idx = remaining_list[np.argmax(min_distances)]
             selected_idx.append(furthest_idx)
-            remaining_idx.remove(furthest_idx)
+            remaining.discard(furthest_idx)
 
         return X[selected_idx]
 

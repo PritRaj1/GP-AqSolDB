@@ -6,9 +6,16 @@ def main():
     df = pd.read_csv("data/solubility-dataset.csv")
 
     proplist = [
-        "HeavyAtomCount", "NumHAcceptors", "NumHDonors", "NumHeteroatoms",
-        "NumRotatableBonds", "NumValenceElectrons", "NumAromaticRings",
-        "NumSaturatedRings", "NumAliphaticRings", "RingCount",
+        "HeavyAtomCount",
+        "NumHAcceptors",
+        "NumHDonors",
+        "NumHeteroatoms",
+        "NumRotatableBonds",
+        "NumValenceElectrons",
+        "NumAromaticRings",
+        "NumSaturatedRings",
+        "NumAliphaticRings",
+        "RingCount",
     ]
 
     feature_names = ["log_MolWt"] + [f"{prop}/MolWt" for prop in proplist]
@@ -41,8 +48,10 @@ def main():
     for i in range(len(feature_names)):
         for j in range(i + 1, len(feature_names)):
             if abs(corr_matrix[i, j]) > 0.8:
-                print(f"  {feature_names[i]} <-> {feature_names[j]}: "
-                      f"{corr_matrix[i, j]:.3f}")
+                print(
+                    f"  {feature_names[i]} <-> {feature_names[j]}: "
+                    f"{corr_matrix[i, j]:.3f}"
+                )
 
     print("\n=== OUTLIERS ===")
     for i, name in enumerate(feature_names):

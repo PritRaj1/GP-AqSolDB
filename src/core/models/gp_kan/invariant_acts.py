@@ -4,7 +4,6 @@ from typing import List, Optional, Tuple
 import jax
 import jax.numpy as jnp
 
-from ....utils import load_normalization_config
 from .normal_dist import NormalDist, get_device_config
 
 
@@ -15,9 +14,9 @@ class NormaliseGaussian:
         self, min_var: float = 0.2, config: Optional[ConfigParser] = None
     ) -> None:
         if config is not None:
-            norm_params = load_normalization_config(config)
-            self.min_var = norm_params["min_var"]
+            self.min_var = config.getfloat("NORMALIZATION", "min_var", fallback=0.2)
             self.device_config = get_device_config(config)
+
         else:
             self.min_var = min_var
             self.device_config = {"use_gpu": False, "device": "cpu"}
@@ -85,6 +84,7 @@ class ReduceSumGaussian:
 
         if config is not None:
             self.device_config = get_device_config(config)
+
         else:
             self.device_config = {"use_gpu": False, "device": "cpu"}
 

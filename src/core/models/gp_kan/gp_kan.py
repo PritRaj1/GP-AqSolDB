@@ -16,15 +16,6 @@ from .invariant_acts import (
 from .normal_dist import NormalDist, get_device_config, setup_jax_device
 
 
-def ensure_int(val: Any, name: str = "value") -> int:
-    if val is None:
-        raise ValueError(f"{name} cannot be None")
-    try:
-        return int(val)
-    except Exception:
-        raise ValueError(f"{name} must be convertible to int, got {val!r}")
-
-
 class GP_KAN:
     """Gaussian Process Kolmogorov-Arnold Network."""
 
@@ -67,15 +58,9 @@ class GP_KAN:
         layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
 
         for i in range(len(layer_sizes) - 1):
-            input_size = layer_sizes[i]
-            output_size = layer_sizes[i + 1]
-
-            input_size_int = ensure_int(input_size, "input_size")
-            output_size_int = ensure_int(output_size, "output_size")
-
             layer = DenseGPLayer(
-                input_size=input_size_int,
-                output_size=output_size_int,
+                input_size=int(layer_sizes[i]),
+                output_size=int(layer_sizes[i + 1]),
                 config=self.config,
                 key=jax.random.PRNGKey(self.seed + i),
             )
@@ -84,6 +69,7 @@ class GP_KAN:
             if i < len(layer_sizes) - 2:
                 activation = self._create_activation(i)
                 self.activations.append(activation)
+
             else:
                 self.activations.append(None)
 
@@ -220,10 +206,13 @@ class GP_KAN:
         """
         if learning_rate is None:
             learning_rate = float(self.config["TRAINING"].get("learning_rate", "0.001"))
+
         if num_epochs is None:
             num_epochs = int(self.config["TRAINING"].get("num_epochs", "30"))
+
         if batch_size is None:
             batch_size = int(self.config["TRAINING"].get("batch_size", "32"))
+
         if pretrain_iters is None:
             pretrain_iters = int(self.config["TRAINING"].get("pretrain_iters", "10"))
 
@@ -304,6 +293,7 @@ class GP_KAN:
                         best_val_loss = val_loss
                         patience_counter = 0
                         best_params = params.copy()
+
                     else:
                         patience_counter += 1
 
@@ -311,7 +301,9 @@ class GP_KAN:
                         print(f"Early stopping at epoch {epoch}")
                         if best_params is not None:
                             self.set_params(best_params)
+
                         break
+
                 else:
                     if epoch % 5 == 0:
                         print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
@@ -324,6 +316,7 @@ class GP_KAN:
 
         if best_params is not None:
             self.set_params(best_params)
+
         else:
             self.set_params(params)
 
@@ -364,10 +357,11 @@ class GP_KAN:
 
     def save_fig(self, path: str, max_neurons_per_layer: int = 3) -> None:
         """Save figures for each layer separately."""
+        from ....plotting import save_layer_fig
 
         for layer_idx, layer in enumerate(self.layers):
             layer_path = path.replace(".png", f"_layer_{layer_idx}.png")
-            layer.save_fig(layer_path, max_neurons_shown=max_neurons_per_layer)
+            save_layer_fig(layer, layer_path, max_neurons_shown=max_neurons_per_layer)
 
     def to_device(self, device: str) -> None:
         """Move the entire network to a specific device."""

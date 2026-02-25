@@ -27,6 +27,7 @@ def load_parallel_conf(config: Any) -> Dict[str, Any]:
         n_jobs_raw = parallel_config.get("n_jobs", fallback=None)
         if n_jobs_raw is None or n_jobs_raw.lower() == "none":
             n_jobs = None
+
         else:
             try:
                 n_jobs = parallel_config.getint("n_jobs")
@@ -43,8 +44,9 @@ def load_parallel_conf(config: Any) -> Dict[str, Any]:
                 test_result = cp.sum(test_array)
                 cp.asnumpy(test_result)
                 gpu_available = True
-            except Exception as e:
-                print(f"GPU test failed: {e}. Disabling GPU acceleration.")
+
+            except (RuntimeError, OSError) as e:
+                warnings.warn(f"GPU test failed: {e}. Disabling GPU acceleration.")
                 gpu_available = False
 
         PARALLEL_SETTINGS.update(
@@ -97,21 +99,7 @@ def configure_parallel_settings(
             "use_parallel": use_parallel,
             "n_jobs": n_jobs,
             "chunk_size": chunk_size,
-            "use_gpu": use_gpu,
+            "use_gpu": use_gpu and CUPY_AVAILABLE,
             "min_size_for_parallel": min_size_for_parallel,
         }
     )
-
-    print("Parallel kernel settings:")
-    print(f"  Use parallel: {use_parallel}")
-    print(f"  Jobs: {n_jobs if n_jobs else 'auto'}")
-    print(f"  Chunk size: {chunk_size}")
-    print(f"  Use GPU: {use_gpu}")
-    print(f"  Min size for parallel: {min_size_for_parallel}")
-
-    if use_gpu:
-        if CUPY_AVAILABLE:
-            print("  GPU backend: CuPy")
-        else:
-            print("  GPU backend: None available")
-            PARALLEL_SETTINGS["use_gpu"] = False
