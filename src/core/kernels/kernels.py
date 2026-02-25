@@ -57,10 +57,18 @@ def _matern_formula(sq_dist: jnp.ndarray, alpha: float) -> jnp.ndarray:
         raise ValueError(f"Matern alpha={alpha} not supported. Use 0.5, 1.5, or 2.5.")
 
 
+@jax.jit
+def _tps_formula(sq_dist: jnp.ndarray, alpha: Optional[float]) -> jnp.ndarray:
+    r = jnp.sqrt(jnp.maximum(sq_dist, 0))
+    # r^2 * ln(r), with 0*ln(0) = 0 by convention
+    return jnp.where(r > 0, r**2 * jnp.log(r), 0.0)
+
+
 KERNEL_FORMULAS = {
     "RBF": _rbf_formula,
     "RQ": _rq_formula,
     "MATERN": _matern_formula,
+    "TPS": _tps_formula,
 }
 
 
@@ -82,7 +90,7 @@ def compute_kernel(
     Parameters
     ----------
     kernel_type : str
-        One of "RBF", "RQ", "MATERN".
+        One of "RBF", "RQ", "MATERN", "TPS".
     X1 : array, shape (n1, d)
     X2 : array, shape (n2, d)
     sigma : array, shape (d,)

@@ -4,7 +4,7 @@ import pytest
 from src.core.kernels import compute_kernel
 
 
-@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ", "TPS"])
 def test_kernel_symmetry(kernel_type):
     sigma = np.array([1.0, 1.0, 1.0])
     alpha = 1.0 if kernel_type == "RQ" else None
@@ -27,6 +27,13 @@ def test_kernel_identity(kernel_type):
     K_xx = np.asarray(compute_kernel(kernel_type, X, X, sigma, alpha=alpha))
 
     assert np.allclose(np.diag(K_xx), 1.0, rtol=1e-10)
+
+
+def test_tps_self_kernel_zero():
+    sigma = np.array([1.0, 1.0, 1.0])
+    X = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    K = np.asarray(compute_kernel("TPS", X, X, sigma))
+    assert np.allclose(np.diag(K), 0.0, atol=1e-10), "TPS(x,x) should be 0"
 
 
 @pytest.mark.parametrize("sigma_val", [0.5, 1.0, 2.0])
@@ -55,3 +62,20 @@ def test_kernel_positive_definite(kernel_type):
     K = np.asarray(compute_kernel(kernel_type, X, X, sigma, alpha=alpha))
     eigenvalues = np.linalg.eigvalsh(K)
     assert np.all(eigenvalues > -1e-10), "Kernel should be PSD"
+
+
+def test_tps_conditionally_positive_definite():
+    """TPS is CPD of order 2: c^T K c >= 0 when c perp degree-1 polys."""
+    np.random.seed(42)
+    sigma = np.array([1.0, 1.0])
+    X = np.random.randn(10, 2)
+    K = np.asarray(compute_kernel("TPS", X, X, sigma))
+
+    # Project out the polynomial space of degree <= 1: [1, X]
+    n = len(X)
+    P_poly = np.column_stack([np.ones(n), X])
+    Q, _ = np.linalg.qr(P_poly, mode="reduced")
+    P = np.eye(n) - Q @ Q.T
+    K_proj = P @ K @ P
+    eigenvalues = np.linalg.eigvalsh(K_proj)
+    assert np.all(eigenvalues > -1e-10), "TPS should be conditionally PSD"

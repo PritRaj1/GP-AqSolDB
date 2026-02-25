@@ -64,7 +64,7 @@ class GPAutoTuner(BaseAutoTuner):
                 use_sparse = trial.suggest_categorical("use_sparse", [True, False])
 
             kernel_type = trial.suggest_categorical(
-                "kernel_type", ["RBF", "RQ", "MATERN"]
+                "kernel_type", ["RBF", "RQ", "MATERN", "TPS"]
             )
             lmbda = trial.suggest_float("lmbda", 1e-3, 0.1, log=True)
 
