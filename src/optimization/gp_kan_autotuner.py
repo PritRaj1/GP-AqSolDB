@@ -102,6 +102,16 @@ class GPKANAutoTuner(BaseAutoTuner):
         }
         return self.config
 
+    @staticmethod
+    def _make_activation_param(
+        act_type: str, hidden_size: int, dim: int = -1, keep_dim: bool = False
+    ) -> Dict[str, Any]:
+        if act_type == "ReshapeGaussian":
+            return {"new_shape": [hidden_size, 1]}
+        elif act_type == "ReduceSumGaussian":
+            return {"dim": dim, "keep_dim": keep_dim}
+        return {}
+
     def _extract_architecture(
         self, best_params: Dict[str, Any]
     ) -> Tuple[List[int], List[str], List[Dict[str, Any]]]:
@@ -111,18 +121,16 @@ class GPKANAutoTuner(BaseAutoTuner):
 
         for i in range(best_params.get("num_hidden_layers", 0)):
             hidden_sizes.append(best_params[f"hidden_size_{i}"])
-            activation_types.append(best_params[f"activation_type_{i}"])
-
-            activation_param: Dict[str, Any] = {}
-            if best_params[f"activation_type_{i}"] == "ReshapeGaussian":
-                activation_param["new_shape"] = [best_params[f"hidden_size_{i}"], 1]
-
-            elif best_params[f"activation_type_{i}"] == "ReduceSumGaussian":
-                activation_param["dim"] = best_params.get(f"reducesum_dim_{i}", -1)
-                activation_param["keep_dim"] = best_params.get(
-                    f"reducesum_keepdim_{i}", False
+            act_type = best_params[f"activation_type_{i}"]
+            activation_types.append(act_type)
+            activation_params.append(
+                self._make_activation_param(
+                    act_type,
+                    best_params[f"hidden_size_{i}"],
+                    dim=best_params.get(f"reducesum_dim_{i}", -1),
+                    keep_dim=best_params.get(f"reducesum_keepdim_{i}", False),
                 )
-            activation_params.append(activation_param)
+            )
 
         return hidden_sizes, activation_types, activation_params
 
@@ -161,18 +169,18 @@ class GPKANAutoTuner(BaseAutoTuner):
                 )
                 activation_types.append(activation_type)
 
-                activation_param: Dict[str, Any] = {}
-                if activation_type == "ReshapeGaussian":
-                    activation_param["new_shape"] = [hidden_size, 1]
-
-                elif activation_type == "ReduceSumGaussian":
-                    activation_param["dim"] = trial.suggest_int(
-                        f"reducesum_dim_{i}", -1, 0
-                    )
-                    activation_param["keep_dim"] = trial.suggest_categorical(
+                dim = -1
+                keep_dim = False
+                if activation_type == "ReduceSumGaussian":
+                    dim = trial.suggest_int(f"reducesum_dim_{i}", -1, 0)
+                    keep_dim = trial.suggest_categorical(
                         f"reducesum_keepdim_{i}", [True, False]
                     )
-                activation_params.append(activation_param)
+                activation_params.append(
+                    self._make_activation_param(
+                        activation_type, hidden_size, dim=dim, keep_dim=keep_dim
+                    )
+                )
 
             num_inducing_points = trial.suggest_int("num_inducing_points", 1, 20)
             z_init_low = trial.suggest_float("z_init_low", -2.0, -0.1)

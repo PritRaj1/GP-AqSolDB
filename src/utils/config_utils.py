@@ -1,30 +1,19 @@
 from configparser import ConfigParser
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 
 def create_default_config(
     n_features: Optional[int] = None,
-    input_size: Optional[int] = None,
-    output_size: int = 1,
-    learning_rate: float = 0.001,
-    num_epochs: int = 30,
-    batch_size: int = 32,
-    pretrain_iters: int = 10,
-    seed: int = 42,
-    min_var: float = 0.2,
-    device_precision: str = "float32",
     use_gpu: bool = False,
-    n_jobs: int = 2,
-    chunk_size: int = 500,
-    min_size_for_parallel: int = 1000,
     kernel_type: str = "RBF",
     lmbda: float = 0.1,
     alpha: float = 1.0,
-    use_sparse: bool = False,
     num_inducing: int = 20,
-    inducing_method: str = "random",
+    **kwargs: Any,
 ) -> ConfigParser:
     config = ConfigParser()
+    input_size = kwargs.pop("input_size", None)
+    output_size = kwargs.pop("output_size", 1)
     if n_features is not None or input_size is not None:
         config["NETWORK"] = {
             "input_size": str(input_size if input_size is not None else n_features),
@@ -49,10 +38,13 @@ def create_default_config(
         "alpha": str(alpha),
     }
     config["SPARSE"] = {
-        "use_sparse": str(use_sparse).lower(),
+        "use_sparse": str(kwargs.pop("use_sparse", False)).lower(),
         "num_inducing": str(num_inducing),
-        "inducing_method": inducing_method,
+        "inducing_method": str(kwargs.pop("inducing_method", "random")),
     }
+    n_jobs = kwargs.pop("n_jobs", 2)
+    chunk_size = kwargs.pop("chunk_size", 500)
+    min_size_for_parallel = kwargs.pop("min_size_for_parallel", 1000)
     config["PARALLEL"] = {
         "use_parallel": "true",
         "n_jobs": str(n_jobs),
@@ -60,7 +52,13 @@ def create_default_config(
         "use_gpu": str(use_gpu).lower(),
         "min_size_for_parallel": str(min_size_for_parallel),
     }
+    min_var = kwargs.pop("min_var", 0.2)
     config["NORMALIZATION"] = {"min_var": str(min_var)}
+    seed = kwargs.pop("seed", 42)
+    learning_rate = kwargs.pop("learning_rate", 0.001)
+    num_epochs = kwargs.pop("num_epochs", 30)
+    batch_size = kwargs.pop("batch_size", 32)
+    pretrain_iters = kwargs.pop("pretrain_iters", 10)
     config["TRAINING"] = {
         "seed": str(seed),
         "learning_rate": str(learning_rate),
@@ -68,10 +66,11 @@ def create_default_config(
         "batch_size": str(batch_size),
         "pretrain_iters": str(pretrain_iters),
     }
+    device_precision = kwargs.pop("device_precision", "float32")
     config["DEVICE"] = {
         "use_gpu": str(use_gpu).lower(),
         "device": "gpu" if use_gpu else "cpu",
-        "precision": device_precision,
+        "precision": str(device_precision),
     }
     return config
 
@@ -100,28 +99,21 @@ def load_kan_conf(config: ConfigParser) -> Dict[str, Union[int, float]]:
         if section not in config:
             raise ValueError(f"{section} section not found in config")
 
+    result: Dict[str, Union[int, float]] = load_gp_config(config)
+
     network = config["NETWORK"]
-    gp = config["GP"]
     norm = config["NORMALIZATION"]
     train = config["TRAINING"]
-    return {
-        "input_size": int(network.get("input_size", "1")),
-        "output_size": int(network.get("output_size", "1")),
-        "num_inducing_points": int(gp.get("num_inducing_points", "10")),
-        "z_init_low": float(gp.get("z_init_low", "-2.0")),
-        "z_init_high": float(gp.get("z_init_high", "2.0")),
-        "h_init_low": float(gp.get("h_init_low", "-1.0")),
-        "h_init_high": float(gp.get("h_init_high", "1.0")),
-        "global_length_scale": float(gp.get("global_length_scale", "0.4")),
-        "min_length_scale": float(gp.get("min_length_scale", "0.2")),
-        "global_covariance_scale": float(gp.get("global_covariance_scale", "1.0")),
-        "min_covariance_scale": float(gp.get("min_covariance_scale", "0.1")),
-        "global_jitter": float(gp.get("global_jitter", "0.001")),
-        "baseline_jitter": float(gp.get("baseline_jitter", "0.01")),
-        "min_var": float(norm.get("min_var", "0.2")),
-        "seed": int(train.get("seed", "42")),
-        "learning_rate": float(train.get("learning_rate", "0.001")),
-        "num_epochs": int(train.get("num_epochs", "30")),
-        "batch_size": int(train.get("batch_size", "32")),
-        "pretrain_iters": int(train.get("pretrain_iters", "10")),
-    }
+    result.update(
+        {
+            "input_size": int(network.get("input_size", "1")),
+            "output_size": int(network.get("output_size", "1")),
+            "min_var": float(norm.get("min_var", "0.2")),
+            "seed": int(train.get("seed", "42")),
+            "learning_rate": float(train.get("learning_rate", "0.001")),
+            "num_epochs": int(train.get("num_epochs", "30")),
+            "batch_size": int(train.get("batch_size", "32")),
+            "pretrain_iters": int(train.get("pretrain_iters", "10")),
+        }
+    )
+    return result

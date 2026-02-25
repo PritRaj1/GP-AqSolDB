@@ -3,30 +3,16 @@ from typing import Any, Optional, Tuple, Union
 import numpy as np
 from scipy import linalg, stats
 
-from ...kernels import compute_kernel
+from .base_gp import BaseGP
 
 
-class DenseGP:
+class DenseGP(BaseGP):
     def __init__(self, config: Any, sigma: np.ndarray) -> None:
-        self.config = config
-        self.sigma = np.asarray(sigma)
-        self.kernel_type = config.get("KERNEL", "type")
-        self.alpha = config.getfloat("KERNEL", "alpha")
+        super().__init__(config, sigma)
         self.L: Optional[np.ndarray] = None
         self.alpha_vec: Optional[np.ndarray] = None
         self.X_train: Optional[np.ndarray] = None
         self.y_train: Optional[np.ndarray] = None
-        self.noise_var = config.getfloat("KERNEL", "lmbda")
-
-    def _kernel(self, X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
-        return compute_kernel(self.kernel_type, X1, X2, self.sigma, self.alpha)
-
-    def _recast_2D(self, X: np.ndarray) -> np.ndarray:
-        X = np.asarray(X)
-        if X.ndim == 1:
-            X = X.reshape(-1, 1)
-
-        return X
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "DenseGP":
         if len(X) == 0 or len(y) == 0:
@@ -43,18 +29,7 @@ class DenseGP:
         K = self._kernel(self.X_train, self.X_train)
         K += self.noise_var * np.eye(len(self.X_train))
 
-        # Escalating jitter for numerical stability
-        for jitter in [0, 1e-8, 1e-6, 1e-4]:
-            try:
-                if jitter > 0:
-                    K += jitter * np.eye(len(self.X_train))
-                self.L = linalg.cholesky(K, lower=True)
-                break
-
-            except linalg.LinAlgError:
-                continue
-        else:
-            raise linalg.LinAlgError("Cholesky failed even with jitter=1e-4")
+        self.L = self._cholesky_with_jitter(K)
 
         self.alpha_vec = linalg.solve_triangular(self.L, self.y_train, lower=True)
         return self
@@ -85,9 +60,3 @@ class DenseGP:
     ) -> Tuple[float, float, float]:
         slope, intercept, r_value, p_value, std_err = stats.linregress(y_true, y_pred)
         return r_value, p_value, std_err
-
-    def get_model_complexity(self) -> int:
-        n_params = len(self.sigma) + 1  # sigmas + lambda
-        if self.kernel_type == "RQ":
-            n_params += 1
-        return n_params

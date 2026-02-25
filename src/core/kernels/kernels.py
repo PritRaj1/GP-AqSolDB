@@ -33,48 +33,55 @@ def _compute_sq_dist(X1: np.ndarray, X2: np.ndarray, sigma: np.ndarray) -> np.nd
 
 # ---------------------------------------------------------------------------
 # Kernel formulas (pure functions: sq_dist -> kernel matrix)
+# These use `xp` (array module) so they work with both numpy and cupy arrays.
 # ---------------------------------------------------------------------------
 
 
-def _rbf_formula(sq_dist: np.ndarray, alpha: Optional[float]) -> np.ndarray:
-    result: np.ndarray = np.exp(-0.5 * sq_dist)
-    return result
+def _get_xp(arr: Any) -> Any:
+    """Return cupy if arr is a cupy array, else numpy."""
+    if cp is not None and isinstance(arr, cp.ndarray):
+        return cp
+    return np
 
 
-def _rq_formula(sq_dist: np.ndarray, alpha: Optional[float]) -> np.ndarray:
+def _rbf_formula(sq_dist: Any, alpha: Optional[float], xp: Any = np) -> Any:
+    return xp.exp(-0.5 * sq_dist)
+
+
+def _rq_formula(sq_dist: Any, alpha: Optional[float], xp: Any = np) -> Any:
     if alpha is None:
         raise ValueError("alpha is required for RQ kernel")
-    result: np.ndarray = (1 + 0.5 * sq_dist / alpha) ** (-alpha)
-    return result
+    return (1 + 0.5 * sq_dist / alpha) ** (-alpha)
 
 
-def _matern_formula(sq_dist: np.ndarray, alpha: Optional[float]) -> np.ndarray:
+def _matern_formula(sq_dist: Any, alpha: Optional[float], xp: Any = np) -> Any:
     if alpha is None:
         raise ValueError("alpha (nu) is required for MATERN kernel")
-    dist: np.ndarray = np.sqrt(np.maximum(sq_dist, 0))
+    dist = xp.sqrt(xp.maximum(sq_dist, 0))
 
     if alpha == 0.5:
-        result: np.ndarray = np.exp(-dist)
-        return result
+        return xp.exp(-dist)
 
     elif alpha == 1.5:
-        sqrt3_dist = np.sqrt(3) * dist
-        result = (1 + sqrt3_dist) * np.exp(-sqrt3_dist)
-        return result
+        sqrt3_dist = xp.sqrt(3) * dist
+        return (1 + sqrt3_dist) * xp.exp(-sqrt3_dist)
 
     elif alpha == 2.5:
-        sqrt5_dist = np.sqrt(5) * dist
-        result = (1 + sqrt5_dist + 5 * dist**2 / 3) * np.exp(-sqrt5_dist)
-        return result
+        sqrt5_dist = xp.sqrt(5) * dist
+        return (1 + sqrt5_dist + 5 * dist**2 / 3) * xp.exp(-sqrt5_dist)
 
     else:
+        # General Matern uses scipy.special.kv — CPU-only
+        if xp is not np:
+            raise ValueError(
+                f"Matern with alpha={alpha} only supports 0.5, 1.5, 2.5 on GPU"
+            )
         dist_safe = np.where(dist < 1e-10, 1e-10, dist)
-        result = (
+        return (
             (2 ** (1 - alpha) / math.gamma(alpha))
             * (np.sqrt(2 * alpha) * dist_safe) ** alpha
             * kv(alpha, np.sqrt(2 * alpha) * dist_safe)
         )
-        return result
 
 
 KERNEL_FORMULAS = {
@@ -96,6 +103,7 @@ def _gpu_kernel(
     kernel_type: str,
     alpha: Optional[float] = None,
 ) -> np.ndarray:
+    """Compute kernel entirely on GPU, transfer only the final result back."""
     if not CUPY_AVAILABLE or cp is None:
         raise RuntimeError("GPU acceleration not available. Install cupy.")
 
@@ -110,43 +118,15 @@ def _gpu_kernel(
         X2_sq = cp.sum(X2_norm**2, axis=1)
         sq_dist = X1_sq + X2_sq - 2 * (X1_norm @ X2_norm.T)
 
-        if kernel_type == "RBF":
-            result = cp.exp(-0.5 * sq_dist)
-
-        elif kernel_type == "RQ":
-            if alpha is None:
-                raise ValueError("alpha is required for RQ kernel")
-            result = (1 + 0.5 * sq_dist / alpha) ** (-alpha)
-
-        elif kernel_type == "MATERN":
-            if alpha is None:
-                raise ValueError("alpha (nu) is required for MATERN kernel")
-            dist = cp.sqrt(cp.maximum(sq_dist, 0))
-
-            if alpha == 0.5:
-                result = cp.exp(-dist)
-
-            elif alpha == 1.5:
-                sqrt3_dist = cp.sqrt(3) * dist
-                result = (1 + sqrt3_dist) * cp.exp(-sqrt3_dist)
-
-            elif alpha == 2.5:
-                sqrt5_dist = cp.sqrt(5) * dist
-                result = (1 + sqrt5_dist + 5 * dist**2 / 3) * cp.exp(-sqrt5_dist)
-
-            else:
-                raise ValueError(f"Matern with alpha={alpha} not implemented for GPU")
-
-        else:
-            raise ValueError(f"Unknown kernel type: {kernel_type}")
-
+        formula = KERNEL_FORMULAS[kernel_type]
+        result = formula(sq_dist, alpha, xp=cp)
         return np.asarray(cp.asnumpy(result))
 
     except Exception as e:
         try:
             cp.get_default_memory_pool().free_all_blocks()
         except Exception:
-            pass
+            warnings.warn("Failed to free GPU memory pool during error cleanup")
         raise RuntimeError(f"GPU computation failed: {e}")
 
 

@@ -1,5 +1,6 @@
 import glob
 import os
+import pickle
 from configparser import ConfigParser
 
 import imageio
@@ -9,7 +10,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
 from src.core.models import GP
-from src.optimization import GPAutoTuner, load_sigmas_from_file
+from src.optimization import GPAutoTuner
 from src.plotting import (
     FIGURE_DIR,
     make_feature_grid,
@@ -258,7 +259,8 @@ def main():
         print("Loading previously optimized hyperparameters...")
         config = ConfigParser()
         config.read(CONFIG_PATH)
-        sigmas = load_sigmas_from_file(SIGMA_PATH)
+        with open(SIGMA_PATH, "rb") as f:
+            sigmas = np.array(pickle.load(f))
 
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")

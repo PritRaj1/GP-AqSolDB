@@ -4,10 +4,10 @@ import numpy as np
 from scipy import linalg
 
 from ....utils import get_inducing_selector
-from ...kernels import compute_kernel
+from .base_gp import BaseGP
 
 
-class FITCGP:
+class FITCGP(BaseGP):
     """
     Sparse GP using FITC (Fully Independent Training Conditional) approximation.
 
@@ -15,12 +15,8 @@ class FITCGP:
     """
 
     def __init__(self, config: Any, sigma: np.ndarray) -> None:
-        self.config = config
-        self.sigma = np.asarray(sigma)
-        self.kernel_type = config.get("KERNEL", "type")
-        self.alpha = config.getfloat("KERNEL", "alpha")
+        super().__init__(config, sigma)
         self.num_inducing = config.getint("KERNEL", "num_inducing", fallback=20)
-        self.noise_var = config.getfloat("KERNEL", "lmbda")
 
         self.X_train: Optional[np.ndarray] = None
         self.y_train: Optional[np.ndarray] = None
@@ -32,15 +28,6 @@ class FITCGP:
         self.Kmm_inv: Optional[np.ndarray] = None
         self.Knm: Optional[np.ndarray] = None
         self.is_fitted = False
-
-    def _kernel(self, X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
-        return compute_kernel(self.kernel_type, X1, X2, self.sigma, self.alpha)
-
-    def _recast_2D(self, X: np.ndarray) -> np.ndarray:
-        X = np.asarray(X)
-        if X.ndim == 1:
-            X = X.reshape(-1, 1)
-        return X
 
     def _select_inducing_points(
         self, X: np.ndarray, y: Optional[np.ndarray] = None, method: str = "kmeans"
@@ -78,16 +65,7 @@ class FITCGP:
 
         A = self.Kmm + Kmn @ (self.Knm / self.Lambda[:, None])
 
-        for jitter in [0, 1e-8, 1e-6, 1e-4]:
-            try:
-                if jitter > 0:
-                    A += jitter * np.eye(M)
-                self.LA = linalg.cholesky(A, lower=True)
-                break
-            except linalg.LinAlgError:
-                continue
-        else:
-            raise linalg.LinAlgError("Cholesky failed even with jitter=1e-4")
+        self.LA = self._cholesky_with_jitter(A)
 
         b = Kmn @ (self.y_train / self.Lambda)
         self.v = linalg.solve_triangular(self.LA, b, lower=True)
@@ -133,8 +111,6 @@ class FITCGP:
         return None
 
     def get_model_complexity(self) -> int:
-        n_params: int = len(self.sigma) + 1  # sigmas + lambda
-        if self.kernel_type == "RQ":
-            n_params += 1
+        n_params: int = super().get_model_complexity()
         n_params += self.num_inducing * len(self.sigma)  # inducing points
         return int(n_params)

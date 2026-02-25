@@ -292,12 +292,3 @@ class GPAutoTuner(BaseAutoTuner):
             raise FileNotFoundError(f"Sigma file not found: {self.sigma_save_path}")
 
         return config, np.array(sigmas)
-
-
-def load_sigmas_from_file(file_path: str) -> np.ndarray:
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            return np.array(pickle.load(f))
-
-    else:
-        raise FileNotFoundError(f"Sigma file not found: {file_path}")

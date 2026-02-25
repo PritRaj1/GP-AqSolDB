@@ -227,7 +227,7 @@ class GP_KAN:
         print("Pretraining GP hyperparameters...")
         try:
             self._pretrain_gp_hyperparameters(X_train, y_train, pretrain_iters)
-        except Exception as e:
+        except (RuntimeError, ValueError, FloatingPointError) as e:
             print(f"Warning: Pretraining failed: {e}")
             print("Continuing with default hyperparameters...")
 
@@ -308,7 +308,7 @@ class GP_KAN:
                     if epoch % 5 == 0:
                         print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
 
-            except Exception as e:
+            except (RuntimeError, ValueError, FloatingPointError) as e:
                 print(f"Training failed at epoch {epoch}: {e}")
                 if best_params is not None:
                     self.set_params(best_params)
@@ -349,7 +349,7 @@ class GP_KAN:
                     loss = pretrain_loss_fn(params)
                     print(f"  Pretrain {i}: Inducing point log-likelihood {-loss:.4f}")
 
-            except Exception as e:
+            except (RuntimeError, ValueError, FloatingPointError) as e:
                 print(f"  Pretraining failed at iteration {i}: {e}")
                 break
 

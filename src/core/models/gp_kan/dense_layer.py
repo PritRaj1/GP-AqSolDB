@@ -52,40 +52,9 @@ def build_kernel_mat(
     func: Callable[[jax.Array, jax.Array], jax.Array],
 ) -> jax.Array:
     """Always returns (..., N1, N2) where N1 = x1.shape[-1], N2 = x2.shape[-1]."""
-    if x1.ndim == 1 and x2.ndim == 1:
-        x1_expanded = x1[:, None]
-        x2_expanded = x2[None, :]
-
-    elif x1.ndim == x2.ndim:
-        if x1.ndim == 1:
-            x1_expanded = x1[:, None]
-            x2_expanded = x2[None, :]
-
-        else:
-            x1_expanded = x1[..., :, None]
-            x2_expanded = x2[..., None, :]
-
-    else:
-        if x1.ndim > x2.ndim:
-            if x2.ndim == 1:
-                x1_expanded = x1[..., :, None]
-                x2_expanded = x2[None, :]
-
-            else:
-                x1_expanded = x1[..., :, None]
-                x2_expanded = x2[None, :]
-
-        else:
-            if x1.ndim == 1:
-                x1_expanded = x1[:, None]
-                x2_expanded = x2[..., None, :]
-
-            else:
-                x1_expanded = x1[None, :]
-                x2_expanded = x2[..., :, None]
-
-    k_matrix = func(x1_expanded, x2_expanded)
-    return k_matrix
+    x1_expanded = x1[..., :, None]
+    x2_expanded = x2[..., None, :]
+    return func(x1_expanded, x2_expanded)
 
 
 class DenseGPLayer:
