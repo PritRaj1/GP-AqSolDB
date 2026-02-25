@@ -19,7 +19,7 @@ from src.plotting import (
     plot_predictions,
     plot_surface,
 )
-from src.utils.data_utils import load_aqsol_data
+from src.utils.data_utils import infer_defaults, load_aqsol_data
 
 CONFIG_PATH = "config/gp.ini"
 SIGMA_PATH = "config/gp_sigmas.pkl"
@@ -249,6 +249,7 @@ def main():
 
     else:
         print("No optimized hyperparameters found. Running auto-tuning...")
+        defaults = infer_defaults(X_train)
         tuner = GPAutoTuner(
             X_train,
             y_train,
@@ -259,6 +260,7 @@ def main():
             use_gpu=True,
             sampler="tpe",
             max_samples=4000,
+            data_defaults=defaults,
         )
         tuner.optimize(n_trials=3000)
         config, sigmas = tuner.load_optimized_parameters()

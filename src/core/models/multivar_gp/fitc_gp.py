@@ -48,7 +48,11 @@ class FITCGP(BaseGP):
 
     def __init__(self, config: Any, sigma: jnp.ndarray) -> None:
         super().__init__(config, sigma)
-        self.num_inducing = config.getint("KERNEL", "num_inducing", fallback=20)
+        self.num_inducing = config.getint(
+            "SPARSE",
+            "num_inducing",
+            fallback=config.getint("KERNEL", "num_inducing", fallback=20),
+        )
 
         self.X_train: Optional[jnp.ndarray] = None
         self.y_train: Optional[jnp.ndarray] = None

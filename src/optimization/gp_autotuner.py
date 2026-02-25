@@ -24,10 +24,12 @@ class GPAutoTuner(BaseAutoTuner):
         use_gpu: bool = False,
         sampler: str = "bayesian",
         max_samples: Optional[int] = None,
+        data_defaults: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.sigma_save_path = sigma_save_path
         self.gp_mode = gp_mode
         self.max_samples = max_samples
+        self.data_defaults = data_defaults
 
         if self.gp_mode not in ["dense", "sparse", "both"]:
             raise ValueError("gp_mode must be 'dense', 'sparse', or 'both'")
@@ -54,19 +56,52 @@ class GPAutoTuner(BaseAutoTuner):
 
     def _objective(self, trial: optuna.Trial) -> float:
         try:
-            if self.gp_mode == "dense":
-                use_sparse = False
-
-            elif self.gp_mode == "sparse":
-                use_sparse = True
+            dd = self.data_defaults
+            if dd is not None:
+                use_sparse = dd["use_sparse"]
+                num_inducing = dd["num_inducing"]
+                inducing_method = dd["inducing_method"]
+                lmbda_lo, lmbda_hi = dd["lmbda_range"]
+                sigma_ranges = dd["sigma_ranges"]
 
             else:
-                use_sparse = trial.suggest_categorical("use_sparse", [True, False])
+                if self.gp_mode == "dense":
+                    use_sparse = False
+
+                elif self.gp_mode == "sparse":
+                    use_sparse = True
+
+                else:
+                    use_sparse = trial.suggest_categorical("use_sparse", [True, False])
+
+                lmbda_lo, lmbda_hi = 1e-3, 0.1
+                sigma_ranges = [(0.2, 2.0)] * self.n_features
+
+                if use_sparse:
+                    min_ind = max(10, int(0.1 * self.n_samples))
+                    max_ind = min(int(0.5 * self.n_samples), self.n_samples - 1)
+                    num_inducing = trial.suggest_int("num_inducing", min_ind, max_ind)
+                    inducing_method = trial.suggest_categorical(
+                        "inducing_method",
+                        [
+                            "random",
+                            "uniform",
+                            "kmeans",
+                            "kmeans_plus_plus",
+                            "stratified",
+                            "adaptive",
+                            "furthest_point",
+                        ],
+                    )
+
+                else:
+                    num_inducing = 20
+                    inducing_method = "random"
 
             kernel_type = trial.suggest_categorical(
                 "kernel_type", ["RBF", "RQ", "MATERN", "TPS"]
             )
-            lmbda = trial.suggest_float("lmbda", 1e-3, 0.1, log=True)
+            lmbda = trial.suggest_float("lmbda", lmbda_lo, lmbda_hi, log=True)
 
             if kernel_type == "RQ":
                 alpha = trial.suggest_float("rq_alpha", 0.5, 5.0)
@@ -78,32 +113,9 @@ class GPAutoTuner(BaseAutoTuner):
                 alpha = 1.0
 
             sigmas = [
-                trial.suggest_float(f"sigma_{i}", 0.2, 2.0)
+                trial.suggest_float(f"sigma_{i}", *sigma_ranges[i])
                 for i in range(self.n_features)
             ]
-
-            if use_sparse:
-                min_inducing = max(10, int(0.1 * self.n_samples))
-                max_inducing = min(int(0.5 * self.n_samples), self.n_samples - 1)
-                num_inducing = trial.suggest_int(
-                    "num_inducing", min_inducing, max_inducing
-                )
-                inducing_method = trial.suggest_categorical(
-                    "inducing_method",
-                    [
-                        "random",
-                        "uniform",
-                        "kmeans",
-                        "kmeans_plus_plus",
-                        "stratified",
-                        "adaptive",
-                        "furthest_point",
-                    ],
-                )
-
-            else:
-                num_inducing = 20
-                inducing_method = "random"
 
             config = ConfigParser()
             config["KERNEL"] = {
@@ -201,7 +213,12 @@ class GPAutoTuner(BaseAutoTuner):
         return best_params
 
     def _save_best_parameters(self, best_params: Dict[str, Any]) -> None:
-        if self.gp_mode == "dense":
+        dd = self.data_defaults
+
+        if dd is not None:
+            use_sparse = str(dd["use_sparse"]).lower()
+
+        elif self.gp_mode == "dense":
             use_sparse = "false"
 
         elif self.gp_mode == "sparse":
@@ -234,8 +251,13 @@ class GPAutoTuner(BaseAutoTuner):
 
         self.config["SPARSE"]["use_sparse"] = use_sparse
         if use_sparse == "true":
-            num_inducing = best_params.get("num_inducing", 20)
-            inducing_method = best_params.get("inducing_method", "random")
+            if dd is not None:
+                num_inducing = dd["num_inducing"]
+                inducing_method = dd["inducing_method"]
+
+            else:
+                num_inducing = best_params.get("num_inducing", 20)
+                inducing_method = best_params.get("inducing_method", "random")
             self.config["SPARSE"]["num_inducing"] = str(num_inducing)
             self.config["SPARSE"]["inducing_method"] = inducing_method
 

@@ -1,8 +1,12 @@
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+
+from ..core.kernels import compute_kernel
 
 
 def load_aqsol_data(
@@ -87,11 +91,13 @@ def load_aqsol_data(
         X_array = scaler.fit_transform(X_df)
         if return_frame:
             X_processed = pd.DataFrame(X_array, columns=feature_names, index=sol.index)
+
         else:
             X_processed = X_array
     else:
         if return_frame:
             X_processed = X_df.copy()
+
         else:
             X_processed = X_df.to_numpy(dtype=np.float64)
 
@@ -99,3 +105,85 @@ def load_aqsol_data(
         return X_processed, y, feature_names, scaler
 
     return X_processed, y, feature_names
+
+
+def _median_pairwise_dists(X: np.ndarray) -> np.ndarray:
+    """Median absolute pairwise distance per feature column."""
+    d = X.shape[1]
+    medians = np.ones(d)
+    for dim in range(d):
+        col = X[:, dim]
+        dists = np.abs(col[:, None] - col[None, :])
+        nonzero = dists[dists > 0]
+        if len(nonzero):
+            medians[dim] = float(np.median(nonzero))
+
+    return medians
+
+
+def infer_defaults(
+    X: np.ndarray,
+    csv_path: str = "data/solubility-dataset.csv",
+) -> Dict[str, object]:
+    """Infer GP hyperparameter defaults from data properties."""
+    n, d = X.shape
+    rng = np.random.RandomState(42)
+
+    # Subsample for expensive ops
+    sub_n = min(500, n)
+    sub_idx = rng.choice(n, sub_n, replace=False)
+    X_sub = X[sub_idx]
+
+    # Median-heuristic sigmas (1/median_dist per dim)
+    medians = _median_pairwise_dists(X_sub)
+    sigmas_heuristic = 1.0 / np.maximum(medians, 1e-8)
+
+    # Nystrom residuals for num_inducing
+    sigma_jnp = jnp.array(sigmas_heuristic)
+    X_sub_jnp = jnp.array(X_sub)
+    K = np.asarray(compute_kernel("RBF", X_sub_jnp, X_sub_jnp, sigma_jnp))
+    tr_K = np.trace(K)
+
+    num_inducing = int(np.sqrt(n))
+    for m in [10, 20, 50, 100, 200]:
+        if m >= sub_n:
+            continue
+
+        km = KMeans(n_clusters=m, random_state=42, n_init=3, max_iter=50)
+        Z_jnp = jnp.array(km.fit(X_sub).cluster_centers_)
+        Knm = np.asarray(compute_kernel("RBF", X_sub_jnp, Z_jnp, sigma_jnp))
+        Kmm = np.asarray(compute_kernel("RBF", Z_jnp, Z_jnp, sigma_jnp))
+        Kmm += 1e-6 * np.eye(m)
+        Q = Knm @ np.linalg.inv(Kmm) @ Knm.T
+        if (tr_K - np.trace(Q)) / max(tr_K, 1e-12) < 0.05:
+            num_inducing = m
+            break
+
+    # Lambda range from measurement noise in CSV
+    lmbda_lo = 1e-3
+    try:
+        sol = pd.read_csv(csv_path)
+        if "SD" in sol.columns:
+            mean_sd_sq = float(np.mean(sol["SD"].to_numpy(dtype=np.float64) ** 2))
+            if np.isfinite(mean_sd_sq) and mean_sd_sq > 0:
+                lmbda_lo = mean_sd_sq
+
+    except (FileNotFoundError, KeyError):
+        pass
+
+    # Sigma ranges per dimension: [0.5, 2.0] * heuristic, clamped to [0.1, 5.0]
+    sigma_ranges = []
+    for dim in range(d):
+        lo = float(np.clip(0.5 * sigmas_heuristic[dim], 0.1, 5.0))
+        hi = float(np.clip(2.0 * sigmas_heuristic[dim], 0.1, 5.0))
+        if lo > hi:
+            lo, hi = hi, lo
+        sigma_ranges.append((lo, hi))
+
+    return {
+        "use_sparse": n > 2000,
+        "num_inducing": num_inducing,
+        "inducing_method": "kmeans",
+        "lmbda_range": (lmbda_lo, 0.1),
+        "sigma_ranges": sigma_ranges,
+    }
