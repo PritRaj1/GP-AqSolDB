@@ -70,7 +70,6 @@ def main():
             config_path=CONFIG_PATH,
             params_save_path=PARAMS_PATH,
             metric="MSE",
-            n_jobs=4,
             use_gpu=True,
             max_hidden_layers=4,
             max_hidden_size=100,

@@ -1,8 +1,5 @@
-from ...utils import load_parallel_conf
-from .kernels import compute_kernel, get_parallel_info
+from .kernels import compute_kernel
 
 __all__ = [
     "compute_kernel",
-    "get_parallel_info",
-    "load_parallel_conf",
 ]

@@ -23,9 +23,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gpu = [
-    "cupy-cuda12x",
-]
 notebooks = [
     "ipykernel",
     "jupyter",

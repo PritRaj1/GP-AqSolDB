@@ -23,6 +23,7 @@ def test_uncertainty_behavior():
     gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     _, y_std = gp.predict(X_test, return_std=True)
+    y_std = np.asarray(y_std)
 
     # Uncertainty should be lower at training points
     training_indices = []
@@ -48,6 +49,7 @@ def test_uncertainty_distance_relationship():
     gp = DenseGP(config, sigma)
     gp.fit(X_train, y_train)
     _, y_std = gp.predict(X_test, return_std=True)
+    y_std = np.asarray(y_std)
 
     distances = np.min(np.abs(X_test - X_train.T), axis=1)
     far_points = distances > 2.0

@@ -147,6 +147,8 @@ def test_gp_with_optimized_parameters():
 
         X_test = np.random.uniform(0, 5, (10, 2))
         y_pred, y_std = gp.predict(X_test, return_std=True)
+        y_pred = np.asarray(y_pred)
+        y_std = np.asarray(y_std)
 
         assert np.all(y_std >= 0)
         assert not np.any(np.isnan(y_pred))

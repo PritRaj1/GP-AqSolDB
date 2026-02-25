@@ -35,7 +35,7 @@ def test_unified_gp_switching():
     config_dense = create_config(use_sparse=False)
     gp_dense = GP(config_dense, sigma)
     gp_dense.fit(X_train, y_train)
-    y_pred_dense = gp_dense.predict(X_test)
+    y_pred_dense = np.asarray(gp_dense.predict(X_test))
     mse_dense = mean_squared_error(y_test, y_pred_dense)
 
     # Sparse GP
@@ -44,7 +44,7 @@ def test_unified_gp_switching():
     )
     gp_sparse = GP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
-    y_pred_sparse = gp_sparse.predict(X_test)
+    y_pred_sparse = np.asarray(gp_sparse.predict(X_test))
     mse_sparse = mean_squared_error(y_test, y_pred_sparse)
 
     # Both models should produce reasonably similar predictions
@@ -64,7 +64,7 @@ def test_different_inducing_methods():
         config = create_config(use_sparse=True, num_inducing=30, inducing_method=method)
         gp = GP(config, sigma)
         gp.fit(X_train, y_train)
-        y_pred = gp.predict(X_test)
+        y_pred = np.asarray(gp.predict(X_test))
         results[method] = mean_squared_error(y_test, y_pred)
 
     # Both methods should produce reasonable predictions
@@ -85,6 +85,7 @@ def test_uncertainty_quantification():
     gp_dense = GP(config_dense, sigma)
     gp_dense.fit(X_train, y_train)
     _, y_std_dense = gp_dense.predict(X_test, return_std=True)
+    y_std_dense = np.asarray(y_std_dense)
 
     assert np.all(y_std_dense > 0)
     assert np.all(np.isfinite(y_std_dense))
@@ -96,6 +97,7 @@ def test_uncertainty_quantification():
     gp_sparse = GP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
     _, y_std_sparse = gp_sparse.predict(X_test, return_std=True)
+    y_std_sparse = np.asarray(y_std_sparse)
 
     assert np.all(y_std_sparse > 0)
     assert np.all(np.isfinite(y_std_sparse))

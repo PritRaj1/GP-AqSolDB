@@ -41,14 +41,14 @@ def test_sparse_vs_full_gp():
     config_full = create_config("RBF", lmbda=0.1, sparse=False)
     gp_full = DenseGP(config_full, sigma)
     gp_full.fit(X_train, y_train)
-    y_pred_full = gp_full.predict(X_test)
+    y_pred_full = np.asarray(gp_full.predict(X_test))
     mse_full = mean_squared_error(y_test, y_pred_full)
 
     # Sparse GP
     config_sparse = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=50)
     gp_sparse = FITCGP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
-    y_pred_sparse = gp_sparse.predict(X_test)
+    y_pred_sparse = np.asarray(gp_sparse.predict(X_test))
     mse_sparse = mean_squared_error(y_test, y_pred_sparse)
 
     assert mse_full > 0
@@ -73,7 +73,7 @@ def test_different_inducing_points(num_inducing):
     gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train)
 
-    y_pred = gp.predict(X_test)
+    y_pred = np.asarray(gp.predict(X_test))
     mse = mean_squared_error(y_test, y_pred)
 
     assert mse > 0
@@ -93,12 +93,14 @@ def test_sparse_gp_with_uncertainty():
     gp_full = DenseGP(config_full, sigma)
     gp_full.fit(X_train, y_train)
     _, y_std_full = gp_full.predict(X_test, return_std=True)
+    y_std_full = np.asarray(y_std_full)
 
     # Sparse GP
     config_sparse = create_config("RBF", lmbda=0.1, sparse=True, num_inducing=30)
     gp_sparse = FITCGP(config_sparse, sigma)
     gp_sparse.fit(X_train, y_train)
     _, y_std_sparse = gp_sparse.predict(X_test, return_std=True)
+    y_std_sparse = np.asarray(y_std_sparse)
 
     assert np.all(y_std_full > 0)
     assert np.all(y_std_sparse > 0)
@@ -122,7 +124,7 @@ def test_inducing_point_selection_methods(method):
     gp = FITCGP(config, sigma)
     gp.fit(X_train, y_train, inducing_method=method)
 
-    y_pred = gp.predict(X_test)
+    y_pred = np.asarray(gp.predict(X_test))
     mse = mean_squared_error(y_test, y_pred)
 
     assert mse > 0
@@ -142,12 +144,13 @@ def test_adaptive_inducing_point():
     # Stratified
     gp_stratified = FITCGP(config, sigma)
     gp_stratified.fit(X_train, y_train, inducing_method="stratified")
-    mse_stratified = mean_squared_error(y_test, gp_stratified.predict(X_test))
+    y_pred = np.asarray(gp_stratified.predict(X_test))
+    mse_stratified = mean_squared_error(y_test, y_pred)
 
     # Adaptive
     gp_adaptive = FITCGP(config, sigma)
     gp_adaptive.fit(X_train, y_train, inducing_method="adaptive")
-    mse_adaptive = mean_squared_error(y_test, gp_adaptive.predict(X_test))
+    mse_adaptive = mean_squared_error(y_test, np.asarray(gp_adaptive.predict(X_test)))
 
     assert mse_stratified > 0
     assert mse_adaptive > 0

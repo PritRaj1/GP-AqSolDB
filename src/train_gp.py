@@ -20,7 +20,6 @@ from src.plotting import (
     plot_surface,
 )
 from src.utils.data_utils import load_aqsol_data
-from src.utils.kernel_utils import configure_parallel_settings
 
 CONFIG_PATH = "config/gp.ini"
 SIGMA_PATH = "config/gp_sigmas.pkl"
@@ -50,13 +49,6 @@ def learning_evolution(
 
     for section in config.sections():
         gif_config[section] = dict(config[section])
-
-    if "PARALLEL" not in gif_config:
-        gif_config["PARALLEL"] = {}
-
-    gif_config["PARALLEL"]["use_parallel"] = "false"
-    gif_config["PARALLEL"]["n_jobs"] = "1"
-    gif_config["PARALLEL"]["use_gpu"] = "false"
 
     top2_idx, _, _ = _top2_from_sigmas(sigmas)
     x_idx, y_idx = top2_idx[0], top2_idx[1]
@@ -248,13 +240,6 @@ def main():
     X_test = scaler.transform(X_test_df)
     X = scaler.transform(X_df)
 
-    try:
-        configure_parallel_settings(use_parallel=True, n_jobs=4, use_gpu=True)
-
-    except Exception as e:
-        print(f"Warning: Could not configure parallel processing: {e}")
-        print("Continuing with sequential processing...")
-
     if os.path.exists(CONFIG_PATH) and os.path.exists(SIGMA_PATH):
         print("Loading previously optimized hyperparameters...")
         config = ConfigParser()
@@ -271,10 +256,7 @@ def main():
             sigma_save_path=SIGMA_PATH,
             gp_mode="dense",
             metric="MSE",
-            n_jobs=4,
             use_gpu=True,
-            chunk_size=200,
-            min_size_for_parallel=500,
             sampler="tpe",
             max_samples=4000,
         )
@@ -285,8 +267,8 @@ def main():
     gp.fit(X_train, y_train)
 
     y_pred, y_std = gp.predict(X_test, return_std=True)
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
+    mse = mean_squared_error(y_test, np.asarray(y_pred))
+    r2 = r2_score(y_test, np.asarray(y_pred))
 
     print(f"Test MSE: {mse:.4f}")
     print(f"Test R-squared: {r2:.4f}")

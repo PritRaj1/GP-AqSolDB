@@ -22,7 +22,6 @@ class GPKANAutoTuner(BaseAutoTuner):
         config_path: str = "../config/gp_kan.ini",
         params_save_path: str = "../config/gp_kan_params.pkl",
         metric: str = "BIC",
-        n_jobs: int = 2,
         use_gpu: bool = False,
         max_hidden_layers: int = 2,
         max_hidden_size: int = 8,
@@ -44,9 +43,7 @@ class GPKANAutoTuner(BaseAutoTuner):
             "None",
         ]
 
-        super().__init__(
-            X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
-        )
+        super().__init__(X_train, y_train, config_path, metric, use_gpu, sampler)
 
         self.config = ConfigParser()
         if os.path.exists(config_path):
@@ -326,21 +323,6 @@ class GPKANAutoTuner(BaseAutoTuner):
         hidden_sizes, activation_types, _ = self._extract_architecture(best_params)
         print(f"Best architecture: {[self.n_features] + hidden_sizes + [1]}")
         print(f"Best activations: {activation_types}")
-
-    def _process_optimization_results(
-        self, best_params: Dict[str, Any], best_value: float
-    ) -> Dict[str, Any]:
-        hidden_sizes, activation_types, activation_params = self._extract_architecture(
-            best_params
-        )
-        self._save_best_parameters(best_params, activation_types, activation_params)
-        return {
-            "best_params": best_params,
-            "best_value": best_value,
-            "hidden_sizes": hidden_sizes,
-            "activation_types": activation_types,
-            "activation_params": activation_params,
-        }
 
     def _save_best_parameters(
         self,

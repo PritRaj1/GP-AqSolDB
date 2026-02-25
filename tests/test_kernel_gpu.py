@@ -1,67 +1,65 @@
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from src.core.kernels import compute_kernel
-from src.utils.kernel_utils import configure_parallel_settings
 
 
 @pytest.fixture
 def sample_kernel_data():
     np.random.seed(42)
-    X1 = np.random.randn(500, 3)
-    X2 = np.random.randn(250, 3)
+    X1 = np.random.randn(100, 3)
+    X2 = np.random.randn(50, 3)
     sigma = np.random.uniform(0.1, 2.0, 3)
     return X1, X2, sigma
 
 
-@pytest.mark.parametrize("kernel_type", ["RBF", "RQ"])
-def test_sequential_vs_parallel(kernel_type, sample_kernel_data):
+def test_output_is_jax_array(sample_kernel_data):
     X1, X2, sigma = sample_kernel_data
-    alpha = 2.0 if kernel_type == "RQ" else None
-
-    configure_parallel_settings(use_parallel=False, use_gpu=False)
-    result_seq = compute_kernel(kernel_type, X1, X2, sigma, alpha=alpha)
-
-    configure_parallel_settings(use_parallel=True, use_gpu=False, n_jobs=2)
-    result_par = compute_kernel(kernel_type, X1, X2, sigma, alpha=alpha)
-
-    assert np.allclose(result_seq, result_par, rtol=1e-10)
-    assert result_seq.shape == result_par.shape
+    result = compute_kernel("RBF", X1, X2, sigma)
+    assert isinstance(result, jax.Array)
 
 
-def test_gpu_vs_cpu():
-    np.random.seed(42)
-    X1 = np.random.randn(300, 3)
-    X2 = np.random.randn(150, 3)
-    sigma = np.random.uniform(0.1, 2.0, 3)
-
-    configure_parallel_settings(use_parallel=False, use_gpu=False)
-    result_cpu = compute_kernel("RBF", X1, X2, sigma)
-
-    configure_parallel_settings(use_parallel=True, use_gpu=True, n_jobs=2)
-    try:
-        result_gpu = compute_kernel("RBF", X1, X2, sigma)
-        assert np.allclose(result_cpu, result_gpu, rtol=1e-5, atol=1e-8)
-
-    except Exception as e:
-        error_msg = str(e).lower()
-        if any(kw in error_msg for kw in ["gpu", "cuda", "device", "memory"]):
-            pytest.skip(f"GPU not available: {e}")
-        raise
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ", "MATERN"])
+def test_numpy_input_acceptance(kernel_type, sample_kernel_data):
+    X1, X2, sigma = sample_kernel_data
+    alpha = 2.0 if kernel_type == "RQ" else 1.5 if kernel_type == "MATERN" else None
+    result = compute_kernel(kernel_type, X1, X2, sigma, alpha=alpha)
+    assert result.shape == (100, 50)
+    assert not jnp.any(jnp.isnan(result))
 
 
-@pytest.mark.parametrize("matrix_size", [100, 500, 1000])
-def test_parallel_performance_scaling(matrix_size):
-    np.random.seed(42)
-    X1 = np.random.randn(matrix_size, 5)
-    X2 = np.random.randn(matrix_size // 2, 5)
-    sigma = np.random.uniform(0.1, 2.0, 5)
+@pytest.mark.parametrize("kernel_type", ["RBF", "RQ", "MATERN"])
+def test_jax_input_acceptance(kernel_type, sample_kernel_data):
+    X1, X2, sigma = sample_kernel_data
+    X1_jax = jnp.asarray(X1)
+    X2_jax = jnp.asarray(X2)
+    sigma_jax = jnp.asarray(sigma)
+    alpha = 2.0 if kernel_type == "RQ" else 1.5 if kernel_type == "MATERN" else None
+    result = compute_kernel(kernel_type, X1_jax, X2_jax, sigma_jax, alpha=alpha)
+    assert result.shape == (100, 50)
+    assert not jnp.any(jnp.isnan(result))
 
-    configure_parallel_settings(use_parallel=False, use_gpu=False)
-    result_seq = compute_kernel("RBF", X1, X2, sigma)
 
-    configure_parallel_settings(use_parallel=True, use_gpu=False, n_jobs=2)
-    result_par = compute_kernel("RBF", X1, X2, sigma)
+def test_kernel_consistency_across_types(sample_kernel_data):
+    """All kernel types should produce PSD matrices."""
+    X1, _, sigma = sample_kernel_data
+    X = X1[:20]
+    for kernel_type, alpha in [("RBF", None), ("RQ", 2.0), ("MATERN", 1.5)]:
+        K = np.asarray(compute_kernel(kernel_type, X, X, sigma[:3], alpha=alpha))
+        eigenvalues = np.linalg.eigvalsh(K)
+        assert np.all(eigenvalues > -1e-8), f"{kernel_type} kernel not PSD"
 
-    assert result_seq.shape == result_par.shape
-    assert np.allclose(result_seq, result_par, rtol=1e-10)
+
+def test_gpu_device_placement():
+    """If a GPU is available, verify the result lives on GPU."""
+    devices = jax.devices("gpu") if jax.devices("gpu") else []
+    if not devices:
+        pytest.skip("No GPU available")
+
+    X1 = jnp.ones((10, 3))
+    X2 = jnp.ones((5, 3))
+    sigma = jnp.ones(3)
+    result = compute_kernel("RBF", X1, X2, sigma)
+    assert result.devices().pop().platform == "gpu"

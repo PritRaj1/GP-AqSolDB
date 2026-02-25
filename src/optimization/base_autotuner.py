@@ -19,7 +19,6 @@ class BaseAutoTuner(ABC):
         y_train: np.ndarray,
         config_path: str,
         metric: str = "BIC",
-        n_jobs: int = 2,
         use_gpu: bool = False,
         sampler: str = "bayesian",
     ) -> None:
@@ -29,7 +28,6 @@ class BaseAutoTuner(ABC):
         self.n_features = X_train.shape[1]
         self.n_samples = X_train.shape[0]
         self.metric = metric.upper()
-        self.n_jobs = n_jobs
         self.use_gpu = use_gpu
         self.sampler = sampler.lower()
 
@@ -98,7 +96,6 @@ class BaseAutoTuner(ABC):
     def _create_default_config(self) -> ConfigParser:
         return create_default_config(
             n_features=self.n_features,
-            n_jobs=self.n_jobs,
             use_gpu=self.use_gpu,
         )
 

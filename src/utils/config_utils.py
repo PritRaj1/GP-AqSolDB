@@ -42,16 +42,6 @@ def create_default_config(
         "num_inducing": str(num_inducing),
         "inducing_method": str(kwargs.pop("inducing_method", "random")),
     }
-    n_jobs = kwargs.pop("n_jobs", 2)
-    chunk_size = kwargs.pop("chunk_size", 500)
-    min_size_for_parallel = kwargs.pop("min_size_for_parallel", 1000)
-    config["PARALLEL"] = {
-        "use_parallel": "true",
-        "n_jobs": str(n_jobs),
-        "chunk_size": str(chunk_size),
-        "use_gpu": str(use_gpu).lower(),
-        "min_size_for_parallel": str(min_size_for_parallel),
-    }
     min_var = kwargs.pop("min_var", 0.2)
     config["NORMALIZATION"] = {"min_var": str(min_var)}
     seed = kwargs.pop("seed", 42)

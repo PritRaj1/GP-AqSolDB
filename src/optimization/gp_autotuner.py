@@ -5,11 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import optuna
-from scipy.linalg import LinAlgError
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
-from ..core.kernels import get_parallel_info, load_parallel_conf
 from ..core.models import GP
 from .base_autotuner import BaseAutoTuner
 
@@ -23,17 +21,12 @@ class GPAutoTuner(BaseAutoTuner):
         sigma_save_path: str = "../config/gp_sigmas.pkl",
         gp_mode: str = "both",
         metric: str = "BIC",
-        n_jobs: int = 2,
         use_gpu: bool = False,
-        chunk_size: int = 500,
-        min_size_for_parallel: int = 1000,
         sampler: str = "bayesian",
         max_samples: Optional[int] = None,
     ) -> None:
         self.sigma_save_path = sigma_save_path
         self.gp_mode = gp_mode
-        self.chunk_size = chunk_size
-        self.min_size_for_parallel = min_size_for_parallel
         self.max_samples = max_samples
 
         if self.gp_mode not in ["dense", "sparse", "both"]:
@@ -49,36 +42,15 @@ class GPAutoTuner(BaseAutoTuner):
             X_train = X_train[subset_idx]
             y_train = y_train[subset_idx]
 
-        super().__init__(
-            X_train, y_train, config_path, metric, n_jobs, use_gpu, sampler
-        )
-
-        self._load_parallel_settings()
+        super().__init__(X_train, y_train, config_path, metric, use_gpu, sampler)
 
     def _create_default_config(self) -> ConfigParser:
         from ..utils.config_utils import create_default_config
 
         return create_default_config(
             n_features=self.n_features,
-            n_jobs=self.n_jobs,
             use_gpu=self.use_gpu,
-            chunk_size=self.chunk_size,
-            min_size_for_parallel=self.min_size_for_parallel,
         )
-
-    def _load_parallel_settings(self) -> None:
-        try:
-            load_parallel_conf(self.config)
-            parallel_info = get_parallel_info()
-            settings = parallel_info["settings"]
-            print(
-                f"Parallel config: cores={parallel_info['cpu_cores']}, "
-                f"gpu={parallel_info['gpu_available']}, "
-                f"jobs={settings['n_jobs']}, chunk={settings['chunk_size']}"
-            )
-
-        except Exception as e:
-            print(f"Warning: Could not load parallel settings: {e}")
 
     def _objective(self, trial: optuna.Trial) -> float:
         try:
@@ -145,9 +117,6 @@ class GPAutoTuner(BaseAutoTuner):
                 "inducing_method": inducing_method,
             }
 
-            if "PARALLEL" in self.config:
-                config["PARALLEL"] = dict(self.config["PARALLEL"])
-
             cv_results = self._cross_validate_gp(config, sigmas, n_splits=3)
 
             if self.metric == "BIC":
@@ -159,7 +128,7 @@ class GPAutoTuner(BaseAutoTuner):
             else:
                 return float(np.mean(cv_results["mse"]))
 
-        except (LinAlgError, ValueError) as e:
+        except (RuntimeError, ValueError) as e:
             print(f"Trial failed: {e}")
             return float("inf")
 
@@ -183,8 +152,8 @@ class GPAutoTuner(BaseAutoTuner):
             n_params = gp.get_model_complexity()
 
             y_pred = gp.predict(X_val_fold)
-            mse = mean_squared_error(y_val_fold, y_pred)
-            r2 = r2_score(y_val_fold, y_pred)
+            mse = mean_squared_error(y_val_fold, np.asarray(y_pred))
+            r2 = r2_score(y_val_fold, np.asarray(y_pred))
             bic = self.calculate_bic(mse, n_params, len(y_val_fold))
 
             mse_scores.append(mse)

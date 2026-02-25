@@ -1,11 +1,4 @@
-from .gp_kan import (
-    GP_KAN,
-    DenseGPLayer,
-    NormalDist,
-    NormaliseGaussian,
-    ReduceSumGaussian,
-    ReshapeGaussian,
-)
+from .gp_kan import GP_KAN, DenseGPLayer, NormalDist
 from .multivar_gp import FITCGP, GP, DenseGP
 
 __all__ = [
@@ -15,7 +8,4 @@ __all__ = [
     "GP_KAN",
     "DenseGPLayer",
     "NormalDist",
-    "NormaliseGaussian",
-    "ReduceSumGaussian",
-    "ReshapeGaussian",
 ]
