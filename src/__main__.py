@@ -7,7 +7,7 @@ import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         prog="gp-kan",
         description="GP-KAN solubility prediction",
@@ -39,7 +39,7 @@ def main():
         sys.exit(1)
 
 
-def _clean():
+def _clean() -> None:
     patterns = {
         "figures": ["figures/*.png", "figures/*.gif", "tests/figures/*.png"],
         "logs": ["logs/"],

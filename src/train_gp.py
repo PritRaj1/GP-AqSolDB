@@ -2,6 +2,7 @@ import glob
 import os
 import pickle
 from configparser import ConfigParser
+from typing import Any, List, Tuple
 
 import imageio
 import matplotlib.pyplot as plt
@@ -25,26 +26,26 @@ CONFIG_PATH = "config/gp.ini"
 SIGMA_PATH = "config/gp_sigmas.pkl"
 
 
-def _top2_from_sigmas(sigmas):
+def _top2_from_sigmas(sigmas: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     length_scales = 1.0 / sigmas
     sorted_indices = np.argsort(length_scales)[::-1]
     return sorted_indices[:2], length_scales, sorted_indices
 
 
 def learning_evolution(
-    X,
-    y,
-    feature_names,
-    config,
-    sigmas,
-    full_X,
-    n_init=1,
-    n_steps=300,
-    gif_path=f"{FIGURE_DIR}/learning_evolution.gif",
-):
+    X: np.ndarray,
+    y: np.ndarray,
+    feature_names: Any,
+    config: ConfigParser,
+    sigmas: np.ndarray,
+    full_X: np.ndarray,
+    n_init: int = 1,
+    n_steps: int = 300,
+    gif_path: str = f"{FIGURE_DIR}/learning_evolution.gif",
+) -> None:
     np.random.seed(42)
     os.makedirs(FIGURE_DIR, exist_ok=True)
-    frames = []
+    frames: List[np.ndarray] = []
     gif_config = ConfigParser()
 
     for section in config.sections():
@@ -210,7 +211,7 @@ def learning_evolution(
         frames.append(imageio.v2.imread(frame_path))
         os.remove(frame_path)
 
-    imageio.mimsave(gif_path, frames, duration=3)
+    imageio.mimsave(gif_path, frames, duration=3)  # type: ignore[arg-type]
     print(f"Active learning GIF saved to {gif_path}")
 
     for f in glob.glob(f"{FIGURE_DIR}/_al_frame_*.png"):
@@ -220,12 +221,12 @@ def learning_evolution(
             pass
 
 
-def main():
+def main() -> None:
     print("=" * 80)
     print("Tuning/training on AqSolDB")
     print("=" * 80)
 
-    X_df, y, feature_names, scaler = load_aqsol_data(
+    X_df, y, feature_names, scaler = load_aqsol_data(  # type: ignore[misc]
         scale=False,
         return_frame=True,
         return_scaler=True,
@@ -268,9 +269,11 @@ def main():
     gp = GP(config, sigmas)
     gp.fit(X_train, y_train)
 
-    y_pred, y_std = gp.predict(X_test, return_std=True)
-    mse = mean_squared_error(y_test, np.asarray(y_pred))
-    r2 = r2_score(y_test, np.asarray(y_pred))
+    y_pred_raw, y_std_raw = gp.predict(X_test, return_std=True)
+    y_pred = np.asarray(y_pred_raw)
+    y_std = np.asarray(y_std_raw)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
 
     print(f"Test MSE: {mse:.4f}")
     print(f"Test R-squared: {r2:.4f}")
@@ -295,7 +298,8 @@ def main():
     )
 
     X1g, X2g, X_grid = make_feature_grid(X, x_idx, y_idx, grid_size=60)
-    _, y_std_grid = gp.predict(X_grid, return_std=True)
+    _, y_std_grid_raw = gp.predict(X_grid, return_std=True)
+    y_std_grid = np.asarray(y_std_grid_raw)
     plot_heatmap(
         X1g,
         X2g,
@@ -311,7 +315,7 @@ def main():
     X1g_s, X2g_s, X_grid_s = make_feature_grid(
         X, x_idx, y_idx, grid_size=80, pct_low=5, pct_high=95
     )
-    y_pred_grid = gp.predict(X_grid_s).reshape(X1g_s.shape)
+    y_pred_grid = np.asarray(gp.predict(X_grid_s)).reshape(X1g_s.shape)
     plot_surface(
         X1g_s,
         X2g_s,

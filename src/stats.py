@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def main():
+def main() -> None:
     df = pd.read_csv("data/solubility-dataset.csv")
 
     proplist = [

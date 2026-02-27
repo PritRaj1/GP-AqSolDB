@@ -1,4 +1,5 @@
 import os
+from typing import Any, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +14,14 @@ plt.rcParams["font.size"] = 16
 FIGURE_DIR = "figures"
 
 
-def make_feature_grid(X, x_idx, y_idx, grid_size=60, pct_low=1, pct_high=99):
+def make_feature_grid(
+    X: np.ndarray,
+    x_idx: int,
+    y_idx: int,
+    grid_size: int = 60,
+    pct_low: int = 1,
+    pct_high: int = 99,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Create a 2D meshgrid over two features, filling others via nearest neighbor."""
     x1 = np.linspace(
         np.percentile(X[:, x_idx], pct_low),
@@ -46,13 +54,19 @@ def make_feature_grid(X, x_idx, y_idx, grid_size=60, pct_low=1, pct_high=99):
     return X1g, X2g, X_grid
 
 
-def _ensure_dir(path):
+def _ensure_dir(path: str) -> None:
     d = os.path.dirname(path)
     if d:
         os.makedirs(d, exist_ok=True)
 
 
-def plot_predictions(y_test, y_pred, y_std, title, save_path):
+def plot_predictions(
+    y_test: np.ndarray,
+    y_pred: np.ndarray,
+    y_std: np.ndarray,
+    title: str,
+    save_path: str,
+) -> None:
     """Scatter plot of predictions vs actual with uncertainty error bars."""
     fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -108,8 +122,16 @@ def plot_predictions(y_test, y_pred, y_std, title, save_path):
 
 
 def plot_heatmap(
-    X1g, X2g, y_std_grid, x_name, y_name, X_train, x_idx, y_idx, save_path
-):
+    X1g: np.ndarray,
+    X2g: np.ndarray,
+    y_std_grid: np.ndarray,
+    x_name: str,
+    y_name: str,
+    X_train: Any,
+    x_idx: int,
+    y_idx: int,
+    save_path: str,
+) -> None:
     """2D uncertainty heatmap with optional training data overlay."""
     fig, (ax_heat, ax_hist) = plt.subplots(1, 2, figsize=(16, 7))
     cf = ax_heat.contourf(X1g, X2g, y_std_grid, levels=30, cmap="plasma")
@@ -153,8 +175,17 @@ def plot_heatmap(
 
 
 def plot_surface(
-    X1g, X2g, y_pred_grid, x_idx, y_idx, X, y, feature_names, label, save_path
-):
+    X1g: np.ndarray,
+    X2g: np.ndarray,
+    y_pred_grid: np.ndarray,
+    x_idx: int,
+    y_idx: int,
+    X: np.ndarray,
+    y: np.ndarray,
+    feature_names: Any,
+    label: str,
+    save_path: str,
+) -> None:
     """3D surface plot with data point overlay."""
     n = min(200, len(X))
     if len(X) > n:
@@ -206,7 +237,13 @@ def plot_surface(
     plt.close()
 
 
-def plot_layer_neuron(layer, axes, I_idx, O_idx, num_pts=100):
+def plot_layer_neuron(
+    layer: Any,
+    axes: Any,
+    I_idx: int,
+    O_idx: int,
+    num_pts: int = 100,
+) -> None:
     """Plot a single GP neuron's predictive mean and uncertainty."""
     import jax.numpy as jnp
     import jax.scipy.linalg
@@ -223,7 +260,7 @@ def plot_layer_neuron(layer, axes, I_idx, O_idx, num_pts=100):
     plot_max = float(jnp.max(inducing_points) + 2 * length_scale)
     query_points = jnp.linspace(plot_min, plot_max, num_pts)
 
-    def kernel_fcn(x1, x2):
+    def kernel_fcn(x1: Any, x2: Any) -> Any:
         return signal_variance**2 * jnp.exp(-((x1 - x2) ** 2) / (2 * length_scale**2))
 
     K_hh = build_kernel_mat(query_points, inducing_points, kernel_fcn)
@@ -251,7 +288,7 @@ def plot_layer_neuron(layer, axes, I_idx, O_idx, num_pts=100):
     axes.grid(True, alpha=0.3)
 
 
-def save_layer_fig(layer, path, max_neurons_shown=5):
+def save_layer_fig(layer: Any, path: str, max_neurons_shown: int = 5) -> None:
     """Save GP neuron plots for a DenseGPLayer."""
     plot_num = min(max_neurons_shown, layer.num_neurons)
     num_cols = min(plot_num, 5)
@@ -280,7 +317,12 @@ def save_layer_fig(layer, path, max_neurons_shown=5):
     plt.close()
 
 
-def plot_length_scales(length_scales, feature_names, sorted_indices, save_path):
+def plot_length_scales(
+    length_scales: np.ndarray,
+    feature_names: Any,
+    sorted_indices: np.ndarray,
+    save_path: str,
+) -> None:
     """Horizontal bar chart of kernel length scales."""
     sorted_features = [feature_names[i] for i in sorted_indices]
     sorted_ls = length_scales[sorted_indices]
@@ -293,7 +335,7 @@ def plot_length_scales(length_scales, feature_names, sorted_indices, save_path):
     ax.set_title("Kernel Length Scales - Feature Importance")
     ax.grid(True, alpha=0.3)
 
-    colors = plt.cm.viridis(np.linspace(0, 1, len(bars)))
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, len(bars)))
     for bar, color in zip(bars, colors):
         bar.set_color(color)
 

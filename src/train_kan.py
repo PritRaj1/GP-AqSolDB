@@ -1,5 +1,6 @@
 import os
 from configparser import ConfigParser
+from typing import Any, Tuple
 
 import numpy as np
 from sklearn.metrics import mean_squared_error, r2_score
@@ -20,28 +21,30 @@ CONFIG_PATH = "config/gp_kan.ini"
 PARAMS_PATH = "config/gp_kan_params.pkl"
 
 
-def _predict_kan(gp_kan, X):
+def _predict_kan(gp_kan: Any, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Forward pass through GP-KAN, returning (mean, std)."""
-    dist = NormalDist(X, np.zeros_like(X))
+    import jax.numpy as jnp
+
+    dist = NormalDist(jnp.asarray(X), jnp.zeros_like(jnp.asarray(X)))
     out = gp_kan.forward(dist)
     mean = out.mean.flatten()
     std = np.sqrt(np.maximum(out.var.flatten(), 1e-6))
     return mean, std
 
 
-def _top2_from_layers(gp_kan):
+def _top2_from_layers(gp_kan: Any) -> np.ndarray:
     first_layer = gp_kan.layers[0]
     variances = np.var(first_layer.get_z(), axis=(1, 2))
     sorted_indices = np.argsort(variances)[::-1]
     return sorted_indices[:2]
 
 
-def main():
+def main() -> None:
     print("=" * 80)
     print("Tuning/training GP-KAN on AqSolDB")
     print("=" * 80)
 
-    X_df, y, feature_names, scaler = load_aqsol_data(
+    X_df, y, feature_names, scaler = load_aqsol_data(  # type: ignore[misc]
         scale=False,
         return_frame=True,
         return_scaler=True,
