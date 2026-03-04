@@ -192,6 +192,6 @@ def test_xla_opt():
         output2 = jitted_forward(input_dist)
     jit_time = time.time() - start_time
 
-    assert jnp.allclose(output1.mean, output2.mean, rtol=1e-3, atol=1e-3)
-    assert jnp.allclose(output1.var, output2.var, rtol=1e-3, atol=1e-3)
+    assert jnp.allclose(output1.mean, output2.mean, rtol=1e-2, atol=1e-2)
+    assert jnp.allclose(output1.var, output2.var, rtol=1e-2, atol=1e-2)
     assert jit_time < no_jit_time

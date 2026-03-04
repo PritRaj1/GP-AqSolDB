@@ -323,31 +323,29 @@ class GP_KAN:
     def _pretrain_gp_hyperparameters(
         self, X_train: jax.Array, y_train: jax.Array, num_iters: int
     ) -> None:
-        """Pretrain GP hyperparameters by maximizing ll of inducing points."""
+        """Pretrain GP hyperparameters by maximizing ll of inducing points via L-BFGS."""
 
         def pretrain_loss_fn(params: Dict[str, Any]) -> jax.Array:
             self.set_params(params)
             return -self.loglikelihood()
 
-        grad_fn = jit(grad(pretrain_loss_fn))
+        value_and_grad_fn = jit(jax.value_and_grad(pretrain_loss_fn))
 
-        optimizer = optax.chain(
-            optax.clip_by_global_norm(0.5),
-            optax.sgd(0.001, momentum=0.9),
-        )
-
+        optimizer = optax.lbfgs()
         params = self.get_params()
         opt_state = optimizer.init(params)
 
         for i in range(num_iters):
             try:
-                grads = grad_fn(params)
-                updates, opt_state = optimizer.update(grads, opt_state)
+                val, grads = value_and_grad_fn(params)
+                updates, opt_state = optimizer.update(
+                    grads, opt_state, params,
+                    value=val, grad=grads, value_fn=pretrain_loss_fn,
+                )
                 params = optax.apply_updates(params, updates)
 
                 if i % 5 == 0:
-                    loss = pretrain_loss_fn(params)
-                    print(f"  Pretrain {i}: Inducing point log-likelihood {-loss:.4f}")
+                    print(f"  Pretrain {i}: Inducing point log-likelihood {-val:.4f}")
 
             except (RuntimeError, ValueError, FloatingPointError) as e:
                 print(f"  Pretraining failed at iteration {i}: {e}")
