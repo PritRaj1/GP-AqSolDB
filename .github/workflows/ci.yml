@@ -27,6 +27,8 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v --cov=src --cov-report=xml
+        env:
+          JAX_PLATFORMS: cpu
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

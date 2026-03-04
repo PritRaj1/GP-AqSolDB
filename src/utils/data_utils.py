@@ -152,7 +152,9 @@ def infer_defaults(
         km = KMeans(n_clusters=m, random_state=42, n_init=3, max_iter=50)
         Z_jnp = jnp.array(km.fit(X_sub).cluster_centers_)
         Knm = np.asarray(compute_kernel("RBF", X_sub_jnp, Z_jnp, sigma_jnp))
-        Kmm = np.asarray(compute_kernel("RBF", Z_jnp, Z_jnp, sigma_jnp)) + 1e-6 * np.eye(m)
+        Kmm = np.asarray(
+            compute_kernel("RBF", Z_jnp, Z_jnp, sigma_jnp)
+        ) + 1e-6 * np.eye(m)
         Q = Knm @ np.linalg.inv(Kmm) @ Knm.T
         if (tr_K - np.trace(Q)) / max(tr_K, 1e-12) < 0.05:
             num_inducing = m
