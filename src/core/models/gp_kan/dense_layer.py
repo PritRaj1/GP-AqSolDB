@@ -204,7 +204,7 @@ class DenseGPLayer:
     def _scipy_cholesky(
         self, kernel_matrix: jax.Array
     ) -> tuple[jax.Array, jax.Array, jax.Array]:
-        cholesky_factor = jax.scipy.linalg.cholesky(kernel_matrix)
+        cholesky_factor = jax.scipy.linalg.cholesky(kernel_matrix, lower=True)
         cholesky_inverse = jax.scipy.linalg.inv(cholesky_factor)
         if kernel_matrix.ndim == 4:
             cholesky_inverse_transpose = jnp.transpose(cholesky_inverse, (0, 1, 3, 2))
