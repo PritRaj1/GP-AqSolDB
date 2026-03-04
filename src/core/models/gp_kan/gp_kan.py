@@ -323,7 +323,7 @@ class GP_KAN:
     def _pretrain_gp_hyperparameters(
         self, X_train: jax.Array, y_train: jax.Array, num_iters: int
     ) -> None:
-        """Pretrain GP hyperparameters by maximizing ll of inducing points via L-BFGS."""
+        """Pretrain GP hyperparameters via L-BFGS on inducing point ll."""
 
         def pretrain_loss_fn(params: Dict[str, Any]) -> jax.Array:
             self.set_params(params)
@@ -339,8 +339,12 @@ class GP_KAN:
             try:
                 val, grads = value_and_grad_fn(params)
                 updates, opt_state = optimizer.update(
-                    grads, opt_state, params,
-                    value=val, grad=grads, value_fn=pretrain_loss_fn,
+                    grads,
+                    opt_state,
+                    params,
+                    value=val,
+                    grad=grads,
+                    value_fn=pretrain_loss_fn,
                 )
                 params = optax.apply_updates(params, updates)
 
