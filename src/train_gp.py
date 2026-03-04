@@ -263,7 +263,7 @@ def main() -> None:
             max_samples=4000,
             data_defaults=defaults,
         )
-        tuner.optimize(n_trials=3000)
+        tuner.optimize(n_trials=1000)
         config, sigmas = tuner.load_optimized_parameters()
 
     gp = GP(config, sigmas)

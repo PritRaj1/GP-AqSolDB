@@ -30,6 +30,9 @@ notebooks = [
     "rdkit",
 ]
 
+[tool.setuptools.packages.find]
+include = ["src", "src.*"]
+
 [project.scripts]
 gp-kan = "src.__main__:main"
 
