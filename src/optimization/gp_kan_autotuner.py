@@ -245,7 +245,7 @@ class GPKANAutoTuner(BaseAutoTuner):
             else:
                 return float(np.mean(cv_results["mse"]))
 
-        except (ValueError, RuntimeError) as e:
+        except (ValueError, RuntimeError, TypeError) as e:
             print(f"Trial failed: {e}")
             return float("inf")
 
@@ -308,7 +308,7 @@ class GPKANAutoTuner(BaseAutoTuner):
                 bic_scores.append(bic)
                 r2_scores.append(r2)
 
-            except (ValueError, RuntimeError) as e:
+            except (ValueError, RuntimeError, TypeError) as e:
                 print(f"CV fold failed: {e}")
                 mse_scores.append(1e6)
                 bic_scores.append(1e6)
