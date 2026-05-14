@@ -45,8 +45,6 @@ Thumbs.db
 # Project specific
 *.log
 logs/
-figures/*.png
-figures/*.gif
 tests/figures/*.png
 htmlcov/
 .coverage

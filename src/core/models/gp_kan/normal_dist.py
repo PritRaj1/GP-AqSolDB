@@ -20,17 +20,8 @@ def get_device_config(config: ConfigParser) -> Dict[str, Union[bool, str]]:
 
 def setup_jax_device(config: ConfigParser) -> None:
     device_config = get_device_config(config)
-
-    if device_config["use_gpu"]:
-        jax.config.update("jax_platform_name", "gpu")
-
-        if device_config["precision"] == "float64":
-            jax.config.update("jax_enable_x64", True)
-
-        elif device_config["precision"] == "float32":
-            jax.config.update("jax_enable_x64", False)
-    else:
-        jax.config.update("jax_platform_name", "cpu")
+    platform = "gpu" if device_config["use_gpu"] else "cpu"
+    jax.config.update("jax_platform_name", platform)
 
 
 @jdc.pytree_dataclass

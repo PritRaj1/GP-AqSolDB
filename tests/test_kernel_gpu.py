@@ -53,9 +53,9 @@ def test_kernel_consistency_across_types(sample_kernel_data):
 
 
 def test_gpu_device_placement():
-    """If a GPU is available, verify the result lives on GPU."""
-    devices = jax.devices("gpu") if jax.devices("gpu") else []
-    if not devices:
+    try:
+        jax.devices("gpu")
+    except RuntimeError:
         pytest.skip("No GPU available")
 
     X1 = jnp.ones((10, 3))

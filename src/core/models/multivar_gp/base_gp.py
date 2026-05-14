@@ -27,22 +27,13 @@ class BaseGP:
         return X
 
     def _cholesky_with_jitter(self, K: jnp.ndarray) -> jnp.ndarray:
-        """Cholesky decomposition with escalating jitter for numerical stability."""
+        """Cholesky with escalating jitter, (relies on global x64)."""
         n = K.shape[0]
-        orig_dtype = K.dtype
-        with jax.enable_x64(True):
-            K_f64 = jnp.asarray(K, dtype=jnp.float64)
-            for jitter in [0.0, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2]:
-                if jitter > 0:
-                    eye = jnp.eye(n, dtype=jnp.float64)
-                    K_j = K_f64 + jitter * eye
-
-                else:
-                    K_j = K_f64
-
-                L = jax.scipy.linalg.cholesky(K_j, lower=True)
-                if not jnp.any(jnp.isnan(L)):
-                    return L.astype(orig_dtype)
+        for jitter in (0.0, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2):
+            K_j = K + jitter * jnp.eye(n, dtype=K.dtype) if jitter > 0 else K
+            L = jax.scipy.linalg.cholesky(K_j, lower=True)
+            if not jnp.any(jnp.isnan(L)):
+                return L
 
         raise RuntimeError("Cholesky failed even with jitter=1e-2")
 
