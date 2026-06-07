@@ -2,18 +2,20 @@ import glob
 import os
 import pickle
 from configparser import ConfigParser
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 from src.core.models import GP
 from src.optimization import GPAutoTuner
 from src.plotting import (
     FIGURE_DIR,
+    label_axes_original_units,
     make_feature_grid,
     plot_heatmap,
     plot_length_scales,
@@ -32,113 +34,90 @@ def _top2_from_sigmas(sigmas: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.nd
     return sorted_indices[:2], length_scales, sorted_indices
 
 
+def _clone_dense_config(config: ConfigParser) -> ConfigParser:
+    """Copy a config and force dense GP mode"""
+    cloned = ConfigParser()
+    for section in config.sections():
+        cloned[section] = dict(config[section])
+    if not cloned.has_section("SPARSE"):
+        cloned.add_section("SPARSE")
+
+    cloned["SPARSE"]["use_sparse"] = "false"
+    return cloned
+
+
 def learning_evolution(
     X: np.ndarray,
     y: np.ndarray,
-    feature_names: Any,
+    feature_names: List[str],
     config: ConfigParser,
     sigmas: np.ndarray,
-    full_X: np.ndarray,
+    scaler: StandardScaler,
+    *,
     n_init: int = 1,
     n_steps: int = 300,
+    grid_size: int = 60,
     gif_path: str = f"{FIGURE_DIR}/learning_evolution.gif",
 ) -> None:
+    """Active learning over full feature space, projected onto top-2"""
     np.random.seed(42)
     os.makedirs(FIGURE_DIR, exist_ok=True)
     frames: List[np.ndarray] = []
-    gif_config = ConfigParser()
 
-    for section in config.sections():
-        gif_config[section] = dict(config[section])
+    al_config = _clone_dense_config(config)
 
-    top2_idx, _, _ = _top2_from_sigmas(sigmas)
-    x_idx, y_idx = top2_idx[0], top2_idx[1]
+    top2, _, _ = _top2_from_sigmas(sigmas)
+    x_idx, y_idx = int(top2[0]), int(top2[1])
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
 
-    grid_size = 60
-    x1 = np.linspace(
-        np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99), grid_size
+    X1g, X2g, X_grid = make_feature_grid(
+        X, x_idx, y_idx, grid_size=grid_size, fill="mean", pct_low=5, pct_high=95
     )
-    x2 = np.linspace(
-        np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99), grid_size
-    )
-    X1g, X2g = np.meshgrid(x1, x2)
-    X_grid = np.zeros((X1g.size, X.shape[1]))
-    X_grid[:, x_idx] = X1g.ravel()
-    X_grid[:, y_idx] = X2g.ravel()
-    for i in range(X.shape[1]):
-        if i not in (x_idx, y_idx):
-            X_grid[:, i] = np.mean(X[:, i])
 
-    # Pre-scan to determine axis limits
     pool_idx = np.arange(len(X))
     init_idx = np.random.choice(pool_idx, size=n_init, replace=False)
-    temp_train_idx = list(init_idx)
-    temp_pool_idx = np.setdiff1d(np.arange(len(X)), temp_train_idx)
-    temp_mean_uncertainties = []
-    grid_unc_min, grid_unc_max = np.inf, -np.inf
-
-    for _ in range(n_steps):
-        if len(temp_pool_idx) == 0:
-            break
-        X_train, y_train = X[temp_train_idx], y[temp_train_idx]
-        gp = GP(gif_config, sigmas)
-        gp.fit(X_train, y_train)
-        _, y_std_grid = gp.predict(X_grid, return_std=True)
-        grid_unc_min = min(grid_unc_min, np.min(y_std_grid))
-        grid_unc_max = max(grid_unc_max, np.max(y_std_grid))
-        X_pool = X[temp_pool_idx]
-        _, y_std_pool = gp.predict(X_pool, return_std=True)
-        temp_mean_uncertainties.append(np.mean(y_std_pool))
-
-        if len(temp_pool_idx) > 0:
-            next_idx = temp_pool_idx[np.argmax(y_std_pool)]
-            temp_train_idx.append(next_idx)
-            temp_pool_idx = np.setdiff1d(temp_pool_idx, [next_idx])
-
-    if (
-        len(temp_mean_uncertainties) == 0
-        or not np.isfinite(temp_mean_uncertainties).all()
-    ):
-        unc_ylim = (0, 1)
-        grid_unc_min, grid_unc_max = 0, 1
-
-    else:
-        unc_ylim = (
-            min(temp_mean_uncertainties) * 0.95,
-            max(temp_mean_uncertainties) * 1.05,
-        )
-
-    del temp_train_idx, temp_pool_idx, temp_mean_uncertainties
-
-    # Actual run with frame generation
-    mean_uncertainties = []
-    pool_idx = np.arange(len(X))
-    init_idx = np.random.choice(pool_idx, size=n_init, replace=False)
-    train_idx = list(init_idx)
+    train_idx: List[int] = list(init_idx)
     pool_idx = np.setdiff1d(pool_idx, train_idx)
 
+    gp = GP(al_config, sigmas).fit(X[train_idx], y[train_idx])
+    _, init_std_grid = gp.predict(X_grid, return_std=True)
+    _, init_std_pool = gp.predict(X[pool_idx], return_std=True)
+    grid_unc_max = float(np.asarray(init_std_grid).max()) * 1.05
+    pool_unc_max = float(np.asarray(init_std_pool).mean()) * 1.05
+    levels = np.linspace(0.0, grid_unc_max, 40)
+
+    mean_uncertainties: List[float] = []
+
     for step in range(n_steps):
-        X_train, y_train = X[train_idx], y[train_idx]
+        if step > 0:
+            gp = GP(al_config, sigmas).fit(X[train_idx], y[train_idx])
+
         X_pool = X[pool_idx]
-
-        gp = GP(gif_config, sigmas)
-        gp.fit(X_train, y_train)
-
         _, y_std_pool = gp.predict(X_pool, return_std=True)
-        mean_uncertainties.append(np.mean(y_std_pool))
+        y_std_pool_np = np.asarray(y_std_pool)
+        mean_uncertainties.append(float(np.mean(y_std_pool_np)))
 
-        if len(pool_idx) > 0:
-            next_idx = pool_idx[np.argmax(y_std_pool)]
-            train_idx.append(next_idx)
-            pool_idx = np.setdiff1d(pool_idx, [next_idx])
+        _, y_std_grid = gp.predict(X_grid, return_std=True)
+        y_std_grid_np = np.asarray(y_std_grid).reshape(X1g.shape)
 
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
         ax = axes[0]
+        im = ax.contourf(
+            X1g,
+            X2g,
+            y_std_grid_np,
+            levels=levels,
+            cmap="plasma",
+            alpha=0.7,
+            vmin=0.0,
+            vmax=grid_unc_max,
+        )
+        fig.colorbar(im, ax=ax, label="Uncertainty")
+
         ax.scatter(
-            full_X[:, x_idx],
-            full_X[:, y_idx],
+            X[:, x_idx],
+            X[:, y_idx],
             c="black",
             s=40,
             marker="x",
@@ -176,23 +155,9 @@ def learning_evolution(
         ax.set_title(f"Data Seen {step + 1}/{n_steps}")
         ax.legend(loc="lower left")
         ax.grid(True, alpha=0.3)
-        ax.set_xlim(np.percentile(X[:, x_idx], 1), np.percentile(X[:, x_idx], 99))
-        ax.set_ylim(np.percentile(X[:, y_idx], 1), np.percentile(X[:, y_idx], 99))
-
-        _, y_std_grid = gp.predict(X_grid, return_std=True)
-        y_std_grid = y_std_grid.reshape(X1g.shape)
-        levels = np.linspace(grid_unc_min, grid_unc_max, 40)
-        im = ax.contourf(
-            X1g,
-            X2g,
-            y_std_grid,
-            levels=levels,
-            cmap="plasma",
-            alpha=0.7,
-            vmin=grid_unc_min,
-            vmax=grid_unc_max,
-        )
-        fig.colorbar(im, ax=ax, label="Uncertainty")
+        ax.set_xlim(np.percentile(X[:, x_idx], 5), np.percentile(X[:, x_idx], 95))
+        ax.set_ylim(np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95))
+        label_axes_original_units(ax, scaler, x_idx, y_idx)
 
         ax2 = axes[1]
         ax2.plot(np.arange(1, step + 2), mean_uncertainties, "-o", color="purple")
@@ -200,7 +165,7 @@ def learning_evolution(
         ax2.set_ylabel("Mean Predictive Variance")
         ax2.set_title("Uncertainty Reduction")
         ax2.set_xlim(1, n_steps)
-        ax2.set_ylim(unc_ylim)
+        ax2.set_ylim(0.0, max(pool_unc_max, max(mean_uncertainties) * 1.05))
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
@@ -211,7 +176,18 @@ def learning_evolution(
         frames.append(imageio.v2.imread(frame_path))
         os.remove(frame_path)
 
-    imageio.mimsave(gif_path, frames, duration=3)  # type: ignore[arg-type]
+        if len(pool_idx) == 0:
+            break
+        next_idx = int(pool_idx[int(np.argmax(y_std_pool_np))])
+        train_idx.append(next_idx)
+        pool_idx = np.setdiff1d(pool_idx, [next_idx])
+
+    imageio.mimsave(
+        gif_path,
+        frames,  # type: ignore[arg-type]
+        duration=80,  # ms per frame
+        loop=0,
+    )
     print(f"Active learning GIF saved to {gif_path}")
 
     for f in glob.glob(f"{FIGURE_DIR}/_al_frame_*.png"):
@@ -281,7 +257,7 @@ def main() -> None:
 
     # Plots
     top2, length_scales, sorted_indices = _top2_from_sigmas(sigmas)
-    x_idx, y_idx = top2[0], top2[1]
+    x_idx, y_idx = int(top2[0]), int(top2[1])
 
     plot_predictions(
         y_test,
@@ -310,6 +286,7 @@ def main() -> None:
         x_idx,
         y_idx,
         f"{FIGURE_DIR}/kernel_uncertainty_heatmap.png",
+        scaler=scaler,
     )
 
     X1g_s, X2g_s, X_grid_s = make_feature_grid(
@@ -327,17 +304,18 @@ def main() -> None:
         feature_names,
         "GP Solubility",
         f"{FIGURE_DIR}/solubility_surface.png",
+        scaler=scaler,
     )
 
     subset_size = min(500, len(X))
     subset_idx = np.random.choice(len(X), subset_size, replace=False)
     learning_evolution(
-        X[subset_idx, :2],
+        X[subset_idx],
         y[subset_idx],
-        feature_names[:2],
+        feature_names,
         config,
-        sigmas[:2],
-        full_X=X,
+        sigmas,
+        scaler,
         gif_path=f"{FIGURE_DIR}/learning_evolution.gif",
     )
 

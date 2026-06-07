@@ -128,6 +128,7 @@ def main() -> None:
         x_idx,
         y_idx,
         f"{FIGURE_DIR}/kernel_uncertainty_heatmap_kan.png",
+        scaler=scaler,
     )
 
     X1g_s, X2g_s, X_grid_s = make_feature_grid(
@@ -145,6 +146,7 @@ def main() -> None:
         feature_names,
         "GP-KAN Solubility",
         f"{FIGURE_DIR}/solubility_surface_kan.png",
+        scaler=scaler,
     )
 
     gp_kan.save_fig(f"{FIGURE_DIR}/gp_kan_architecture.png", max_neurons_per_layer=3)

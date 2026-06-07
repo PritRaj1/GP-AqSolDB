@@ -1,10 +1,17 @@
 import os
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
+import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from matplotlib.axes import Axes
+from matplotlib.ticker import FuncFormatter
 from scipy.spatial.distance import cdist
+from sklearn.preprocessing import StandardScaler
+
+from .core.models.gp_kan.dense_layer import build_kernel_mat
 
 plt.style.use("seaborn-v0_8")
 sns.set_palette("husl")
@@ -14,6 +21,32 @@ plt.rcParams["font.size"] = 16
 FIGURE_DIR = "figures"
 
 
+def _original_units_formatter(
+    scaler: StandardScaler, feature_idx: int
+) -> FuncFormatter:
+    """Format scaled-feature tick values back to original units for display"""
+    mean = float(scaler.mean_[feature_idx])
+    scale = float(scaler.scale_[feature_idx])
+    return FuncFormatter(lambda val, _pos: f"{val * scale + mean:.3g}")
+
+
+def label_axes_original_units(
+    ax: Axes,
+    scaler: Optional[StandardScaler],
+    x_idx: Optional[int] = None,
+    y_idx: Optional[int] = None,
+) -> None:
+    """Relabel x/y axes to display values in original (pre-scaling) units"""
+    if scaler is None:
+        return
+
+    if x_idx is not None:
+        ax.xaxis.set_major_formatter(_original_units_formatter(scaler, x_idx))
+
+    if y_idx is not None:
+        ax.yaxis.set_major_formatter(_original_units_formatter(scaler, y_idx))
+
+
 def make_feature_grid(
     X: np.ndarray,
     x_idx: int,
@@ -21,8 +54,9 @@ def make_feature_grid(
     grid_size: int = 60,
     pct_low: int = 1,
     pct_high: int = 99,
+    fill: str = "nearest",
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Create a 2D meshgrid over two features, filling others via nearest neighbor."""
+    """2D meshgrid over two features; ``fill`` is "nearest" or "mean" for others."""
     x1 = np.linspace(
         np.percentile(X[:, x_idx], pct_low),
         np.percentile(X[:, x_idx], pct_high),
@@ -34,23 +68,33 @@ def make_feature_grid(
         grid_size,
     )
     X1g, X2g = np.meshgrid(x1, x2)
-    X_grid = np.zeros((X1g.size, X.shape[1]))
-    X_grid[:, x_idx] = X1g.ravel()
-    X_grid[:, y_idx] = X2g.ravel()
+    if fill == "mean":
+        X_grid = np.tile(X.mean(axis=0), (X1g.size, 1))
 
-    subset_size = min(1000, len(X))
-    if len(X) > subset_size:
-        np.random.seed(42)
-        X_sample = X[np.random.choice(len(X), subset_size, replace=False)]
+    elif fill == "nearest":
+        X_grid = np.zeros((X1g.size, X.shape[1]))
+        subset_size = min(1000, len(X))
+        if len(X) > subset_size:
+            np.random.seed(42)
+            X_sample = X[np.random.choice(len(X), subset_size, replace=False)]
+
+        else:
+            X_sample = X
+
+        distances = cdist(
+            np.column_stack([X1g.ravel(), X2g.ravel()]),
+            X_sample[:, [x_idx, y_idx]],
+        )
+        nn = np.argmin(distances, axis=1)
+        for i in range(X.shape[1]):
+            if i not in (x_idx, y_idx):
+                X_grid[:, i] = X_sample[nn, i]
 
     else:
-        X_sample = X
+        raise ValueError(f"fill must be 'nearest' or 'mean', got {fill!r}")
 
-    for i in range(X.shape[1]):
-        if i not in (x_idx, y_idx):
-            distances = cdist(X_grid[:, [x_idx, y_idx]], X_sample[:, [x_idx, y_idx]])
-            X_grid[:, i] = X_sample[np.argmin(distances, axis=1), i]
-
+    X_grid[:, x_idx] = X1g.ravel()
+    X_grid[:, y_idx] = X2g.ravel()
     return X1g, X2g, X_grid
 
 
@@ -131,8 +175,9 @@ def plot_heatmap(
     x_idx: int,
     y_idx: int,
     save_path: str,
+    scaler: Optional[StandardScaler] = None,
 ) -> None:
-    """2D uncertainty heatmap with optional training data overlay."""
+    """2D uncertainty heatmap with optional training data overlay"""
     fig, (ax_heat, ax_hist) = plt.subplots(1, 2, figsize=(16, 7))
     cf = ax_heat.contourf(X1g, X2g, y_std_grid, levels=30, cmap="plasma")
     fig.colorbar(cf, ax=ax_heat, label="Predicted Uncertainty")
@@ -142,12 +187,14 @@ def plot_heatmap(
     ax_heat.set_title("2D Uncertainty Heatmap (Top 2 Features)")
     ax_heat.set_xlim(X1g[0].min(), X1g[0].max())
     ax_heat.set_ylim(X2g[:, 0].min(), X2g[:, 0].max())
+    label_axes_original_units(ax_heat, scaler, x_idx, y_idx)
 
     if X_train is not None:
         n = min(500, len(X_train))
         if len(X_train) > n:
             np.random.seed(42)
             X_train = X_train[np.random.choice(len(X_train), n, replace=False)]
+
         ax_heat.scatter(
             X_train[:, x_idx],
             X_train[:, y_idx],
@@ -185,8 +232,9 @@ def plot_surface(
     feature_names: Any,
     label: str,
     save_path: str,
+    scaler: Optional[StandardScaler] = None,
 ) -> None:
-    """3D surface plot with data point overlay."""
+    """3D surface plot with data points overlaid"""
     n = min(200, len(X))
     if len(X) > n:
         np.random.seed(42)
@@ -217,7 +265,7 @@ def plot_surface(
         s=20,
         alpha=0.8,
         marker="x",
-        label=f"Actual Data ({len(X_s)} points)",
+        label=f"Actual Data ({len(X_s)} points, projected)",
         edgecolor="black",
         linewidth=0.5,
     )
@@ -228,6 +276,7 @@ def plot_surface(
     ax.set_title("3D Solubility Surface Plot")
     ax.set_xlim(np.percentile(X[:, x_idx], 5), np.percentile(X[:, x_idx], 95))
     ax.set_ylim(np.percentile(X[:, y_idx], 5), np.percentile(X[:, y_idx], 95))
+    label_axes_original_units(ax, scaler, x_idx, y_idx)
     ax.legend()
     ax.view_init(elev=10, azim=30)
 
@@ -244,12 +293,7 @@ def plot_layer_neuron(
     O_idx: int,
     num_pts: int = 100,
 ) -> None:
-    """Plot a single GP neuron's predictive mean and uncertainty."""
-    import jax.numpy as jnp
-    import jax.scipy.linalg
-
-    from .core.models.gp_kan.dense_layer import build_kernel_mat
-
+    """Plot single GP neuron's predictive mean and uncertainty."""
     inducing_points = layer.get_z()[I_idx, O_idx, :]
     inducing_function_values = layer.h[I_idx, O_idx, :]
     signal_variance = layer.get_s()[I_idx, O_idx]
