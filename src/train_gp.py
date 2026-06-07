@@ -7,6 +7,7 @@ from typing import List, Tuple
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -71,7 +72,7 @@ def learning_evolution(
     x_name, y_name = feature_names[x_idx], feature_names[y_idx]
 
     X1g, X2g, X_grid = make_feature_grid(
-        X, x_idx, y_idx, grid_size=grid_size, fill="mean", pct_low=5, pct_high=95
+        X, x_idx, y_idx, grid_size=grid_size, fill="nearest", pct_low=5, pct_high=95
     )
 
     pool_idx = np.arange(len(X))
@@ -82,7 +83,10 @@ def learning_evolution(
     gp = GP(al_config, sigmas).fit(X[train_idx], y[train_idx])
     _, init_std_grid = gp.predict(X_grid, return_std=True)
     _, init_std_pool = gp.predict(X[pool_idx], return_std=True)
-    grid_unc_max = float(np.asarray(init_std_grid).max()) * 1.05
+    init_smoothed = gaussian_filter(
+        np.asarray(init_std_grid).reshape(X1g.shape), sigma=1.5
+    )
+    grid_unc_max = float(init_smoothed.max()) * 1.05
     pool_unc_max = float(np.asarray(init_std_pool).mean()) * 1.05
     levels = np.linspace(0.0, grid_unc_max, 40)
 
@@ -98,7 +102,9 @@ def learning_evolution(
         mean_uncertainties.append(float(np.mean(y_std_pool_np)))
 
         _, y_std_grid = gp.predict(X_grid, return_std=True)
-        y_std_grid_np = np.asarray(y_std_grid).reshape(X1g.shape)
+        y_std_grid_np = gaussian_filter(
+            np.asarray(y_std_grid).reshape(X1g.shape), sigma=1.5
+        )
 
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
